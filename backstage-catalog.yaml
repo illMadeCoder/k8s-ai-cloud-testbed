@@ -32,6 +32,7 @@ metadata:
     kubernetes.io/namespace: default
 spec:
   type: service
+  lifecycle: production
   system: k8s-lab
   owner: user:admin
   description: Demo application running on the cluster
@@ -51,6 +52,7 @@ metadata:
     kubernetes.io/namespace: argocd
 spec:
   type: service
+  lifecycle: production
   system: k8s-lab
   owner: user:admin
   description: ArgoCD continuous deployment platform
@@ -70,6 +72,7 @@ metadata:
     kubernetes.io/namespace: observability
 spec:
   type: service
+  lifecycle: production
   system: k8s-lab
   owner: user:admin
   description: Grafana metrics visualization platform
@@ -91,6 +94,7 @@ metadata:
     kubernetes.io/namespace: observability
 spec:
   type: service
+  lifecycle: production
   system: k8s-lab
   owner: user:admin
   description: Prometheus metrics collection and storage
@@ -110,6 +114,7 @@ metadata:
     kubernetes.io/namespace: backstage
 spec:
   type: service
+  lifecycle: production
   system: k8s-lab
   owner: user:admin
   description: Service discovery and development portal
@@ -129,6 +134,7 @@ metadata:
     kubernetes.io/namespace: vault
 spec:
   type: service
+  lifecycle: production
   system: k8s-lab
   owner: user:admin
   description: HashiCorp Vault for secrets management
@@ -148,6 +154,7 @@ metadata:
     kubernetes.io/namespace: envoy-gateway-system
 spec:
   type: service
+  lifecycle: production
   system: k8s-lab
   owner: user:admin
   description: Modern ingress controller with Gateway API

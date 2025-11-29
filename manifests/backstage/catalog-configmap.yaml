@@ -6,6 +6,18 @@ metadata:
 data:
   catalog.yaml: |
     ---
+    # Backstage Catalog Location
+    apiVersion: backstage.io/v1alpha1
+    kind: Location
+    metadata:
+      name: self
+      title: Self-Reference
+    spec:
+      type: url
+      targets:
+        - https://raw.githubusercontent.com/illMadeCoder/illm-k8s-lab/main/backstage-catalog.yaml
+
+    ---
     # Backstage Service Catalog - Auto-discovered Services
     apiVersion: backstage.io/v1alpha1
     kind: System
@@ -27,6 +39,7 @@ data:
         kubernetes.io/namespace: default
     spec:
       type: service
+      lifecycle: production
       system: k8s-lab
       owner: user:admin
       description: Demo application running on the cluster
@@ -46,6 +59,7 @@ data:
         kubernetes.io/namespace: argocd
     spec:
       type: service
+      lifecycle: production
       system: k8s-lab
       owner: user:admin
       description: ArgoCD continuous deployment platform
@@ -65,6 +79,7 @@ data:
         kubernetes.io/namespace: observability
     spec:
       type: service
+      lifecycle: production
       system: k8s-lab
       owner: user:admin
       description: Grafana metrics visualization platform
@@ -86,6 +101,7 @@ data:
         kubernetes.io/namespace: observability
     spec:
       type: service
+      lifecycle: production
       system: k8s-lab
       owner: user:admin
       description: Prometheus metrics collection and storage
@@ -105,6 +121,7 @@ data:
         kubernetes.io/namespace: backstage
     spec:
       type: service
+      lifecycle: production
       system: k8s-lab
       owner: user:admin
       description: Service discovery and development portal
@@ -124,6 +141,7 @@ data:
         kubernetes.io/namespace: vault
     spec:
       type: service
+      lifecycle: production
       system: k8s-lab
       owner: user:admin
       description: HashiCorp Vault for secrets management
@@ -143,6 +161,7 @@ data:
         kubernetes.io/namespace: envoy-gateway-system
     spec:
       type: service
+      lifecycle: production
       system: k8s-lab
       owner: user:admin
       description: Modern ingress controller with Gateway API
