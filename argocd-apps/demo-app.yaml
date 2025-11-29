@@ -9,8 +9,7 @@ metadata:
 spec:
   project: default
   source:
-    # Update this to your repo URL
-    repoURL: https://github.com/YOUR_USERNAME/illm-k8s-lab.git
+    repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
     targetRevision: HEAD
     path: apps/demo-app
   destination:
