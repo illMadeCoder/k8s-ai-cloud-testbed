@@ -1,16 +1,4 @@
 ---
-# Backstage Catalog Location
-apiVersion: backstage.io/v1alpha1
-kind: Location
-metadata:
-  name: self
-  title: Self-Reference
-spec:
-  type: url
-  targets:
-    - https://raw.githubusercontent.com/illMadeCoder/illm-k8s-lab/main/backstage-catalog.yaml
-
----
 # Backstage Service Catalog - Auto-discovered Services
 apiVersion: backstage.io/v1alpha1
 kind: System
