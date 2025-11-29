@@ -19,6 +19,11 @@ spec:
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
       ref: values
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/backstage
+      directory:
+        include: '*-httproute.yaml'
   destination:
     server: https://kubernetes.default.svc
     namespace: backstage
