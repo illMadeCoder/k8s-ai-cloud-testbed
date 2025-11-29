@@ -62,15 +62,15 @@ backstage:
       locations:
         - type: url
           target: https://raw.githubusercontent.com/illMadeCoder/illm-k8s-lab/main/backstage-catalog.yaml
-          rules:
-            - allow: [System, Component, API, Resource, Location, Template]
 
     # Authentication configuration for lab
     auth:
       environment: development
       providers:
-        guest:
-          dangerouslyAllowOutsideDomainRedirects: true
+        guest: {}
+
+    permission:
+      enabled: false
 
 # Service configuration (top-level, not under backstage)
 service:
