@@ -60,6 +60,12 @@ backstage:
       rules:
         - allow: [Component, System, API, Resource, Location, Template]
 
+    # Authentication configuration for lab
+    auth:
+      providers:
+        guest:
+          dangerouslyAllowOutsideDomainRedirects: true
+
 # Service configuration (top-level, not under backstage)
 service:
   type: NodePort
