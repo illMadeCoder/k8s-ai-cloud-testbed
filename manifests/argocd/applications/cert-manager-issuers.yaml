@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: demo-app
+  name: cert-manager-issuers
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -11,10 +11,12 @@ spec:
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
     targetRevision: HEAD
-    path: manifests/workloads/demo-app
+    path: manifests/cert-manager
+    directory:
+      include: 'issuers.yaml'
   destination:
     server: https://kubernetes.default.svc
-    namespace: demo
+    namespace: cert-manager
   syncPolicy:
     automated:
       prune: true

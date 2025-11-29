@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
     targetRevision: HEAD
-    path: manifests/workloads/routes
+    path: manifests/routes
   destination:
     server: https://kubernetes.default.svc
     namespace: default

@@ -15,7 +15,7 @@ spec:
       helm:
         releaseName: vault
         valueFiles:
-          - $values/manifests/workloads/vault/values.yaml
+          - $values/manifests/vault/values.yaml
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
       ref: values

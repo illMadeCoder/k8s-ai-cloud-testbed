@@ -15,7 +15,7 @@ applications:
     source:
       repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: manifests/applications
+      path: manifests/argocd/applications
       directory:
         exclude: 'app-of-apps.yaml'
     destination:

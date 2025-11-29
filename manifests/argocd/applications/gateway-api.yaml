@@ -2,13 +2,22 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: observability
+  name: gateway-api
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: envoy-gateway
+      jqPathExpressions:
+        - .spec.selector
+        - .metadata.annotations
+        - .metadata.labels
+        - .metadata.managedFields
+        - .spec.template.metadata.annotations
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
       jqPathExpressions:
@@ -16,19 +25,19 @@ spec:
         - .metadata.managedFields
         - .spec.validation
   sources:
-    - repoURL: https://prometheus-community.github.io/helm-charts
-      chart: kube-prometheus-stack
-      targetRevision: 79.9.0
+    - repoURL: oci://docker.io/envoyproxy/gateway-helm
+      chart: gateway-helm
+      targetRevision: v1.2.4
       helm:
-        releaseName: kube-prometheus-stack
+        releaseName: eg
         valueFiles:
-          - $values/manifests/workloads/observability/values.yaml
+          - $values/manifests/gateway-api/values.yaml
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: observability
+    namespace: envoy-gateway-system
   syncPolicy:
     automated:
       prune: true

@@ -15,7 +15,7 @@ spec:
       helm:
         releaseName: backstage
         valueFiles:
-          - $values/manifests/workloads/backstage/values.yaml
+          - $values/manifests/backstage/values.yaml
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
       ref: values
