@@ -1,0 +1,49 @@
+# Chaos Mesh Helm chart values
+# https://github.com/chaos-mesh/chaos-mesh/tree/master/helm/chaos-mesh
+
+# Controller manager configuration
+controllerManager:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Chaos daemon configuration
+chaosDaemon:
+  runtime: containerd
+  socketPath: /run/containerd/containerd.sock
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# Dashboard configuration
+dashboard:
+  create: true
+  replicaCount: 1
+  securityMode: false
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# DNS server for DNS chaos experiments
+dnsServer:
+  create: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
