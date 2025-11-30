@@ -55,7 +55,15 @@ spec:
                   allow:
                     - host: raw.githubusercontent.com
                 csp:
+                  upgrade-insecure-requests: false
                   connect-src: ["'self'", "http:", "https:"]
+                  default-src: ["'self'"]
+                  script-src: ["'self'", "'unsafe-eval'"]
+                  style-src: ["'self'", "'unsafe-inline'"]
+                  img-src: ["'self'", "data:"]
+                  font-src: ["'self'"]
+                  frame-ancestors: ["'self'"]
+                  object-src: ["'none'"]
                 cors:
                   origin:
                     - http://backstage.local:32266
