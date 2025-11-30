@@ -29,26 +29,35 @@ spec:
         resourceMultiplier: 1.0
         timeout: 30m
 
-  # Infrastructure provisioning (disabled for this experiment)
+  # Infrastructure provisioning
   provision:
     enabled: false
     terraform:
       module: minikube
+      # Root terraform config in experiments/http-baseline/terraform/
 
-  # Kubernetes deployment
+  # ArgoCD app-of-apps for this experiment
+  # Defines which manifests from /manifests/ to deploy
+  argocd:
+    appOfApps: argocd/app-of-apps.yaml
+    waitFor:
+      - kind: Deployment
+        name: demo-app
+        namespace: demo-app
+        condition: Available
+      - kind: Deployment
+        name: locust-master
+        namespace: locust
+        condition: Available
+
+  # Kubernetes deployment (legacy - use argocd section instead)
   deploy:
     manifestRefs:
       - path: manifests/demo-app
-        enabled: true
-        waitFor:
-          kind: Deployment
-          name: demo-app
-          namespace: demo-app
-          condition: Available
       - path: manifests/observability
-        enabled: true
       - path: manifests/locust
-        enabled: true
+      - path: manifests/minio
+      - path: manifests/argo-workflows
 
   # Experiment execution
   execute:

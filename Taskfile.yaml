@@ -163,8 +163,38 @@ tasks:
         echo "Validating {{.NAME}}..."
         python3 -c "import yaml; yaml.safe_load(open('$CONFIG'))" && echo "OK: Valid YAML"
 
+  exp:deploy:
+    desc: Deploy experiment's app-of-apps (NAME=<experiment>)
+    cmds:
+      - |
+        if [ -z "{{.NAME}}" ]; then
+          echo "Usage: task exp:deploy NAME=<experiment-name>"
+          exit 1
+        fi
+        APP_OF_APPS="{{.EXPERIMENTS_DIR}}/{{.NAME}}/argocd/app-of-apps.yaml"
+        if [ ! -f "$APP_OF_APPS" ]; then
+          echo "ERROR: app-of-apps.yaml not found at $APP_OF_APPS"
+          exit 1
+        fi
+        echo "Deploying app-of-apps for experiment: {{.NAME}}"
+        kubectl apply -f "$APP_OF_APPS"
+        echo "Waiting for ArgoCD to sync applications..."
+        sleep 5
+        kubectl get applications -n argocd -l experiment={{.NAME}}
+
+  exp:undeploy:
+    desc: Remove experiment's app-of-apps (NAME=<experiment>)
+    cmds:
+      - |
+        if [ -z "{{.NAME}}" ]; then
+          echo "Usage: task exp:undeploy NAME=<experiment-name>"
+          exit 1
+        fi
+        echo "Removing app-of-apps for experiment: {{.NAME}}"
+        kubectl delete application -n argocd -l experiment={{.NAME}} --ignore-not-found
+
   exp:run:
-    desc: Run an experiment (NAME=<experiment> ENV=<environment>)
+    desc: Run an experiment workflow (NAME=<experiment> ENV=<environment>)
     cmds:
       - |
         if [ -z "{{.NAME}}" ]; then

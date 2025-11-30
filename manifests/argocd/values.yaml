@@ -1,28 +1,10 @@
 # ArgoCD Helm values
-# Minimal config for lab use - tune as needed
+# Minimal config for lab use - ArgoCD only, no auto-bootstrap
+#
+# Experiments define their own app-of-apps to control what gets deployed
 
 server:
   service:
     type: NodePort  # Easy access in minikube, change to LoadBalancer for cloud
 
-# Bootstrap all applications via app-of-apps pattern
-# This creates the app-of-apps Application during Helm install
-applications:
-  app-of-apps:
-    namespace: argocd
-    finalizers:
-      - resources-finalizer.argocd.argoproj.io
-    source:
-      repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
-      targetRevision: HEAD
-      path: manifests
-      directory:
-        recurse: true
-        exclude: 'app-of-apps.yaml'
-    destination:
-      server: https://kubernetes.default.svc
-      namespace: argocd
-    syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
+# No applications section - experiments manage their own deployments

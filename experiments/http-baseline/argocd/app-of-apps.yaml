@@ -1,0 +1,92 @@
+# HTTP Baseline Experiment - App of Apps
+# Deploys only the manifests needed for this experiment
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: http-baseline-apps
+  namespace: argocd
+  labels:
+    experiment: http-baseline
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Core infrastructure
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/cert-manager
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/gateway-api
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Observability stack
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/observability
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/loki
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/promtail
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Load testing
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/locust
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Target application
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/demo-app
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Artifact storage
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/minio
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Workflow engine
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/argo-workflows
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
