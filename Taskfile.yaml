@@ -163,6 +163,16 @@ tasks:
         echo "Validating {{.NAME}}..."
         python3 -c "import yaml; yaml.safe_load(open('$CONFIG'))" && echo "OK: Valid YAML"
 
+  exp:deploy:core:
+    desc: Deploy core infrastructure (observability, storage, etc.)
+    cmds:
+      - |
+        echo "Deploying core infrastructure..."
+        kubectl apply -f {{.EXPERIMENTS_DIR}}/_core/argocd/app-of-apps.yaml
+        echo "Waiting for ArgoCD to sync..."
+        sleep 5
+        kubectl get applications -n argocd -l layer=core
+
   exp:deploy:
     desc: Deploy experiment's app-of-apps (NAME=<experiment>)
     cmds:

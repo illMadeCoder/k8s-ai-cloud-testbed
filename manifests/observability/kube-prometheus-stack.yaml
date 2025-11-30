@@ -15,6 +15,16 @@ spec:
         - .metadata.annotations
         - .metadata.managedFields
         - .spec.validation
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .metadata.managedFields
+        - .webhooks[].clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .metadata.managedFields
+        - .webhooks[].clientConfig.caBundle
   sources:
     - repoURL: https://prometheus-community.github.io/helm-charts
       chart: kube-prometheus-stack

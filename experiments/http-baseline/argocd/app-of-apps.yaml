@@ -1,5 +1,5 @@
 # HTTP Baseline Experiment - App of Apps
-# Deploys only the manifests needed for this experiment
+# Only experiment-specific resources (core infra deployed separately)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -7,57 +7,13 @@ metadata:
   namespace: argocd
   labels:
     experiment: http-baseline
+    layer: experiment
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   sources:
-    # Core infrastructure
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
-      targetRevision: HEAD
-      path: manifests/cert-manager
-      directory:
-        recurse: false
-        include: '*.yaml'
-
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
-      targetRevision: HEAD
-      path: manifests/gateway-api
-      directory:
-        recurse: false
-        include: '*.yaml'
-
-    # Observability stack
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
-      targetRevision: HEAD
-      path: manifests/observability
-      directory:
-        recurse: false
-        include: '*.yaml'
-
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
-      targetRevision: HEAD
-      path: manifests/loki
-      directory:
-        recurse: false
-        include: '*.yaml'
-
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
-      targetRevision: HEAD
-      path: manifests/promtail
-      directory:
-        recurse: false
-        include: '*.yaml'
-
-    # Load testing
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
-      targetRevision: HEAD
-      path: manifests/locust
-      directory:
-        recurse: false
-        include: '*.yaml'
-
-    # Target application
+    # Target application for load testing
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
       path: manifests/demo-app
@@ -65,18 +21,10 @@ spec:
         recurse: false
         include: '*.yaml'
 
-    # Artifact storage
+    # Load testing framework
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: manifests/minio
-      directory:
-        recurse: false
-        include: '*.yaml'
-
-    # Workflow engine
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
-      targetRevision: HEAD
-      path: manifests/argo-workflows
+      path: manifests/locust
       directory:
         recurse: false
         include: '*.yaml'

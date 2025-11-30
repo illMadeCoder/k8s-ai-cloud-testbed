@@ -1,0 +1,87 @@
+# Core Infrastructure App-of-Apps
+# Base platform components deployed for all experiments
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: core-infrastructure
+  namespace: argocd
+  labels:
+    layer: core
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # TLS/Certificate management
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/cert-manager
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Gateway/Ingress
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/gateway-api
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Observability - Prometheus/Grafana
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/observability
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Observability - Loki (logs)
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/loki
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Observability - Promtail (log shipper)
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/promtail
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Observability - OpenTelemetry
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/otel-collector
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Artifact storage
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/minio
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+    # Workflow engine
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: manifests/argo-workflows
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
