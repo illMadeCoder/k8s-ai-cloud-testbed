@@ -1,0 +1,129 @@
+version: '3'
+
+silent: true
+
+vars:
+  ARGOCD_NAMESPACE: argocd
+  ARGOCD_VALUES: bootstrap/argocd/values.yaml
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  # =============================================================================
+  # Bootstrap
+  # =============================================================================
+  bootstrap:
+    desc: Bootstrap the cluster with ArgoCD (installs ArgoCD + app-of-apps)
+    cmds:
+      - helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
+      - helm repo update argo
+      - |
+        helm install argocd argo/argo-cd \
+          --namespace {{.ARGOCD_NAMESPACE}} \
+          --create-namespace \
+          --values {{.ARGOCD_VALUES}} \
+          --wait
+      - task: argocd:password
+
+  bootstrap:upgrade:
+    desc: Upgrade ArgoCD installation
+    cmds:
+      - helm repo update argo
+      - |
+        helm upgrade argocd argo/argo-cd \
+          --namespace {{.ARGOCD_NAMESPACE}} \
+          --values {{.ARGOCD_VALUES}} \
+          --wait
+
+  # =============================================================================
+  # Status
+  # =============================================================================
+  status:
+    desc: Show status of all ArgoCD applications
+    cmds:
+      - kubectl get applications -n {{.ARGOCD_NAMESPACE}}
+
+  status:wide:
+    desc: Show detailed status of all ArgoCD applications
+    cmds:
+      - kubectl get applications -n {{.ARGOCD_NAMESPACE}} -o wide
+
+  status:health:
+    desc: Show only unhealthy applications
+    cmds:
+      - |
+        kubectl get applications -n {{.ARGOCD_NAMESPACE}} -o json | \
+          jq -r '.items[] | select(.status.health.status != "Healthy") | "\(.metadata.name): \(.status.health.status) - \(.status.sync.status)"'
+
+  # =============================================================================
+  # ArgoCD
+  # =============================================================================
+  argocd:password:
+    desc: Display ArgoCD admin password
+    cmds:
+      - |
+        echo "ArgoCD Credentials:"
+        echo "  Username: admin"
+        echo "  Password: $(kubectl -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+
+  argocd:ui:
+    desc: Port-forward ArgoCD UI to localhost:8080
+    cmds:
+      - echo "ArgoCD UI available at https://localhost:8080"
+      - kubectl port-forward svc/argocd-server -n {{.ARGOCD_NAMESPACE}} 8080:443
+
+  argocd:sync:
+    desc: Sync all applications
+    cmds:
+      - kubectl -n {{.ARGOCD_NAMESPACE}} patch application app-of-apps --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
+
+  # =============================================================================
+  # Port Forwards (run in background with &)
+  # =============================================================================
+  pf:grafana:
+    desc: Port-forward Grafana to localhost:3000
+    cmds:
+      - echo "Grafana available at http://localhost:3000 (admin/prom-operator)"
+      - kubectl port-forward svc/kube-prometheus-stack-grafana -n observability 3000:80
+
+  pf:prometheus:
+    desc: Port-forward Prometheus to localhost:9090
+    cmds:
+      - echo "Prometheus available at http://localhost:9090"
+      - kubectl port-forward svc/kube-prometheus-stack-prometheus -n observability 9090:9090
+
+  pf:vault:
+    desc: Port-forward Vault to localhost:8200
+    cmds:
+      - echo "Vault available at http://localhost:8200"
+      - kubectl port-forward svc/vault -n vault 8200:8200
+
+  pf:argo-workflows:
+    desc: Port-forward Argo Workflows UI to localhost:2746
+    cmds:
+      - echo "Argo Workflows available at http://localhost:2746"
+      - kubectl port-forward svc/argo-workflows-server -n argo-workflows 2746:2746
+
+  # =============================================================================
+  # Cleanup
+  # =============================================================================
+  clean:argocd:
+    desc: Uninstall ArgoCD (WARNING - removes all managed applications)
+    prompt: This will remove ArgoCD and all managed applications. Continue?
+    cmds:
+      - helm uninstall argocd -n {{.ARGOCD_NAMESPACE}} || true
+      - kubectl delete namespace {{.ARGOCD_NAMESPACE}} --ignore-not-found
+
+  clean:all:
+    desc: Remove all lab namespaces (WARNING - destructive)
+    prompt: This will delete all lab namespaces. Continue?
+    cmds:
+      - kubectl delete namespace argocd --ignore-not-found
+      - kubectl delete namespace observability --ignore-not-found
+      - kubectl delete namespace vault --ignore-not-found
+      - kubectl delete namespace cert-manager --ignore-not-found
+      - kubectl delete namespace argo-workflows --ignore-not-found
+      - kubectl delete namespace locust --ignore-not-found
