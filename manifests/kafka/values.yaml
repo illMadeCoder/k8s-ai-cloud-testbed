@@ -1,10 +1,6 @@
 # Kafka Helm values for lab environment
 # Bitnami Kafka chart configuration
 
-# Image configuration - using stable tag
-image:
-  tag: 3.8.1-debian-12-r4
-
 # Cluster configuration
 replicaCount: 3
 
