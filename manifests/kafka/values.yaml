@@ -1,0 +1,57 @@
+# Kafka Helm values for lab environment
+# Bitnami Kafka chart configuration
+
+# Cluster configuration
+replicaCount: 3
+
+# Listeners configuration
+listeners:
+  client:
+    protocol: PLAINTEXT
+  controller:
+    protocol: PLAINTEXT
+  interbroker:
+    protocol: PLAINTEXT
+  external:
+    protocol: PLAINTEXT
+
+# Kraft mode (no Zookeeper)
+kraft:
+  enabled: true
+
+# Resource allocation for lab
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 1Gi
+    cpu: 500m
+
+# Persistence
+persistence:
+  enabled: true
+  size: 8Gi
+
+# JVM heap size
+heapOpts: "-Xmx512m -Xms512m"
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    client: 9092
+
+# Metrics - disabled for lighter footprint
+metrics:
+  kafka:
+    enabled: false
+  jmx:
+    enabled: false
+
+# Auto-create topics
+autoCreateTopicsEnable: true
+
+# Log retention
+logRetentionHours: 168
+logSegmentBytes: 1073741824
