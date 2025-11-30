@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master
+  namespace: locust
+  labels:
+    app: locust
+    role: master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust
+      role: master
+  template:
+    metadata:
+      labels:
+        app: locust
+        role: master
+    spec:
+      containers:
+      - name: locust
+        image: locustio/locust:latest
+        args:
+          - --master
+          - --web-port=8089
+        ports:
+        - containerPort: 8089
+          name: web
+        - containerPort: 5557
+          name: master-bind
+        - containerPort: 5558
+          name: master-bind-2
+        volumeMounts:
+        - name: locust-scripts
+          mountPath: /locust
+        env:
+        - name: LOCUST_LOCUSTFILE
+          value: /locust/steady_load.py
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: locust-scripts
+        configMap:
+          name: locust-scripts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-master
+  namespace: locust
+  labels:
+    app: locust
+    role: master
+spec:
+  type: ClusterIP
+  selector:
+    app: locust
+    role: master
+  ports:
+  - name: web
+    port: 8089
+    targetPort: 8089
+  - name: master-bind
+    port: 5557
+    targetPort: 5557
+  - name: master-bind-2
+    port: 5558
+    targetPort: 5558
