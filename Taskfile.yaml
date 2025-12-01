@@ -180,7 +180,7 @@ tasks:
           echo "Usage: task exp:deploy NAME=<experiment-name>"
           exit 1
         fi
-        APP_OF_APPS="{{.EXPERIMENTS_DIR}}/{{.NAME}}/argocd/app-of-apps.yaml"
+        APP_OF_APPS="{{.EXPERIMENTS_DIR}}/{{.NAME}}/app-of-apps.yaml"
         if [ ! -f "$APP_OF_APPS" ]; then
           echo "ERROR: app-of-apps.yaml not found at $APP_OF_APPS"
           exit 1
