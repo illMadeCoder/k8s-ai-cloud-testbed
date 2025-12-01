@@ -21,10 +21,10 @@ spec:
         recurse: false
         include: '*.yaml'
 
-    # Load testing framework
+    # Load testing framework (k6)
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: argocd-apps/locust
+      path: argocd-apps/k6
       directory:
         recurse: false
         include: '*.yaml'
