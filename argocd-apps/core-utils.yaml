@@ -18,7 +18,7 @@ spec:
       path: argocd-apps/cert-manager
       directory:
         recurse: false
-        include: '*.yaml'
+        include: 'cert-manager*.yaml'
 
     # Gateway/Ingress
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
