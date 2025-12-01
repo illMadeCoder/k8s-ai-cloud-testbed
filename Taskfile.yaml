@@ -6,8 +6,8 @@ vars:
   ARGOCD_NAMESPACE: argocd
   ARGOCD_VALUES: manifests/argocd/values.yaml
   ARGO_WF_NAMESPACE: argo-workflows
-  DEPLOYMENTS_DIR: deployments
-  EXPERIMENTS_DIR: deployments/experiments
+  SHARED_DIR: shared
+  EXPERIMENTS_DIR: experiments
   TERRAFORM_DIR: terraform
 
 tasks:
@@ -169,7 +169,7 @@ tasks:
     cmds:
       - |
         echo "Deploying core infrastructure..."
-        kubectl apply -f {{.DEPLOYMENTS_DIR}}/core/argocd/app-of-apps.yaml
+        kubectl apply -f {{.SHARED_DIR}}/argocd/app-of-apps.yaml
         echo "Waiting for ArgoCD to sync..."
         sleep 5
         kubectl get applications -n argocd -l layer=core
@@ -269,11 +269,6 @@ tasks:
     prompt: Delete all experiment workflows?
     cmds:
       - kubectl delete workflows -n {{.ARGO_WF_NAMESPACE}} -l app=experiment-framework
-
-  exp:templates:install:
-    desc: Install experiment WorkflowTemplates
-    cmds:
-      - kubectl apply -f {{.EXPERIMENTS_DIR}}/_templates/
 
   # =============================================================================
   # Terraform
