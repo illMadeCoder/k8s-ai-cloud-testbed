@@ -140,27 +140,9 @@ tasks:
         echo "Available Experiments:"
         echo "======================"
         for dir in {{.EXPERIMENTS_DIR}}/*/; do
-          if [ -f "${dir}experiment.yaml" ]; then
-            name=$(basename "$dir")
-            printf "  - %s\n" "$name"
-          fi
+          name=$(basename "$dir")
+          printf "  - %s\n" "$name"
         done
-
-  exp:validate:
-    desc: Validate an experiment (NAME=<experiment>)
-    cmds:
-      - |
-        if [ -z "{{.NAME}}" ]; then
-          echo "Usage: task exp:validate NAME=<experiment-name>"
-          exit 1
-        fi
-        CONFIG="{{.EXPERIMENTS_DIR}}/{{.NAME}}/experiment.yaml"
-        if [ ! -f "$CONFIG" ]; then
-          echo "ERROR: experiment.yaml not found at $CONFIG"
-          exit 1
-        fi
-        echo "Validating {{.NAME}}..."
-        python3 -c "import yaml; yaml.safe_load(open('$CONFIG'))" && echo "OK: Valid YAML"
 
   deploy:core:
     desc: Deploy core infrastructure (observability, storage, etc.)
