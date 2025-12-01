@@ -1,0 +1,105 @@
+# HTTP Baseline Experiment Workflow
+# Waits for ArgoCD sync, runs load test, signals completion
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: http-baseline-
+  namespace: argo-workflows
+  labels:
+    experiment: http-baseline
+spec:
+  entrypoint: run-experiment
+  arguments:
+    parameters:
+      - name: users
+        value: "10"
+      - name: duration
+        value: "60s"
+      - name: target-url
+        value: "http://demo-app.demo.svc:80"
+
+  templates:
+    - name: run-experiment
+      steps:
+        - - name: wait-for-sync
+            template: wait-argocd-healthy
+
+        - - name: run-load-test
+            template: k6-test
+            arguments:
+              parameters:
+                - name: users
+                  value: "{{workflow.parameters.users}}"
+                - name: duration
+                  value: "{{workflow.parameters.duration}}"
+                - name: target-url
+                  value: "{{workflow.parameters.target-url}}"
+
+        - - name: signal-complete
+            template: complete
+
+    # Wait for ArgoCD applications to be healthy
+    - name: wait-argocd-healthy
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Waiting for ArgoCD applications to sync..."
+            for i in $(seq 1 60); do
+              UNHEALTHY=$(kubectl get applications -n argocd -l experiment=http-baseline -o json | \
+                jq -r '.items[] | select(.status.health.status != "Healthy" or .status.sync.status != "Synced") | .metadata.name')
+              if [ -z "$UNHEALTHY" ]; then
+                echo "All applications healthy and synced!"
+                exit 0
+              fi
+              echo "Waiting... ($i/60) Unhealthy: $UNHEALTHY"
+              sleep 10
+            done
+            echo "Timeout waiting for applications"
+            exit 1
+
+    # Run k6 load test
+    - name: k6-test
+      inputs:
+        parameters:
+          - name: users
+          - name: duration
+          - name: target-url
+      container:
+        image: grafana/k6:latest
+        command: [k6, run]
+        args:
+          - -e
+          - USERS={{inputs.parameters.users}}
+          - -e
+          - DURATION={{inputs.parameters.duration}}
+          - -e
+          - TARGET_URL={{inputs.parameters.target-url}}
+          - --out
+          - json=/tmp/results.json
+          - /scripts/baseline.js
+        volumeMounts:
+          - name: k6-scripts
+            mountPath: /scripts
+      volumes:
+        - name: k6-scripts
+          configMap:
+            name: k6-scripts
+      outputs:
+        artifacts:
+          - name: results
+            path: /tmp/results.json
+            archive:
+              none: {}
+
+    # Signal completion
+    - name: complete
+      container:
+        image: busybox
+        command: [sh, -c]
+        args:
+          - |
+            echo "Experiment complete!"
+            echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Status: SUCCESS"
