@@ -6,7 +6,6 @@ vars:
   ARGOCD_NAMESPACE: argocd
   ARGOCD_VALUES: argocd-apps/argocd/values.yaml
   ARGO_WF_NAMESPACE: argo-workflows
-  SHARED_DIR: shared
   EXPERIMENTS_DIR: experiments
 
 tasks:
@@ -168,7 +167,7 @@ tasks:
     cmds:
       - |
         echo "Deploying core infrastructure..."
-        kubectl apply -f {{.SHARED_DIR}}/argocd/app-of-apps.yaml
+        kubectl apply -f core-app-of-apps.yaml
         echo "Waiting for ArgoCD to sync..."
         sleep 5
         kubectl get applications -n argocd -l layer=core
