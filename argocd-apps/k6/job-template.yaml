@@ -1,0 +1,54 @@
+# Template for running k6 load tests as Kubernetes Jobs
+# This file is not applied directly - it's used by Taskfile to generate jobs
+#
+# Usage via Taskfile:
+#   task exp:run USERS=10 DURATION=60s
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-baseline-${TIMESTAMP}
+  namespace: k6
+  labels:
+    app: k6
+    test: baseline
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: k6
+        test: baseline
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: k6
+        image: grafana/k6:latest
+        command:
+          - k6
+          - run
+          - --out
+          - json=/tmp/results.json
+          - /scripts/baseline.js
+        env:
+        - name: USERS
+          value: "${USERS}"
+        - name: DURATION
+          value: "${DURATION}"
+        - name: TARGET_URL
+          value: "${TARGET_URL}"
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+      volumes:
+      - name: scripts
+        configMap:
+          name: k6-scripts

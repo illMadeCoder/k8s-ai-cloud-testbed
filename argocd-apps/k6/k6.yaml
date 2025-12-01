@@ -1,8 +1,7 @@
----
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: locust
+  name: k6
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -11,10 +10,10 @@ spec:
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
     targetRevision: HEAD
-    path: argocd-apps/locust
+    path: argocd-apps/k6
   destination:
     server: https://kubernetes.default.svc
-    namespace: locust
+    namespace: k6
   syncPolicy:
     automated:
       prune: true

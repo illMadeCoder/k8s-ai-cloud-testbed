@@ -5,7 +5,6 @@ silent: true
 vars:
   ARGOCD_NAMESPACE: argocd
   ARGOCD_VALUES: argocd-apps/argocd/values.yaml
-  ARGO_WF_NAMESPACE: argo-workflows
   EXPERIMENTS_DIR: experiments
 
 tasks:
@@ -128,7 +127,7 @@ tasks:
       - kubectl delete namespace vault --ignore-not-found
       - kubectl delete namespace cert-manager --ignore-not-found
       - kubectl delete namespace argo-workflows --ignore-not-found
-      - kubectl delete namespace locust --ignore-not-found
+      - kubectl delete namespace k6 --ignore-not-found
 
   # =============================================================================
   # Experiments
@@ -185,67 +184,46 @@ tasks:
         kubectl delete application -n argocd -l experiment={{.NAME}} --ignore-not-found
 
   exp:run:
-    desc: Run an experiment workflow (NAME=<experiment> ENV=<environment>)
+    desc: Run k6 load test (USERS=10 DURATION=60s SCRIPT=baseline)
     cmds:
       - |
-        if [ -z "{{.NAME}}" ]; then
-          echo "Usage: task exp:run NAME=<experiment-name> [ENV=minikube]"
-          exit 1
-        fi
-        ENV={{.ENV | default "minikube"}}
-        echo "Starting experiment: {{.NAME}} on $ENV"
-        argo submit -n {{.ARGO_WF_NAMESPACE}} \
-          --from workflowtemplate/experiment-lifecycle \
-          -p experiment-name="{{.NAME}}" \
-          -p environment="$ENV" \
-          --labels app=experiment-framework,experiment={{.NAME}}
+        USERS={{.USERS | default "10"}}
+        DURATION={{.DURATION | default "60s"}}
+        SCRIPT={{.SCRIPT | default "baseline"}}
+        TARGET={{.TARGET | default "http://demo-app.demo.svc:80"}}
+
+        echo "Running k6 load test:"
+        echo "  Script: ${SCRIPT}.js"
+        echo "  Users: $USERS"
+        echo "  Duration: $DURATION"
+        echo "  Target: $TARGET"
         echo ""
-        echo "Watch with: task exp:watch"
+
+        kubectl run k6-${SCRIPT}-$(date +%s) \
+          --namespace=k6 \
+          --image=grafana/k6:latest \
+          --rm -i --restart=Never \
+          --overrides="{
+            \"spec\": {
+              \"containers\": [{
+                \"name\": \"k6\",
+                \"image\": \"grafana/k6:latest\",
+                \"args\": [\"run\", \"-e\", \"USERS=$USERS\", \"-e\", \"DURATION=$DURATION\", \"-e\", \"TARGET_URL=$TARGET\", \"/scripts/${SCRIPT}.js\"],
+                \"volumeMounts\": [{\"name\": \"scripts\", \"mountPath\": \"/scripts\"}]
+              }],
+              \"volumes\": [{\"name\": \"scripts\", \"configMap\": {\"name\": \"k6-scripts\"}}]
+            }
+          }"
 
   exp:status:
-    desc: Show status of experiment workflows
+    desc: Show running k6 pods
     cmds:
-      - kubectl get workflows -n {{.ARGO_WF_NAMESPACE}} -l app=experiment-framework
-
-  exp:watch:
-    desc: Watch the latest experiment workflow
-    cmds:
-      - argo watch -n {{.ARGO_WF_NAMESPACE}} @latest
-
-  exp:logs:
-    desc: Get logs from experiment (NAME=<experiment>)
-    cmds:
-      - |
-        if [ -z "{{.NAME}}" ]; then
-          argo logs -n {{.ARGO_WF_NAMESPACE}} @latest
-        else
-          WORKFLOW=$(kubectl get workflows -n {{.ARGO_WF_NAMESPACE}} \
-            -l experiment={{.NAME}} \
-            --sort-by=.metadata.creationTimestamp \
-            -o jsonpath='{.items[-1].metadata.name}')
-          argo logs -n {{.ARGO_WF_NAMESPACE}} "$WORKFLOW"
-        fi
-
-  exp:stop:
-    desc: Stop a running experiment (NAME=<experiment>)
-    cmds:
-      - |
-        if [ -z "{{.NAME}}" ]; then
-          echo "Usage: task exp:stop NAME=<experiment-name>"
-          exit 1
-        fi
-        WORKFLOW=$(kubectl get workflows -n {{.ARGO_WF_NAMESPACE}} \
-          -l experiment={{.NAME}} \
-          --field-selector=status.phase=Running \
-          -o jsonpath='{.items[0].metadata.name}')
-        if [ -n "$WORKFLOW" ]; then
-          argo stop -n {{.ARGO_WF_NAMESPACE}} "$WORKFLOW"
-        else
-          echo "No running workflow found for {{.NAME}}"
-        fi
+      - kubectl get pods -n k6
 
   exp:clean:
-    desc: Clean up experiment workflows
-    prompt: Delete all experiment workflows?
+    desc: Clean up any leftover k6 pods
     cmds:
-      - kubectl delete workflows -n {{.ARGO_WF_NAMESPACE}} -l app=experiment-framework
+      - |
+        echo "Cleaning up k6 pods..."
+        kubectl delete pods -n k6 --all --ignore-not-found
+        echo "Done."
