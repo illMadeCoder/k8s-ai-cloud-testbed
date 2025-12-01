@@ -14,7 +14,7 @@ terraform {
 }
 
 module "aks" {
-  source = "../../../terraform-modules/aks"
+  source = "../../../../terraform-modules/aks"
 
   cluster_name        = var.cluster_name
   resource_group_name = var.resource_group_name

@@ -239,16 +239,16 @@ tasks:
           echo "Usage: task exp:deploy:prod NAME=<experiment-name>"
           exit 1
         fi
-        PROD_DIR="{{.EXPERIMENTS_DIR}}/{{.NAME}}/prod"
-        if [ ! -d "$PROD_DIR" ]; then
-          echo "ERROR: prod directory not found at $PROD_DIR"
+        TF_DIR="{{.EXPERIMENTS_DIR}}/{{.NAME}}/terraform/prod"
+        if [ ! -d "$TF_DIR" ]; then
+          echo "ERROR: terraform/prod directory not found at $TF_DIR"
           exit 1
         fi
         echo "Deploying production infrastructure for: {{.NAME}}"
-        cd "$PROD_DIR" && terraform init && terraform apply -auto-approve
+        cd "$TF_DIR" && terraform init && terraform apply -auto-approve
         echo ""
         echo "Getting kubeconfig..."
-        cd "$PROD_DIR" && terraform output -raw kube_config_command
+        cd "$TF_DIR" && terraform output -raw kube_config_command
 
   exp:plan:prod:
     desc: Plan production deployment (NAME=<experiment>)
@@ -258,13 +258,13 @@ tasks:
           echo "Usage: task exp:plan:prod NAME=<experiment-name>"
           exit 1
         fi
-        PROD_DIR="{{.EXPERIMENTS_DIR}}/{{.NAME}}/prod"
-        if [ ! -d "$PROD_DIR" ]; then
-          echo "ERROR: prod directory not found at $PROD_DIR"
+        TF_DIR="{{.EXPERIMENTS_DIR}}/{{.NAME}}/terraform/prod"
+        if [ ! -d "$TF_DIR" ]; then
+          echo "ERROR: terraform/prod directory not found at $TF_DIR"
           exit 1
         fi
         echo "Planning production infrastructure for: {{.NAME}}"
-        cd "$PROD_DIR" && terraform init && terraform plan
+        cd "$TF_DIR" && terraform init && terraform plan
 
   exp:undeploy:prod:
     desc: Destroy production AKS cluster (NAME=<experiment>)
@@ -275,13 +275,13 @@ tasks:
           echo "Usage: task exp:undeploy:prod NAME=<experiment-name>"
           exit 1
         fi
-        PROD_DIR="{{.EXPERIMENTS_DIR}}/{{.NAME}}/prod"
-        if [ ! -d "$PROD_DIR" ]; then
-          echo "ERROR: prod directory not found at $PROD_DIR"
+        TF_DIR="{{.EXPERIMENTS_DIR}}/{{.NAME}}/terraform/prod"
+        if [ ! -d "$TF_DIR" ]; then
+          echo "ERROR: terraform/prod directory not found at $TF_DIR"
           exit 1
         fi
         echo "Destroying production infrastructure for: {{.NAME}}"
-        cd "$PROD_DIR" && terraform destroy -auto-approve
+        cd "$TF_DIR" && terraform destroy -auto-approve
 
   exp:kubeconfig:prod:
     desc: Get kubeconfig for production cluster (NAME=<experiment>)
@@ -291,7 +291,7 @@ tasks:
           echo "Usage: task exp:kubeconfig:prod NAME=<experiment-name>"
           exit 1
         fi
-        PROD_DIR="{{.EXPERIMENTS_DIR}}/{{.NAME}}/prod"
-        cd "$PROD_DIR" && eval "$(terraform output -raw kube_config_command)"
+        TF_DIR="{{.EXPERIMENTS_DIR}}/{{.NAME}}/terraform/prod"
+        cd "$TF_DIR" && eval "$(terraform output -raw kube_config_command)"
         echo "Kubeconfig updated. Current context:"
         kubectl config current-context
