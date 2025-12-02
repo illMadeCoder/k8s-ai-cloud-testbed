@@ -13,7 +13,7 @@ spec:
   sources:
     - repoURL: https://grafana.github.io/helm-charts
       chart: k6-operator
-      targetRevision: 3.10.0
+      targetRevision: 3.16.0
       helm:
         releaseName: k6-operator
         values: |
