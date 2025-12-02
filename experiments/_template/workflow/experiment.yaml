@@ -1,0 +1,89 @@
+# EXPERIMENT_NAME Experiment Workflow
+# Replace EXPERIMENT_NAME, APP_NAME, APP_NAMESPACE, TARGET_SERVICE with your values
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: EXPERIMENT_NAME-
+  namespace: argo-workflows
+  labels:
+    experiment: EXPERIMENT_NAME
+spec:
+  serviceAccountName: argo-workflow
+  entrypoint: run-experiment
+  arguments:
+    parameters:
+      - name: users
+        value: "10"
+      - name: duration
+        value: "60s"
+      - name: target-url
+        value: "http://TARGET_SERVICE.APP_NAMESPACE.svc:80"
+
+  templates:
+    - name: run-experiment
+      steps:
+        - - name: wait-for-app
+            template: wait-pods-ready
+
+        - - name: load-test
+            template: k6-test
+            arguments:
+              parameters:
+                - name: users
+                  value: "{{workflow.parameters.users}}"
+                - name: duration
+                  value: "{{workflow.parameters.duration}}"
+                - name: target-url
+                  value: "{{workflow.parameters.target-url}}"
+
+        - - name: complete
+            template: report-complete
+
+    # Wait for pods to be ready
+    - name: wait-pods-ready
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Waiting for APP_NAME pods to be ready..."
+            kubectl wait --for=condition=ready pod -l app=APP_NAME -n APP_NAMESPACE --timeout=120s
+            echo "Pods ready!"
+
+    # Run k6 load test
+    - name: k6-test
+      inputs:
+        parameters:
+          - name: users
+          - name: duration
+          - name: target-url
+      container:
+        image: grafana/k6:latest
+        command: [k6, run]
+        args:
+          - -e
+          - USERS={{inputs.parameters.users}}
+          - -e
+          - DURATION={{inputs.parameters.duration}}
+          - -e
+          - TARGET_URL={{inputs.parameters.target-url}}
+          - /scripts/test.js
+        volumeMounts:
+          - name: k6-scripts
+            mountPath: /scripts
+      volumes:
+        - name: k6-scripts
+          configMap:
+            name: EXPERIMENT_NAME-k6-scripts
+
+    # Report completion
+    - name: report-complete
+      container:
+        image: busybox
+        command: [sh, -c]
+        args:
+          - |
+            echo "========================================"
+            echo "EXPERIMENT_NAME Experiment Complete"
+            echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "========================================"

@@ -1,0 +1,32 @@
+# EXPERIMENT_NAME Experiment - Target
+# Replace EXPERIMENT_NAME, APP_NAME, APP_NAMESPACE with your values
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: EXPERIMENT_NAME-target
+  namespace: argocd
+  labels:
+    experiment: EXPERIMENT_NAME
+    cluster: target
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Deploy application manifests
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: custom-apps/APP_NAME/manifests
+    # Deploy k6 test scripts ConfigMap
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: experiments/EXPERIMENT_NAME/k6
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: APP_NAMESPACE
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

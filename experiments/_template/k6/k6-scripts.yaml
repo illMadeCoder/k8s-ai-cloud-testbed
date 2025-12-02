@@ -1,0 +1,54 @@
+# k6 Scripts ConfigMap for EXPERIMENT_NAME Experiment
+# Replace EXPERIMENT_NAME, TARGET_SERVICE with your values
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: EXPERIMENT_NAME-k6-scripts
+  namespace: argo-workflows
+data:
+  test.js: |
+    // EXPERIMENT_NAME Load Test
+    import http from 'k6/http';
+    import { check, sleep } from 'k6';
+    import { Rate } from 'k6/metrics';
+
+    const errorRate = new Rate('errors');
+
+    export const options = {
+      vus: __ENV.USERS ? parseInt(__ENV.USERS) : 10,
+      duration: __ENV.DURATION || '60s',
+
+      thresholds: {
+        http_req_duration: ['p(95)<500'],
+        errors: ['rate<0.1'],
+      },
+    };
+
+    const BASE_URL = __ENV.TARGET_URL || 'http://TARGET_SERVICE.APP_NAMESPACE.svc:80';
+
+    export default function () {
+      // Customize your test scenario here
+      const res = http.get(`${BASE_URL}/`);
+      const success = check(res, {
+        'status 200': (r) => r.status === 200,
+      });
+      errorRate.add(!success);
+
+      sleep(0.5 + Math.random());
+    }
+
+    export function handleSummary(data) {
+      const metrics = data.metrics;
+      return {
+        'stdout': `
+    === EXPERIMENT_NAME Test Results ===
+
+    Requests: ${metrics.http_reqs?.values?.count || 0}
+    Rate: ${(metrics.http_reqs?.values?.rate || 0).toFixed(2)}/s
+    Avg Latency: ${(metrics.http_req_duration?.values?.avg || 0).toFixed(2)}ms
+    P95 Latency: ${(metrics.http_req_duration?.values?.['p(95)'] || 0).toFixed(2)}ms
+    Error Rate: ${((metrics.errors?.values?.rate || 0) * 100).toFixed(2)}%
+    Status: ${Object.entries(data.thresholds || {}).every(([k,v]) => v.ok) ? 'PASSED' : 'FAILED'}
+    `,
+      };
+    }
