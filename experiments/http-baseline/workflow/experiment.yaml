@@ -8,6 +8,7 @@ metadata:
   labels:
     experiment: http-baseline
 spec:
+  serviceAccountName: argo-workflow
   entrypoint: run-experiment
   arguments:
     parameters:
@@ -38,26 +39,16 @@ spec:
         - - name: signal-complete
             template: complete
 
-    # Wait for ArgoCD applications to be healthy
+    # Wait for demo-app pods to be ready
     - name: wait-argocd-healthy
       container:
         image: bitnami/kubectl:latest
         command: [sh, -c]
         args:
           - |
-            echo "Waiting for ArgoCD applications to sync..."
-            for i in $(seq 1 60); do
-              UNHEALTHY=$(kubectl get applications -n argocd -l experiment=http-baseline -o json | \
-                jq -r '.items[] | select(.status.health.status != "Healthy" or .status.sync.status != "Synced") | .metadata.name')
-              if [ -z "$UNHEALTHY" ]; then
-                echo "All applications healthy and synced!"
-                exit 0
-              fi
-              echo "Waiting... ($i/60) Unhealthy: $UNHEALTHY"
-              sleep 10
-            done
-            echo "Timeout waiting for applications"
-            exit 1
+            echo "Waiting for demo-app pods to be ready..."
+            kubectl wait --for=condition=ready pod -l app=demo-app -n demo --timeout=120s
+            echo "Pods ready!"
 
     # Run k6 load test
     - name: k6-test
@@ -86,12 +77,6 @@ spec:
         - name: k6-scripts
           configMap:
             name: k6-scripts
-      outputs:
-        artifacts:
-          - name: results
-            path: /tmp/results.json
-            archive:
-              none: {}
 
     # Signal completion
     - name: complete
