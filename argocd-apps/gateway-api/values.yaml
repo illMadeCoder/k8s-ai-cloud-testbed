@@ -1,15 +1,17 @@
-# Envoy Gateway Helm Values
-# https://gateway.envoyproxy.io/docs/install/install-helm/
+# Contour Helm Values
+# https://projectcontour.io/docs/latest/guides/gateway-api/
 
-# Skip CRD installation to avoid annotation overflow issue
-skipCRDs: false
+# Enable Gateway API provisioner
+gateway:
+  gatewayClass:
+    # Don't create GatewayClass via Helm - we manage it in default-gateway.yaml
+    create: false
 
-# Gateway configuration
-config:
-  envoyGateway:
-    # Enable Gateway API resources
-    gateway:
-      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+# Contour configuration
+contour:
+  manageCRDs: true
 
-# Create a default GatewayClass for convenience
-createGatewayClass: true
+# Envoy configuration
+envoy:
+  service:
+    type: LoadBalancer

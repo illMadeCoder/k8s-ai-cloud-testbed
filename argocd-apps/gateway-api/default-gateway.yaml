@@ -3,9 +3,9 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
-  name: eg
+  name: contour
 spec:
-  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  controllerName: projectcontour.io/gateway-controller
 ---
 # Default Gateway for the lab environment
 # This creates a single entry point for HTTP traffic
@@ -15,7 +15,7 @@ metadata:
   name: lab-gateway
   namespace: default
 spec:
-  gatewayClassName: eg
+  gatewayClassName: contour
   listeners:
     - name: http
       protocol: HTTP

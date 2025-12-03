@@ -8,28 +8,12 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  ignoreDifferences:
-    - group: apps
-      kind: Deployment
-      name: envoy-gateway
-      jqPathExpressions:
-        - .spec.selector
-        - .metadata.annotations
-        - .metadata.labels
-        - .metadata.managedFields
-        - .spec.template.metadata.annotations
-    - group: apiextensions.k8s.io
-      kind: CustomResourceDefinition
-      jqPathExpressions:
-        - .metadata.annotations
-        - .metadata.managedFields
-        - .spec.validation
   sources:
-    - repoURL: oci://docker.io/envoyproxy/gateway-helm
-      chart: gateway-helm
-      targetRevision: v1.2.4
+    - repoURL: https://charts.projectcontour.io
+      chart: contour
+      targetRevision: 19.0.1
       helm:
-        releaseName: eg
+        releaseName: contour
         valueFiles:
           - $values/argocd-apps/gateway-api/values.yaml
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
@@ -37,14 +21,13 @@ spec:
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: envoy-gateway-system
+    namespace: projectcontour
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - RespectIgnoreDifferences=true
       - ServerSideApply=true
     retry:
       limit: 5
