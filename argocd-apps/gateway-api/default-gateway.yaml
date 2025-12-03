@@ -5,7 +5,7 @@ kind: GatewayClass
 metadata:
   name: contour
 spec:
-  controllerName: projectcontour.io/gateway-controller
+  controllerName: projectcontour.io/projectcontour/contour
 ---
 # Default Gateway for the lab environment
 # This creates a single entry point for HTTP traffic

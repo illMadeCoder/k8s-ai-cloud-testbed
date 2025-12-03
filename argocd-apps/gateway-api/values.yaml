@@ -15,6 +15,10 @@ contour:
   ingressClass:
     create: true
     name: contour
+  # Enable Gateway API support in Contour config
+  contourConfig:
+    gateway:
+      controllerName: projectcontour.io/projectcontour/contour
 
 # Envoy configuration
 envoy:
@@ -24,8 +28,3 @@ envoy:
     tag: v1.31.2
   service:
     type: LoadBalancer
-
-# Enable Gateway API support
-gateway:
-  enabled: true
-  installCRDs: true
