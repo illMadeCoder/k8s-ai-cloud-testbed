@@ -5,7 +5,6 @@ silent: true
 vars:
   ARGOCD_NAMESPACE: argocd
   ARGOCD_VALUES: argocd-apps/components/core/argocd/values.yaml
-  EXPERIMENTS_DIR: experiments
 
 tasks:
   default:
@@ -17,7 +16,7 @@ tasks:
   # Bootstrap
   # =============================================================================
   bootstrap:
-    desc: Bootstrap the cluster with ArgoCD (installs ArgoCD + app-of-apps)
+    desc: Bootstrap minikube with ArgoCD
     cmds:
       - helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
       - helm repo update argo
@@ -47,18 +46,6 @@ tasks:
     cmds:
       - kubectl get applications -n {{.ARGOCD_NAMESPACE}}
 
-  status:wide:
-    desc: Show detailed status of all ArgoCD applications
-    cmds:
-      - kubectl get applications -n {{.ARGOCD_NAMESPACE}} -o wide
-
-  status:health:
-    desc: Show only unhealthy applications
-    cmds:
-      - |
-        kubectl get applications -n {{.ARGOCD_NAMESPACE}} -o json | \
-          jq -r '.items[] | select(.status.health.status != "Healthy") | "\(.metadata.name): \(.status.health.status) - \(.status.sync.status)"'
-
   # =============================================================================
   # ArgoCD
   # =============================================================================
@@ -76,75 +63,11 @@ tasks:
       - echo "ArgoCD UI available at https://localhost:8080"
       - kubectl port-forward svc/argocd-server -n {{.ARGOCD_NAMESPACE}} 8080:443
 
-  argocd:sync:
-    desc: Sync all applications
-    cmds:
-      - kubectl -n {{.ARGOCD_NAMESPACE}} patch application app-of-apps --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
-
   # =============================================================================
-  # Port Forwards (run in background with &)
+  # ArgoCD Apps (for tinkering)
   # =============================================================================
-  pf:grafana:
-    desc: Port-forward Grafana to localhost:3000
-    cmds:
-      - echo "Grafana available at http://localhost:3000 (admin/prom-operator)"
-      - kubectl port-forward svc/kube-prometheus-stack-grafana -n observability 3000:80
-
-  pf:prometheus:
-    desc: Port-forward Prometheus to localhost:9090
-    cmds:
-      - echo "Prometheus available at http://localhost:9090"
-      - kubectl port-forward svc/kube-prometheus-stack-prometheus -n observability 9090:9090
-
-  pf:vault:
-    desc: Port-forward Vault to localhost:8200
-    cmds:
-      - echo "Vault available at http://localhost:8200"
-      - kubectl port-forward svc/vault -n vault 8200:8200
-
-  pf:argo-workflows:
-    desc: Port-forward Argo Workflows UI to localhost:2746
-    cmds:
-      - echo "Argo Workflows available at http://localhost:2746"
-      - kubectl port-forward svc/argo-workflows-server -n argo-workflows 2746:2746
-
-  # =============================================================================
-  # Cleanup
-  # =============================================================================
-  clean:argocd:
-    desc: Uninstall ArgoCD (WARNING - removes all managed applications)
-    prompt: This will remove ArgoCD and all managed applications. Continue?
-    cmds:
-      - helm uninstall argocd -n {{.ARGOCD_NAMESPACE}} || true
-      - kubectl delete namespace {{.ARGOCD_NAMESPACE}} --ignore-not-found
-
-  clean:all:
-    desc: Remove all lab namespaces (WARNING - destructive)
-    prompt: This will delete all lab namespaces. Continue?
-    cmds:
-      - kubectl delete namespace argocd --ignore-not-found
-      - kubectl delete namespace observability --ignore-not-found
-      - kubectl delete namespace vault --ignore-not-found
-      - kubectl delete namespace cert-manager --ignore-not-found
-      - kubectl delete namespace argo-workflows --ignore-not-found
-      - kubectl delete namespace k6 --ignore-not-found
-
-  # =============================================================================
-  # Experiments
-  # =============================================================================
-  exp:list:
-    desc: List all available experiments
-    cmds:
-      - |
-        echo "Available Experiments:"
-        echo "======================"
-        for dir in {{.EXPERIMENTS_DIR}}/*/; do
-          name=$(basename "$dir")
-          printf "  - %s\n" "$name"
-        done
-
   argocd-deploy:minikube:
-    desc: "Deploy ArgoCD apps to minikube: task argocd-deploy:minikube -- <paths...>"
+    desc: "Deploy ArgoCD apps: task argocd-deploy:minikube -- <paths...>"
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
@@ -152,7 +75,6 @@ tasks:
           echo ""
           echo "Examples:"
           echo "  task argocd-deploy:minikube -- argocd-apps/core-app-of-apps.yaml argocd-apps/stacks/loki.yaml"
-          echo "  task argocd-deploy:minikube -- argocd-apps/core-app-of-apps.yaml argocd-apps/stacks/elk.yaml"
           exit 1
         fi
 
@@ -170,16 +92,28 @@ tasks:
         sleep 5
         kubectl get applications -n argocd
 
+  # =============================================================================
+  # Experiments
+  # =============================================================================
+  exp:list:
+    desc: List all available experiments
+    cmds:
+      - |
+        echo "Available Experiments:"
+        echo "======================"
+        for dir in experiments/*/; do
+          name=$(basename "$dir")
+          printf "  - %s\n" "$name"
+        done
+
   exp:deploy:minikube:
-    desc: "Deploy experiment to minikube: task exp:deploy:minikube -- <experiment-path>"
+    desc: "Deploy experiment: task exp:deploy:minikube -- <experiment-path>"
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
           echo "Usage: task exp:deploy:minikube -- <experiment-path>"
           echo ""
-          echo "Examples:"
-          echo "  task exp:deploy:minikube -- experiments/http-baseline"
-          echo "  task exp:deploy:minikube -- experiments/multi-cloud-demo"
+          echo "Example: task exp:deploy:minikube -- experiments/http-baseline"
           exit 1
         fi
 
@@ -189,7 +123,7 @@ tasks:
           echo "ERROR: argocd directory not found at $ARGOCD_DIR"
           exit 1
         fi
-        echo "Deploying all ArgoCD apps for experiment: $EXP_PATH"
+        echo "Deploying experiment: $EXP_PATH"
         for f in "$ARGOCD_DIR"/*.yaml; do
           echo "  Applying: $(basename $f)"
           kubectl apply -f "$f"
@@ -200,128 +134,99 @@ tasks:
         kubectl get applications -n argocd
 
   exp:destroy:minikube:
-    desc: "Destroy experiment on minikube: task exp:destroy:minikube -- <experiment-path>"
+    desc: "Destroy experiment: task exp:destroy:minikube -- <experiment-path>"
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
           echo "Usage: task exp:destroy:minikube -- <experiment-path>"
           echo ""
-          echo "Examples:"
-          echo "  task exp:destroy:minikube -- experiments/http-baseline"
+          echo "Example: task exp:destroy:minikube -- experiments/http-baseline"
           exit 1
         fi
 
         EXP_PATH="{{.CLI_ARGS}}"
         EXP_NAME=$(basename "$EXP_PATH")
-        echo "Destroying all ArgoCD apps for experiment: $EXP_NAME"
+        echo "Destroying experiment: $EXP_NAME"
         kubectl delete application -n argocd -l experiment=$EXP_NAME --ignore-not-found
 
-  exp:run:
-    desc: Run k6 load test (USERS=10 DURATION=60s SCRIPT=baseline)
+  exp:conduct:minikube:
+    desc: "Conduct experiment (idempotent): task exp:conduct:minikube -- <experiment-path>"
     cmds:
       - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task exp:conduct:minikube -- <experiment-path> [USERS=10] [DURATION=60s]"
+          exit 1
+        fi
+
+        EXP_PATH="{{.CLI_ARGS}}"
+        EXP_NAME=$(basename "$EXP_PATH")
+        WORKFLOW_FILE="$EXP_PATH/workflow/experiment.yaml"
+
+        if [ ! -f "$WORKFLOW_FILE" ]; then
+          echo "ERROR: Workflow not found at $WORKFLOW_FILE"
+          exit 1
+        fi
+
         USERS={{.USERS | default "10"}}
         DURATION={{.DURATION | default "60s"}}
-        SCRIPT={{.SCRIPT | default "baseline"}}
         TARGET={{.TARGET | default "http://demo-app.demo.svc:80"}}
 
-        echo "Running k6 load test:"
-        echo "  Script: ${SCRIPT}.js"
+        echo "=============================================="
+        echo "  CONDUCTING EXPERIMENT: $EXP_NAME"
+        echo "=============================================="
         echo "  Users: $USERS"
         echo "  Duration: $DURATION"
         echo "  Target: $TARGET"
         echo ""
 
-        kubectl run k6-${SCRIPT}-$(date +%s) \
-          --namespace=k6 \
-          --image=grafana/k6:latest \
-          --rm -i --restart=Never \
-          --overrides="{
-            \"spec\": {
-              \"containers\": [{
-                \"name\": \"k6\",
-                \"image\": \"grafana/k6:latest\",
-                \"args\": [\"run\", \"-e\", \"USERS=$USERS\", \"-e\", \"DURATION=$DURATION\", \"-e\", \"TARGET_URL=$TARGET\", \"/scripts/${SCRIPT}.js\"],
-                \"volumeMounts\": [{\"name\": \"scripts\", \"mountPath\": \"/scripts\"}]
-              }],
-              \"volumes\": [{\"name\": \"scripts\", \"configMap\": {\"name\": \"k6-scripts\"}}]
-            }
-          }"
+        # Step 1: Clean up any previous run (idempotent)
+        echo "=== Step 1/5: Cleaning up previous run ==="
+        kubectl delete application -n argocd -l experiment=$EXP_NAME --ignore-not-found
+        sleep 3
 
-  exp:run:prod:
-    desc: "Run k6 load test on prod: task exp:run:prod -- <experiment-path> [TARGET=url]"
-    cmds:
-      - |
-        if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task exp:run:prod -- <experiment-path> [TARGET=url] [USERS=10] [DURATION=60s]"
-          exit 1
-        fi
-        EXP_PATH="{{.CLI_ARGS}}"
-        TF_DIR="$EXP_PATH/terraform/prod"
-        KUBECONFIG_FILE="$TF_DIR/kubeconfig-loadgen"
-
-        if [ ! -f "$KUBECONFIG_FILE" ]; then
-          echo "ERROR: Kubeconfig not found: $KUBECONFIG_FILE"
-          echo "Run 'task exp:deploy:prod -- $EXP_PATH' first"
-          exit 1
-        fi
-
-        # Target URL - must be externally accessible from loadgen cluster
-        TARGET_URL={{.TARGET | default ""}}
-        if [ -z "$TARGET_URL" ]; then
-          echo "ERROR: TARGET URL required for cross-cluster load testing"
-          echo "Usage: task exp:run:prod -- $EXP_PATH TARGET=http://<target-external-ip>"
-          echo ""
-          echo "Get target cluster's external IP:"
-          echo "  KUBECONFIG=$TF_DIR/kubeconfig-target kubectl get svc -n demo"
-          exit 1
-        fi
-
-        USERS={{.USERS | default "10"}}
-        DURATION={{.DURATION | default "60s"}}
-        SCRIPT={{.SCRIPT | default "baseline"}}
-
-        echo "Running k6 load test on prod:"
-        echo "  Cluster: loadgen"
-        echo "  Target: $TARGET_URL"
-        echo "  Users: $USERS"
-        echo "  Duration: $DURATION"
+        # Step 2: Deploy
         echo ""
+        echo "=== Step 2/5: Deploying experiment ==="
+        task exp:deploy:minikube -- "$EXP_PATH"
 
-        KUBECONFIG="$KUBECONFIG_FILE" kubectl run k6-${SCRIPT}-$(date +%s) \
-          --namespace=k6 \
-          --image=grafana/k6:latest \
-          --rm -i --restart=Never \
-          --overrides="{
-            \"spec\": {
-              \"containers\": [{
-                \"name\": \"k6\",
-                \"image\": \"grafana/k6:latest\",
-                \"args\": [\"run\", \"-e\", \"USERS=$USERS\", \"-e\", \"DURATION=$DURATION\", \"-e\", \"TARGET_URL=$TARGET_URL\", \"/scripts/${SCRIPT}.js\"],
-                \"volumeMounts\": [{\"name\": \"scripts\", \"mountPath\": \"/scripts\"}]
-              }],
-              \"volumes\": [{\"name\": \"scripts\", \"configMap\": {\"name\": \"k6-scripts\"}}]
-            }
-          }"
+        # Step 3: Submit workflow
+        echo ""
+        echo "=== Step 3/5: Submitting workflow ==="
+        WORKFLOW_NAME=$(argo submit "$WORKFLOW_FILE" \
+          -p users="$USERS" \
+          -p duration="$DURATION" \
+          -p target-url="$TARGET" \
+          -o name -n argo-workflows 2>/dev/null || \
+          kubectl create -f "$WORKFLOW_FILE" -o name)
+        echo "Workflow: $WORKFLOW_NAME"
 
-  exp:status:
-    desc: Show running k6 pods
-    cmds:
-      - kubectl get pods -n k6
+        # Step 4: Wait for completion
+        echo ""
+        echo "=== Step 4/5: Waiting for workflow completion ==="
+        argo wait "$WORKFLOW_NAME" -n argo-workflows 2>/dev/null || \
+          kubectl wait "$WORKFLOW_NAME" --for=condition=Completed --timeout=30m -n argo-workflows
 
-  exp:clean:
-    desc: Clean up any leftover k6 pods
-    cmds:
-      - |
-        echo "Cleaning up k6 pods..."
-        kubectl delete pods -n k6 --all --ignore-not-found
-        echo "Done."
+        # Get results
+        echo ""
+        echo "=== Workflow Results ==="
+        argo get "$WORKFLOW_NAME" -n argo-workflows 2>/dev/null || \
+          kubectl get "$WORKFLOW_NAME" -n argo-workflows -o yaml
+
+        # Step 5: Cleanup
+        echo ""
+        echo "=== Step 5/5: Cleaning up ==="
+        kubectl delete application -n argocd -l experiment=$EXP_NAME --ignore-not-found
+
+        echo ""
+        echo "=============================================="
+        echo "  EXPERIMENT COMPLETE"
+        echo "=============================================="
 
   # =============================================================================
-  # Production Deployment (Azure AKS)
+  # Production (Azure AKS)
   # =============================================================================
   exp:deploy:prod:
-    desc: "Deploy experiment to production AKS: task exp:deploy:prod -- <experiment-path>"
+    desc: "Deploy experiment to prod: task exp:deploy:prod -- <experiment-path>"
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
@@ -337,55 +242,24 @@ tasks:
           exit 1
         fi
 
-        # Deploy infrastructure
-        echo "=== Deploying production infrastructure for: $EXP_PATH ==="
+        echo "=== Deploying infrastructure ==="
         cd "$TF_DIR" && terraform init && terraform apply -auto-approve
 
-        # Get cluster names from terraform output
         echo ""
-        echo "=== Deploying ArgoCD apps to clusters ==="
+        echo "=== Deploying ArgoCD apps ==="
         CLUSTERS=$(cd "$TF_DIR" && terraform output -json cluster_names | jq -r '.[]')
-
         for CLUSTER in $CLUSTERS; do
           ARGOCD_FILE="$ARGOCD_DIR/${CLUSTER}.yaml"
           KUBECONFIG_FILE="$TF_DIR/kubeconfig-${CLUSTER}"
-
-          if [ ! -f "$ARGOCD_FILE" ]; then
-            echo "WARNING: No ArgoCD file for cluster '$CLUSTER' (expected $ARGOCD_FILE)"
-            continue
+          if [ -f "$ARGOCD_FILE" ]; then
+            echo "Deploying to: $CLUSTER"
+            KUBECONFIG="$KUBECONFIG_FILE" kubectl apply -f "$ARGOCD_FILE"
           fi
-
-          echo ""
-          echo "--- Deploying to cluster: $CLUSTER ---"
-          echo "Using kubeconfig: $KUBECONFIG_FILE"
-
-          # Bootstrap ArgoCD + deploy app
-          KUBECONFIG="$KUBECONFIG_FILE" kubectl apply -f "$ARGOCD_FILE"
         done
 
-        echo ""
-        echo "=== Deployment complete ==="
-
-  exp:plan:prod:
-    desc: "Plan production deployment: task exp:plan:prod -- <experiment-path>"
-    cmds:
-      - |
-        if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task exp:plan:prod -- <experiment-path>"
-          exit 1
-        fi
-        EXP_PATH="{{.CLI_ARGS}}"
-        TF_DIR="$EXP_PATH/terraform/prod"
-        if [ ! -d "$TF_DIR" ]; then
-          echo "ERROR: terraform/prod directory not found at $TF_DIR"
-          exit 1
-        fi
-        echo "Planning production infrastructure for: $EXP_PATH"
-        cd "$TF_DIR" && terraform init && terraform plan
-
   exp:destroy:prod:
-    desc: "Destroy production AKS clusters: task exp:destroy:prod -- <experiment-path>"
-    prompt: This will DESTROY all production AKS clusters. Continue?
+    desc: "Destroy prod infrastructure: task exp:destroy:prod -- <experiment-path>"
+    prompt: This will DESTROY production infrastructure. Continue?
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
@@ -395,98 +269,11 @@ tasks:
         EXP_PATH="{{.CLI_ARGS}}"
         TF_DIR="$EXP_PATH/terraform/prod"
         if [ ! -d "$TF_DIR" ]; then
-          echo "ERROR: terraform/prod directory not found at $TF_DIR"
+          echo "ERROR: terraform/prod not found at $TF_DIR"
           exit 1
         fi
-        echo "Destroying all production infrastructure for: $EXP_PATH"
+        echo "Destroying infrastructure..."
         cd "$TF_DIR" && terraform destroy -auto-approve
-
-  exp:kubeconfig:prod:
-    desc: "List kubeconfigs for production clusters: task exp:kubeconfig:prod -- <experiment-path>"
-    cmds:
-      - |
-        if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task exp:kubeconfig:prod -- <experiment-path>"
-          exit 1
-        fi
-        EXP_PATH="{{.CLI_ARGS}}"
-        TF_DIR="$EXP_PATH/terraform/prod"
-        echo "Available kubeconfigs:"
-        ls -1 "$TF_DIR"/kubeconfig-* 2>/dev/null || echo "  No kubeconfigs found. Run exp:deploy:prod first."
-        echo ""
-        echo "Use with: KUBECONFIG=<path> kubectl ..."
-
-  # =============================================================================
-  # Full Experiment Lifecycle (deploy → run → destroy)
-  # =============================================================================
-  exp:conduct:minikube:
-    desc: "Conduct experiment on minikube: task exp:conduct:minikube -- <experiment-path>"
-    cmds:
-      - |
-        if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task exp:conduct:minikube -- <experiment-path> [USERS=10] [DURATION=60s]"
-          exit 1
-        fi
-
-        EXP_PATH="{{.CLI_ARGS}}"
-        WORKFLOW_FILE="$EXP_PATH/workflow/experiment.yaml"
-        if [ ! -f "$WORKFLOW_FILE" ]; then
-          echo "ERROR: Workflow not found at $WORKFLOW_FILE"
-          exit 1
-        fi
-
-        USERS={{.USERS | default "10"}}
-        DURATION={{.DURATION | default "60s"}}
-        TARGET={{.TARGET | default "http://demo-app.demo.svc:80"}}
-
-        echo "=============================================="
-        echo "  FULL EXPERIMENT: $EXP_PATH"
-        echo "=============================================="
-        echo "  Users: $USERS"
-        echo "  Duration: $DURATION"
-        echo "  Target: $TARGET"
-        echo ""
-
-        # Step 1: Deploy
-        echo "=== Step 1/4: Deploying experiment ==="
-        task exp:deploy:minikube -- "$EXP_PATH"
-
-        # Step 2: Submit workflow
-        echo ""
-        echo "=== Step 2/4: Submitting workflow ==="
-        WORKFLOW_NAME=$(kubectl create -f "$WORKFLOW_FILE" \
-          -p users="$USERS" \
-          -p duration="$DURATION" \
-          -p target-url="$TARGET" \
-          -o name 2>/dev/null || \
-          argo submit "$WORKFLOW_FILE" \
-            -p users="$USERS" \
-            -p duration="$DURATION" \
-            -p target-url="$TARGET" \
-            -o name)
-        echo "Workflow: $WORKFLOW_NAME"
-
-        # Step 3: Wait for completion
-        echo ""
-        echo "=== Step 3/4: Waiting for workflow completion ==="
-        argo wait "$WORKFLOW_NAME" --namespace argo-workflows || \
-          kubectl wait "$WORKFLOW_NAME" --for=condition=Completed --timeout=30m -n argo-workflows
-
-        # Get results
-        echo ""
-        echo "=== Workflow Results ==="
-        argo get "$WORKFLOW_NAME" -n argo-workflows 2>/dev/null || \
-          kubectl get "$WORKFLOW_NAME" -n argo-workflows -o yaml
-
-        # Step 4: Undeploy
-        echo ""
-        echo "=== Step 4/4: Cleaning up ==="
-        task exp:destroy:minikube -- "$EXP_PATH"
-
-        echo ""
-        echo "=============================================="
-        echo "  EXPERIMENT COMPLETE"
-        echo "=============================================="
 
   exp:conduct:prod:
     desc: "Conduct experiment on prod: task exp:conduct:prod -- <experiment-path>"
@@ -510,227 +297,28 @@ tasks:
         DURATION={{.DURATION | default "60s"}}
 
         echo "=============================================="
-        echo "  FULL PROD EXPERIMENT: $EXP_PATH"
+        echo "  CONDUCTING PROD EXPERIMENT: $EXP_PATH"
         echo "=============================================="
-        echo "  Users: $USERS"
-        echo "  Duration: $DURATION"
-        echo ""
 
-        # Step 1: Deploy infrastructure + apps
-        echo "=== Step 1/4: Deploying infrastructure ==="
+        # Deploy
         task exp:deploy:prod -- "$EXP_PATH"
 
-        # Get target URL for cross-cluster testing
-        echo ""
-        echo "=== Getting target endpoint ==="
+        # Get target URL
         KUBECONFIG="$TF_DIR/kubeconfig-target" kubectl wait --for=condition=available deploy/demo-app -n demo --timeout=5m
-        TARGET_IP=$(KUBECONFIG="$TF_DIR/kubeconfig-target" kubectl get svc demo-app -n demo -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
-        if [ -z "$TARGET_IP" ]; then
-          echo "WARNING: Could not get LoadBalancer IP, using NodePort"
-          TARGET_IP=$(KUBECONFIG="$TF_DIR/kubeconfig-target" kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
-          TARGET_PORT=$(KUBECONFIG="$TF_DIR/kubeconfig-target" kubectl get svc demo-app -n demo -o jsonpath='{.spec.ports[0].nodePort}')
-          TARGET_URL="http://${TARGET_IP}:${TARGET_PORT}"
-        else
-          TARGET_URL="http://${TARGET_IP}"
-        fi
-        echo "Target URL: $TARGET_URL"
+        TARGET_IP=$(KUBECONFIG="$TF_DIR/kubeconfig-target" kubectl get svc demo-app -n demo -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        TARGET_URL="http://${TARGET_IP}"
+        echo "Target: $TARGET_URL"
 
-        # Step 2: Submit workflow on loadgen cluster
-        echo ""
-        echo "=== Step 2/4: Submitting workflow on loadgen cluster ==="
+        # Run workflow
         WORKFLOW_NAME=$(KUBECONFIG="$TF_DIR/kubeconfig-loadgen" argo submit "$WORKFLOW_FILE" \
-          -p users="$USERS" \
-          -p duration="$DURATION" \
-          -p target-url="$TARGET_URL" \
+          -p users="$USERS" -p duration="$DURATION" -p target-url="$TARGET_URL" \
           -o name -n argo-workflows)
-        echo "Workflow: $WORKFLOW_NAME"
-
-        # Step 3: Wait for completion
-        echo ""
-        echo "=== Step 3/4: Waiting for workflow completion ==="
         KUBECONFIG="$TF_DIR/kubeconfig-loadgen" argo wait "$WORKFLOW_NAME" -n argo-workflows
-
-        # Get results
-        echo ""
-        echo "=== Workflow Results ==="
         KUBECONFIG="$TF_DIR/kubeconfig-loadgen" argo get "$WORKFLOW_NAME" -n argo-workflows
 
-        # Step 4: Destroy infrastructure
-        echo ""
-        echo "=== Step 4/4: Destroying infrastructure ==="
+        # Destroy
         cd "$TF_DIR" && terraform destroy -auto-approve
 
-        echo ""
         echo "=============================================="
-        echo "  PROD EXPERIMENT COMPLETE"
+        echo "  EXPERIMENT COMPLETE"
         echo "=============================================="
-
-  # =============================================================================
-  # Spacelift Integration
-  # =============================================================================
-  spacelift:login:
-    desc: Login to Spacelift CLI
-    cmds:
-      - |
-        if ! command -v spacectl &> /dev/null; then
-          echo "spacectl not found. Install with:"
-          echo "  brew install spacelift-io/spacelift/spacectl"
-          echo "  or see https://docs.spacelift.io/concepts/spacectl"
-          exit 1
-        fi
-        spacectl profile login illm-k8s-lab
-
-  spacelift:stacks:
-    desc: List all Spacelift stacks
-    cmds:
-      - spacectl stack list
-
-  spacelift:trigger:
-    desc: Trigger a Spacelift stack run (STACK=<stack-name>)
-    cmds:
-      - |
-        if [ -z "{{.STACK}}" ]; then
-          echo "Usage: task spacelift:trigger STACK=<stack-name>"
-          echo ""
-          echo "List stacks with: task spacelift:stacks"
-          exit 1
-        fi
-        spacectl stack run-manual --id {{.STACK}}
-
-  exp:deploy:spacelift:
-    desc: "Deploy experiment via Spacelift: task exp:deploy:spacelift -- <experiment-path> [CLOUD=azure]"
-    cmds:
-      - |
-        if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task exp:deploy:spacelift -- <experiment-path> [CLOUD=azure|aws|both]"
-          exit 1
-        fi
-        EXP_PATH="{{.CLI_ARGS}}"
-        EXP_NAME=$(basename "$EXP_PATH")
-        CLOUD={{.CLOUD | default "azure"}}
-
-        case "$CLOUD" in
-          azure)
-            echo "Triggering Spacelift stack: exp-${EXP_NAME}-aks"
-            spacectl stack run-manual --id exp-${EXP_NAME}-aks
-            ;;
-          aws)
-            echo "Triggering Spacelift stack: exp-${EXP_NAME}-eks"
-            spacectl stack run-manual --id exp-${EXP_NAME}-eks
-            ;;
-          both)
-            echo "Triggering Spacelift stacks for both Azure and AWS..."
-            spacectl stack run-manual --id exp-${EXP_NAME}-aks &
-            spacectl stack run-manual --id exp-${EXP_NAME}-eks &
-            wait
-            ;;
-          *)
-            echo "Invalid CLOUD value: $CLOUD"
-            echo "Valid options: azure, aws, both"
-            exit 1
-            ;;
-        esac
-
-  exp:destroy:spacelift:
-    desc: "Destroy experiment via Spacelift: task exp:destroy:spacelift -- <experiment-path> [CLOUD=azure]"
-    prompt: This will DESTROY cloud infrastructure. Continue?
-    cmds:
-      - |
-        if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task exp:destroy:spacelift -- <experiment-path> [CLOUD=azure|aws|both]"
-          exit 1
-        fi
-        EXP_PATH="{{.CLI_ARGS}}"
-        EXP_NAME=$(basename "$EXP_PATH")
-        CLOUD={{.CLOUD | default "azure"}}
-
-        case "$CLOUD" in
-          azure)
-            echo "Triggering destroy for: exp-${EXP_NAME}-aks"
-            spacectl stack task --id exp-${EXP_NAME}-aks --tail "terraform destroy -auto-approve"
-            ;;
-          aws)
-            echo "Triggering destroy for: exp-${EXP_NAME}-eks"
-            spacectl stack task --id exp-${EXP_NAME}-eks --tail "terraform destroy -auto-approve"
-            ;;
-          both)
-            echo "Triggering destroy for both Azure and AWS..."
-            spacectl stack task --id exp-${EXP_NAME}-aks --tail "terraform destroy -auto-approve" &
-            spacectl stack task --id exp-${EXP_NAME}-eks --tail "terraform destroy -auto-approve" &
-            wait
-            ;;
-          *)
-            echo "Invalid CLOUD value: $CLOUD"
-            exit 1
-            ;;
-        esac
-
-  # =============================================================================
-  # Crossplane
-  # =============================================================================
-  crossplane:status:
-    desc: Show Crossplane provider and XRD status
-    cmds:
-      - |
-        echo "=== Crossplane Providers ==="
-        kubectl get providers.pkg.crossplane.io 2>/dev/null || echo "No providers installed"
-        echo ""
-        echo "=== Provider Health ==="
-        kubectl get providers.pkg.crossplane.io -o jsonpath='{range .items[*]}{.metadata.name}: {.status.conditions[?(@.type=="Healthy")].status}{"\n"}{end}' 2>/dev/null || true
-        echo ""
-        echo "=== CompositeResourceDefinitions (XRDs) ==="
-        kubectl get xrds.apiextensions.crossplane.io 2>/dev/null || echo "No XRDs installed"
-        echo ""
-        echo "=== Compositions ==="
-        kubectl get compositions.apiextensions.crossplane.io 2>/dev/null || echo "No compositions installed"
-
-  crossplane:claims:
-    desc: Show all Crossplane claims across namespaces
-    cmds:
-      - |
-        echo "=== Databases ==="
-        kubectl get databases.illm.io --all-namespaces 2>/dev/null || echo "No database claims"
-        echo ""
-        echo "=== Object Storage ==="
-        kubectl get objectstorages.illm.io --all-namespaces 2>/dev/null || echo "No storage claims"
-        echo ""
-        echo "=== Caches ==="
-        kubectl get caches.illm.io --all-namespaces 2>/dev/null || echo "No cache claims"
-        echo ""
-        echo "=== Queues ==="
-        kubectl get queues.illm.io --all-namespaces 2>/dev/null || echo "No queue claims"
-
-  crossplane:managed:
-    desc: Show all Crossplane managed resources
-    cmds:
-      - |
-        echo "=== Azure Managed Resources ==="
-        kubectl get managed -l crossplane.io/provider-config=default 2>/dev/null | head -50 || echo "No Azure resources"
-        echo ""
-        echo "=== AWS Managed Resources ==="
-        kubectl get managed -l aws.upbound.io/provider-config=default 2>/dev/null | head -50 || echo "No AWS resources"
-
-  crossplane:events:
-    desc: Show recent Crossplane events (useful for debugging)
-    cmds:
-      - |
-        echo "=== Recent Crossplane Events ==="
-        kubectl get events -n crossplane-system --sort-by='.lastTimestamp' | tail -30
-
-  deploy:crossplane:
-    desc: Deploy Crossplane (core + providers + XRDs)
-    cmds:
-      - |
-        echo "Deploying Crossplane..."
-        kubectl apply -f argocd-apps/components/infrastructure/crossplane/crossplane.yaml
-        echo "Waiting for Crossplane to be ready..."
-        sleep 10
-        kubectl wait --for=condition=healthy deployment/crossplane -n crossplane-system --timeout=5m || true
-        echo ""
-        echo "Deploying Crossplane providers..."
-        kubectl apply -f argocd-apps/components/infrastructure/crossplane-providers/providers.yaml
-        echo ""
-        echo "Deploying XRDs and Compositions..."
-        kubectl apply -f argocd-apps/components/infrastructure/crossplane-xrds/xrds.yaml
-        echo ""
-        echo "Crossplane deployment initiated. Check status with: task crossplane:status"
