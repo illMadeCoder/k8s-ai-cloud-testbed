@@ -1,0 +1,9 @@
+# Target cluster - the application being load tested
+size: medium
+provider: azure  # or aws
+
+# Specific overrides (optional)
+# nodes: 3
+# vm_size: Standard_D4s_v3
+# min_nodes: 2
+# max_nodes: 10

@@ -1,0 +1,11 @@
+# Cluster configuration
+# Spacelift reads this to provision the cluster
+
+size: medium          # small, medium, large
+provider: azure       # azure, aws
+
+# Optional: override defaults
+# nodes: 3
+# vm_size: Standard_D4s_v3
+# min_nodes: 2
+# max_nodes: 10

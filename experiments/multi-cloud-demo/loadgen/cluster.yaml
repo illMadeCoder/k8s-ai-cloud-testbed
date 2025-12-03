@@ -1,0 +1,3 @@
+# Loadgen cluster - multi-cloud demo
+size: small
+provider: aws  # Different cloud for multi-cloud demo

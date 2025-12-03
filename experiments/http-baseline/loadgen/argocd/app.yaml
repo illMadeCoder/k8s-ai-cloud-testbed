@@ -17,10 +17,10 @@ spec:
     # k6 scripts configmap (experiment-specific test scenarios)
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: experiments/http-baseline/k6
+      path: experiments/http-baseline/loadgen/argocd
       directory:
         recurse: false
-        include: '*.yaml'
+        include: 'k6-scripts.yaml'
 
   destination:
     server: https://kubernetes.default.svc

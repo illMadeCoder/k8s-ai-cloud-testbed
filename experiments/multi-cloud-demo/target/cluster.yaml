@@ -1,0 +1,3 @@
+# Target cluster - multi-cloud demo
+size: medium
+provider: azure
