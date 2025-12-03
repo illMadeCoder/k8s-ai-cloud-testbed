@@ -1,13 +1,9 @@
-# Bitnami Contour Helm Values
-# https://github.com/bitnami/charts/tree/main/bitnami/contour
+# Contour Helm Values (Official Chart)
+# https://projectcontour.io/docs/latest/guides/gateway-api/
 
-# Install Gateway API CRDs
-installCRDs: true
-
-# Contour configuration
-contour:
-  gatewayControllerName: projectcontour.io/gateway-controller
-  manageCRDs: false
+# Gateway provisioner configuration
+gatewayProvisioner:
+  enabled: true
 
 # Envoy configuration
 envoy:
