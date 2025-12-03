@@ -15,8 +15,8 @@ tasks:
   # =============================================================================
   # Init
   # =============================================================================
-  init:minikube:
-    desc: Initialize minikube with ArgoCD
+  init:local:
+    desc: Initialize local cluster with ArgoCD
     cmds:
       - helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
       - helm repo update argo
@@ -26,12 +26,12 @@ tasks:
           --create-namespace \
           --values {{.ARGOCD_VALUES}} \
           --wait
-      - task: argocd:password:minikube
+      - task: argocd:password:local
 
   # =============================================================================
   # Status
   # =============================================================================
-  status:minikube:
+  status:local:
     desc: Show status of all ArgoCD applications
     cmds:
       - kubectl get applications -n {{.ARGOCD_NAMESPACE}}
@@ -39,7 +39,7 @@ tasks:
   # =============================================================================
   # ArgoCD
   # =============================================================================
-  argocd:password:minikube:
+  argocd:password:local:
     desc: Display ArgoCD admin password
     cmds:
       - |
@@ -47,7 +47,7 @@ tasks:
         echo "  Username: admin"
         echo "  Password: $(kubectl -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
 
-  argocd:ui:minikube:
+  argocd:ui:local:
     desc: Port-forward ArgoCD UI to localhost:8080
     cmds:
       - echo "ArgoCD UI available at https://localhost:8080"
@@ -56,15 +56,15 @@ tasks:
   # =============================================================================
   # ArgoCD Apps (for tinkering)
   # =============================================================================
-  argocd-deploy:minikube:
-    desc: "Deploy ArgoCD apps: task argocd-deploy:minikube -- <paths...>"
+  argocd-deploy:local:
+    desc: "Deploy ArgoCD apps: task argocd-deploy:local -- <paths...>"
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task argocd-deploy:minikube -- <path> [path...]"
+          echo "Usage: task argocd-deploy:local -- <path> [path...]"
           echo ""
           echo "Examples:"
-          echo "  task argocd-deploy:minikube -- argocd-apps/core-app-of-apps.yaml argocd-apps/stacks/loki.yaml"
+          echo "  task argocd-deploy:local -- argocd-apps/core-app-of-apps.yaml argocd-apps/stacks/loki.yaml"
           exit 1
         fi
 
@@ -96,14 +96,14 @@ tasks:
           printf "  - %s\n" "$name"
         done
 
-  exp:deploy:minikube:
-    desc: "Deploy experiment: task exp:deploy:minikube -- <experiment-path>"
+  exp:deploy:local:
+    desc: "Deploy experiment: task exp:deploy:local -- <experiment-path>"
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task exp:deploy:minikube -- <experiment-path>"
+          echo "Usage: task exp:deploy:local -- <experiment-path>"
           echo ""
-          echo "Example: task exp:deploy:minikube -- experiments/http-baseline"
+          echo "Example: task exp:deploy:local -- experiments/http-baseline"
           exit 1
         fi
 
@@ -123,14 +123,14 @@ tasks:
         sleep 5
         kubectl get applications -n argocd
 
-  exp:destroy:minikube:
-    desc: "Destroy experiment: task exp:destroy:minikube -- <experiment-path>"
+  exp:destroy:local:
+    desc: "Destroy experiment: task exp:destroy:local -- <experiment-path>"
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task exp:destroy:minikube -- <experiment-path>"
+          echo "Usage: task exp:destroy:local -- <experiment-path>"
           echo ""
-          echo "Example: task exp:destroy:minikube -- experiments/http-baseline"
+          echo "Example: task exp:destroy:local -- experiments/http-baseline"
           exit 1
         fi
 
@@ -139,12 +139,12 @@ tasks:
         echo "Destroying experiment: $EXP_NAME"
         kubectl delete application -n argocd -l experiment=$EXP_NAME --ignore-not-found
 
-  exp:conduct:minikube:
-    desc: "Conduct experiment (idempotent): task exp:conduct:minikube -- <experiment-path> [STACK=loki]"
+  exp:conduct:local:
+    desc: "Conduct experiment (idempotent): task exp:conduct:local -- <experiment-path> [STACK=loki]"
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task exp:conduct:minikube -- <experiment-path> [STACK=loki|elk] [USERS=10] [DURATION=60s]"
+          echo "Usage: task exp:conduct:local -- <experiment-path> [STACK=loki|elk] [USERS=10] [DURATION=60s]"
           exit 1
         fi
 
@@ -205,7 +205,7 @@ tasks:
         # Step 4: Deploy experiment
         echo ""
         echo "=== Step 4/6: Deploying experiment ==="
-        task exp:deploy:minikube -- "$EXP_PATH"
+        task exp:deploy:local -- "$EXP_PATH"
 
         # Step 5: Submit and wait for workflow
         echo ""
