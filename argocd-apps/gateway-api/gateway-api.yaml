@@ -9,9 +9,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://charts.projectcontour.io
+    - repoURL: oci://registry-1.docker.io/bitnamicharts
       chart: contour
-      targetRevision: 19.0.1
+      targetRevision: 20.1.1
       helm:
         releaseName: contour
         valueFiles:

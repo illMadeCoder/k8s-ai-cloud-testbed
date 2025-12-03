@@ -1,15 +1,13 @@
-# Contour Helm Values
-# https://projectcontour.io/docs/latest/guides/gateway-api/
+# Bitnami Contour Helm Values
+# https://github.com/bitnami/charts/tree/main/bitnami/contour
 
-# Enable Gateway API provisioner
-gateway:
-  gatewayClass:
-    # Don't create GatewayClass via Helm - we manage it in default-gateway.yaml
-    create: false
+# Install Gateway API CRDs
+installCRDs: true
 
 # Contour configuration
 contour:
-  manageCRDs: true
+  gatewayControllerName: projectcontour.io/gateway-controller
+  manageCRDs: false
 
 # Envoy configuration
 envoy:
