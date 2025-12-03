@@ -1,6 +1,11 @@
 # Bitnami Contour Helm Values
 # https://github.com/bitnami/charts/tree/main/bitnami/contour
 
+# Allow non-Bitnami official images
+global:
+  security:
+    allowInsecureImages: true
+
 # Use official Contour images instead of Bitnami
 contour:
   image:
