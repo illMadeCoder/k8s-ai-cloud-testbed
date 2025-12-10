@@ -6,8 +6,8 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 
 | | |
 |---|---|
-| **Target** | ~69 experiments across 15 phases |
-| **Environment** | Kind (local), AKS/EKS (cloud), Spacelift, Crossplane |
+| **Target** | ~73 experiments across 16 phases |
+| **Environment** | Kind (local), Raspberry Pi (home lab), AKS/EKS (cloud) |
 | **Focus** | Portfolio-ready experiments with ADRs |
 
 **Principles:**
@@ -56,7 +56,60 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 
 ---
 
-### 1.2 Spacelift Setup
+### 1.2 Raspberry Pi Cluster & Ansible
+
+**Goal:** Build a home lab Kubernetes cluster on Raspberry Pi, provisioned with Ansible
+
+*Bridge between Kind (single-node dev) and cloud (production). Real hardware, real networking, real constraints.*
+
+**Learning objectives:**
+- Understand Ansible for bare-metal/VM provisioning
+- Configure multi-node Kubernetes on physical hardware
+- Handle real networking (DHCP, DNS, load balancing)
+- Practice Day 2 operations on physical infrastructure
+
+**Tasks:**
+- [ ] Create `experiments/raspberry-pi-cluster/`
+- [ ] Hardware setup:
+  - [ ] 3+ Raspberry Pi 4/5 nodes (1 control plane, 2+ workers)
+  - [ ] Network switch, power supply
+  - [ ] SD cards or USB SSDs
+- [ ] Ansible fundamentals:
+  - [ ] Inventory file (static and dynamic)
+  - [ ] Playbooks for base OS configuration
+  - [ ] Roles for reusable configuration (k8s-common, k8s-control-plane, k8s-worker)
+  - [ ] Variables and templates (Jinja2)
+  - [ ] Handlers for service restarts
+  - [ ] Vault for secrets (ansible-vault)
+- [ ] OS provisioning:
+  - [ ] Ubuntu Server or Raspberry Pi OS (64-bit)
+  - [ ] SSH key distribution
+  - [ ] Hostname, timezone, locale configuration
+  - [ ] Package updates and hardening
+- [ ] Kubernetes installation:
+  - [ ] Container runtime (containerd)
+  - [ ] kubeadm, kubelet, kubectl
+  - [ ] Control plane initialization
+  - [ ] Worker node join
+  - [ ] CNI installation (Cilium or Calico)
+- [ ] Networking:
+  - [ ] Static IPs or DHCP reservations
+  - [ ] MetalLB for LoadBalancer services
+  - [ ] Local DNS (Pi-hole or CoreDNS)
+  - [ ] Ingress controller (Contour/nginx)
+- [ ] Storage:
+  - [ ] Local path provisioner
+  - [ ] NFS for shared storage (optional)
+- [ ] ArgoCD bootstrap:
+  - [ ] Deploy ArgoCD to Pi cluster
+  - [ ] Connect to same Git repo as Kind
+  - [ ] Multi-cluster GitOps pattern
+- [ ] Document Ansible patterns and Pi cluster architecture
+- [ ] **ADR:** Document Ansible vs other config management (Puppet, Chef, Salt)
+
+---
+
+### 1.3 Spacelift Setup (Cloud IaC)
 
 **Goal:** Establish Spacelift for Terraform state management and IaC orchestration
 
@@ -76,7 +129,7 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 
 ---
 
-### 1.3 Crossplane Fundamentals
+### 1.4 Crossplane Fundamentals
 
 **Goal:** Master Crossplane for cloud resource provisioning
 
@@ -95,7 +148,7 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 
 ---
 
-### 1.4 FinOps Foundation & Cost Tagging
+### 1.5 FinOps Foundation & Cost Tagging
 
 **Goal:** Establish cost visibility foundation and tagging strategy
 
@@ -2230,11 +2283,80 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 
 ---
 
-## Phase 15: Architecture Artifacts
+## Phase 15: Developer Experience & Internal Platform
+
+*Build an Internal Developer Platform (IDP) that ties together all the platform pieces.*
+
+### 15.1 Backstage Developer Portal
+
+**Goal:** Deploy Backstage as a unified developer portal
+
+**Learning objectives:**
+- Understand Internal Developer Platform (IDP) concepts
+- Configure Backstage catalog and plugins
+- Integrate with existing platform components
+
+**Tasks:**
+- [ ] Create `experiments/backstage-tutorial/`
+- [ ] Deploy Backstage:
+  - [ ] Helm chart or ArgoCD Application
+  - [ ] PostgreSQL backend (via CloudNativePG from Phase 10)
+  - [ ] Authentication (integrate with Auth0 from Phase 3.7)
+- [ ] Software Catalog:
+  - [ ] Define catalog-info.yaml for services
+  - [ ] Component types (service, website, library)
+  - [ ] System and domain groupings
+  - [ ] API definitions (OpenAPI, AsyncAPI, gRPC)
+- [ ] Integrations:
+  - [ ] Kubernetes plugin (show deployments, pods)
+  - [ ] ArgoCD plugin (deployment status)
+  - [ ] GitHub/GitLab integration (repo info, CI status)
+  - [ ] Prometheus/Grafana plugin (metrics links)
+  - [ ] PagerDuty or Opsgenie plugin (on-call info)
+- [ ] Software Templates:
+  - [ ] Create scaffolder template for new services
+  - [ ] Include CI/CD pipeline, Dockerfile, Helm chart
+  - [ ] Integrate with Crossplane for infrastructure
+- [ ] TechDocs:
+  - [ ] Enable TechDocs plugin
+  - [ ] Generate docs from markdown in repos
+- [ ] Document Backstage patterns
+- [ ] **ADR:** Document IDP strategy (Backstage vs Port vs Cortex)
+
+---
+
+### 15.2 Self-Service Infrastructure
+
+**Goal:** Enable developer self-service through the platform
+
+**Learning objectives:**
+- Design golden paths for common workflows
+- Balance flexibility with guardrails
+- Measure developer productivity
+
+**Tasks:**
+- [ ] Create `experiments/self-service-infra/`
+- [ ] Golden paths:
+  - [ ] New service creation (Backstage template → repo → CI/CD → deployed)
+  - [ ] Database provisioning (Backstage → Crossplane claim → ready)
+  - [ ] Environment creation (dev/staging/prod namespaces)
+- [ ] Guardrails integration:
+  - [ ] Policies from Phase 3.5 enforced automatically
+  - [ ] Cost controls from Phase 9.6 applied
+  - [ ] Security scanning from Phase 2 in templates
+- [ ] Developer metrics:
+  - [ ] Lead time for changes
+  - [ ] Deployment frequency
+  - [ ] Time to onboard new service
+- [ ] Document self-service patterns
+
+---
+
+## Phase 16: Architecture Artifacts
 
 *Documentation accumulated from all experiments - ADRs, runbooks, and capacity planning.*
 
-### 15.1 Architecture Decision Records
+### 16.1 Architecture Decision Records
 
 **Goal:** Consolidate ADRs created throughout experiments
 
@@ -2257,10 +2379,12 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
   - [ ] ADR-013: ML platform selection
   - [ ] ADR-014: Vector database selection
   - [ ] ADR-015: Multi-cloud strategy (Crossplane vs Terraform)
+  - [ ] ADR-016: Config management (Ansible vs Puppet vs Chef)
+  - [ ] ADR-017: IDP strategy (Backstage vs Port vs Cortex)
 
 ---
 
-### 15.2 Runbook Library
+### 16.2 Runbook Library
 
 **Goal:** Consolidate operational runbooks developed during experiments
 
@@ -2286,7 +2410,7 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 
 ---
 
-### 15.3 Capacity Planning Guide
+### 16.3 Capacity Planning Guide
 
 **Goal:** Document capacity planning methodology from experiment data
 
@@ -2308,7 +2432,7 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 
 ---
 
-### 15.4 Reference Architecture Document
+### 16.4 Reference Architecture Document
 
 **Goal:** Create comprehensive reference architecture from all learnings
 
@@ -2343,29 +2467,30 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 
 | Phase | Focus | Experiments | Key Skills |
 |-------|-------|-------------|------------|
-| 1 | Platform Bootstrap & GitOps | 4 | GitOps patterns, Spacelift, Crossplane, FinOps foundation |
+| 1 | Platform Bootstrap & GitOps | 5 | GitOps, Raspberry Pi/Ansible, Spacelift, Crossplane, FinOps |
 | 2 | CI/CD & Supply Chain Security | 4 | Image building, scanning, signing, SBOM, registries |
 | 3 | Security Foundations | 8 | ESO, Vault, cert-manager, policies, identity, multi-tenancy |
 | 4 | Observability | 6 | Prometheus, SLOs, MinIO, Loki, OpenTelemetry, Thanos |
 | 5 | Traffic Management | 3 | Gateway API, Ingress, API Gateway |
 | 6 | Service Mesh | 5 | Decision framework, Istio, Linkerd, Cilium, Cross-cluster |
-| 7 | Messaging & Coordination | 6 | Decision framework, Kafka, RabbitMQ, NATS, Cloud queues, ZooKeeper/etcd/Consul |
+| 7 | Messaging & Coordination | 6 | Kafka, RabbitMQ, NATS, Cloud queues, ZooKeeper/etcd/Consul |
 | 8 | Deployment Strategies | 5 | Rolling, Blue-Green, Canary, GitOps, Feature Flags |
-| 9 | Autoscaling & Resources | 6 | HPA, KEDA, VPA, Cluster Autoscaler, Multi-tenancy prod, FinOps |
+| 9 | Autoscaling & Resources | 6 | HPA, KEDA, VPA, Cluster Autoscaler, Multi-tenancy, FinOps |
 | 10 | Data & Storage | 4 | PostgreSQL, Redis, Backup/DR, Migrations |
 | 11 | AI/ML Platform | 4 | AI Analysis, Kubeflow, KServe, Vector DBs |
 | 12 | Benchmarks | 4 | DB, Messaging, Mesh, Runtime comparisons |
 | 13 | Chaos Engineering | 3 | Pod, Network, Infrastructure chaos |
 | 14 | Workflow Orchestration | 3 | Argo Workflows, Events, Advanced CI/CD |
-| 15 | Architecture Artifacts | 4 | ADRs, Runbooks, Capacity Planning, Reference Arch |
+| 15 | Developer Experience | 2 | Backstage, Self-Service Infrastructure, IDP |
+| 16 | Architecture Artifacts | 4 | ADRs, Runbooks, Capacity Planning, Reference Arch |
 
-**Total: ~69 experiments**
+**Total: ~72 experiments**
 
 ---
 
 ## Notes
 
 - All experiments follow `experiments/_template/` structure
-- Spacelift for cloud deployments, Taskfile for local Kind
-- Crossplane claims for cloud resources where applicable
+- **Environment progression**: Kind (dev) → Raspberry Pi (home lab) → Cloud (prod)
+- Ansible for bare-metal/Pi, Spacelift+Terraform for cloud, Crossplane for K8s-native
 - Each experiment should have a portfolio-ready README
