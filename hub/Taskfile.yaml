@@ -31,8 +31,7 @@ tasks:
         helm repo update argo
         helm upgrade --install argocd argo/argo-cd \
           -n {{.ARGOCD_NAMESPACE}} --create-namespace \
-          -f {{.TASKFILE_DIR}}/bootstrap/argocd-values-kind.yaml \
-          --wait
+          -f {{.TASKFILE_DIR}}/bootstrap/argocd-values-kind.yaml
       - |
         echo "Applying hub application..."
         kubectl apply -f {{.TASKFILE_DIR}}/bootstrap/hub-application.yaml
@@ -40,9 +39,9 @@ tasks:
       - |
         echo ""
         echo "=== Next Steps ==="
-        echo "1. Wait for all apps to sync: watch kubectl get applications -n argocd"
-        echo "2. Configure DNS: task hub:dns (requires sudo)"
-        echo "3. Access ArgoCD: curl -k https://argocd-server.argocd.k8s.local"
+        echo "1. Wait for services: task wait"
+        echo "2. Configure DNS:     task dns (requires sudo)"
+        echo "3. Test access:       curl -k https://argocd-server.argocd.k8s.local"
 
   status:
     desc: Show hub status
