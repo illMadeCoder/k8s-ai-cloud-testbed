@@ -8,4 +8,5 @@
 
 server:
   service:
-    type: LoadBalancer  # MetalLB assigns IP
+    type: LoadBalancer
+    loadBalancerIP: 172.19.255.201  # Reserve .200 for DNS
