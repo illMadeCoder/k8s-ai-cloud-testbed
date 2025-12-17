@@ -3,8 +3,8 @@ version: '3'
 silent: true
 
 includes:
-  local: ./tasks/local.yaml
-  lab: ./lab/Taskfile.yaml
+  hub: ./hub/Taskfile.yaml
+  experiments: ./experiments/Taskfile.yaml
 
 tasks:
   default:

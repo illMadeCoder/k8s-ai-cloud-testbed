@@ -5,7 +5,7 @@ silent: true
 vars:
   ORCHESTRATOR_CLUSTER: orchestrator
   ARGOCD_NAMESPACE: argocd
-  ARGOCD_VALUES: lab/workload-catalog/components/core/argocd/values.yaml
+  ARGOCD_VALUES: experiments/components/components/core/argocd/values.yaml
   # Container names for local infrastructure
   CPK_CONTAINER: cloud-provider-kind
   DNSMASQ_CONTAINER: kind-dnsmasq
@@ -176,7 +176,7 @@ tasks:
         fi
       - echo ""
       - echo "Deploying core infrastructure..."
-      - kubectl apply -f lab/workload-catalog/core-app-of-apps.yaml
+      - kubectl apply -f experiments/components/core-app-of-apps.yaml
       - task: password
 
   reset:
@@ -241,8 +241,8 @@ tasks:
           echo "Usage: task local:deploy -- <path> [path...]"
           echo ""
           echo "Examples:"
-          echo "  task local:deploy -- lab/workload-catalog/core-app-of-apps.yaml"
-          echo "  task local:deploy -- lab/workload-catalog/stacks/loki.yaml"
+          echo "  task local:deploy -- experiments/components/core-app-of-apps.yaml"
+          echo "  task local:deploy -- experiments/components/stacks/loki.yaml"
           exit 1
         fi
 

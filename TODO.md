@@ -31,7 +31,7 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 **Learning objectives:**
 - Understand app-of-apps pattern implementation
 - Document multi-source Helm + Git integration
-- Map the workload-catalog structure
+- Map the components structure
 
 **Current Patterns to Document:**
 - [x] **App-of-Apps Hierarchy:**
@@ -129,7 +129,7 @@ git push → GitHub webhook → Cloudflare Tunnel → ArgoCD → sync
 ```
 - GitHub webhook configured to `https://hub.yourdomain.com/api/webhook`
 - Cloudflare Tunnel routes webhook to ArgoCD (no inbound firewall needed)
-- ArgoCD ApplicationSet auto-discovers experiments in `lab/experiments/` directory
+- ArgoCD ApplicationSet auto-discovers experiments in `experiments/scenarios/` directory
 - Fallback: ArgoCD polls Git every 3 min if webhook unavailable
 
 **Bootstrap Requirements:**
@@ -169,7 +169,7 @@ hub/
         ├── external-dns.yaml          # Route53/CloudDNS/Azure DNS
         └── values/
 
-lab/experiments/
+experiments/scenarios/
 └── <experiment-name>/
     ├── orchestrator/                  # Per-experiment orchestrator (ephemeral)
     └── target/                        # Target cluster workloads
@@ -237,7 +237,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - [ ] Ethernet cable
 
 **Tasks:**
-- [ ] Create `lab/experiments/talos-home-lab/`
+- [ ] Create `experiments/scenarios/talos-home-lab/`
 - [ ] Ansible for initial setup:
   - [ ] Inventory file for home lab nodes
   - [ ] Playbook to prepare USB/PXE boot media
@@ -329,7 +329,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Establish cost attribution foundations
 
 **Tasks:**
-- [ ] Create `lab/experiments/finops-foundation/`
+- [ ] Create `experiments/scenarios/finops-foundation/`
 - [ ] Define tagging strategy:
   - [ ] Required labels: `team`, `project`, `environment`, `cost-center`
   - [ ] Document label standards
@@ -360,7 +360,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement GitOps image update patterns
 
 **Tasks:**
-- [ ] Create `lab/experiments/cicd-fundamentals/`
+- [ ] Create `experiments/scenarios/cicd-fundamentals/`
 - [ ] GitHub Actions pipeline:
   - [ ] Build multi-arch container images
   - [ ] Push to GitHub Container Registry (GHCR)
@@ -389,7 +389,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Generate and verify SBOMs
 
 **Tasks:**
-- [ ] Create `lab/experiments/image-security/`
+- [ ] Create `experiments/scenarios/image-security/`
 - [ ] Image scanning with Trivy:
   - [ ] Integrate into CI pipeline
   - [ ] Vulnerability severity thresholds (block on critical/high)
@@ -418,7 +418,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Verify signatures at admission
 
 **Tasks:**
-- [ ] Create `lab/experiments/image-signing/`
+- [ ] Create `experiments/scenarios/image-signing/`
 - [ ] Image signing with Cosign:
   - [ ] Keyless signing (OIDC/Fulcio)
   - [ ] Key-based signing (for air-gapped)
@@ -452,7 +452,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Manage Helm charts as OCI artifacts
 
 **Tasks:**
-- [ ] Create `lab/experiments/registry-management/`
+- [ ] Create `experiments/scenarios/registry-management/`
 - [ ] Registry options:
   - [ ] GHCR configuration and access
   - [ ] Harbor deployment (self-hosted option)
@@ -500,7 +500,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 | **Complexity** | Low |
 
 **Tasks:**
-- [ ] Create `lab/experiments/sealed-secrets/`
+- [ ] Create `experiments/scenarios/sealed-secrets/`
 - [ ] Deploy Sealed Secrets controller to hub cluster
 - [ ] Install `kubeseal` CLI
 - [ ] Create and seal a secret:
@@ -540,7 +540,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 | **Complexity** | Medium |
 
 **Tasks:**
-- [ ] Create `lab/experiments/sops-age/`
+- [ ] Create `experiments/scenarios/sops-age/`
 - [ ] Install SOPS and age CLIs
 - [ ] Generate age keypair:
   - [ ] Understand public/private key model
@@ -614,7 +614,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 ```
 
 **Tasks:**
-- [ ] Create `lab/experiments/eso-openbao/`
+- [ ] Create `experiments/scenarios/eso-openbao/`
 - [ ] Deploy OpenBao to hub cluster:
   - [ ] Helm chart deployment
   - [ ] Initialize and unseal
@@ -652,7 +652,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Automate certificate renewal and monitoring
 
 **Tasks:**
-- [ ] Create `lab/experiments/cert-manager-tutorial/`
+- [ ] Create `experiments/scenarios/cert-manager-tutorial/`
 - [ ] Deploy cert-manager via ArgoCD
 - [ ] Configure Issuers:
   - [ ] SelfSigned (for development)
@@ -682,7 +682,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Compare secret injection methods (Agent vs CSI vs ESO)
 
 **Tasks:**
-- [ ] Create `lab/experiments/openbao-advanced/`
+- [ ] Create `experiments/scenarios/openbao-advanced/`
 - [ ] Configure advanced auth methods:
   - [ ] AppRole (for CI/CD pipelines)
   - [ ] JWT/OIDC (for external identity providers)
@@ -713,7 +713,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Create audit trails for compliance
 
 **Tasks:**
-- [ ] Create `lab/experiments/policy-governance-tutorial/`
+- [ ] Create `experiments/scenarios/policy-governance-tutorial/`
 - [ ] Deploy policy engine:
   - [ ] Kyverno (Kubernetes-native) OR
   - [ ] OPA Gatekeeper (Rego-based)
@@ -763,7 +763,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement least-privilege pod configurations
 
 **Tasks:**
-- [ ] Create `lab/experiments/network-security-tutorial/`
+- [ ] Create `experiments/scenarios/network-security-tutorial/`
 - [ ] Deploy Calico or Cilium CNI (for NetworkPolicy support)
 - [ ] Implement NetworkPolicy patterns:
   - [ ] Default deny all ingress/egress
@@ -790,7 +790,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement just-in-time access patterns
 
 **Tasks:**
-- [ ] Create `lab/experiments/identity-tutorial/`
+- [ ] Create `experiments/scenarios/identity-tutorial/`
 - [ ] Deploy identity provider:
   - [ ] **Auth0** (work requirement) OR
   - [ ] Keycloak (self-hosted alternative)
@@ -828,7 +828,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Integrate RBAC with tenant model
 
 **Tasks:**
-- [ ] Create `lab/experiments/multi-tenancy-security/`
+- [ ] Create `experiments/scenarios/multi-tenancy-security/`
 - [ ] Namespace isolation model:
   - [ ] Create tenant namespaces (tenant-a, tenant-b)
   - [ ] Apply default NetworkPolicies (deny all, allow within tenant)
@@ -872,7 +872,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Configure alerting pipelines
 
 **Tasks:**
-- [ ] Create `lab/experiments/prometheus-tutorial/`
+- [ ] Create `experiments/scenarios/prometheus-tutorial/`
 - [ ] Deploy kube-prometheus-stack via ArgoCD
 - [ ] Build sample app with custom metrics:
   - [ ] Counter (http_requests_total)
@@ -910,7 +910,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Use SLOs to drive architectural decisions
 
 **Tasks:**
-- [ ] Create `lab/experiments/slo-tutorial/`
+- [ ] Create `experiments/scenarios/slo-tutorial/`
 - [ ] Deploy SLO tooling:
   - [ ] Sloth (SLO generator for Prometheus)
   - [ ] Pyrra (SLO dashboards and alerts)
@@ -951,7 +951,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Establish storage foundation for later phases
 
 **Tasks:**
-- [ ] Create `lab/experiments/minio-tutorial/`
+- [ ] Create `experiments/scenarios/minio-tutorial/`
 - [ ] Deploy MinIO operator
 - [ ] Create MinIO tenant:
   - [ ] Single node (development)
@@ -987,7 +987,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Correlate logs with metrics in Grafana
 
 **Tasks:**
-- [ ] Create `lab/experiments/loki-tutorial/`
+- [ ] Create `experiments/scenarios/loki-tutorial/`
 - [ ] Deploy Loki stack (Loki + Promtail)
 - [ ] Configure Loki storage:
   - [ ] Point to MinIO bucket from Phase 4.3
@@ -1026,7 +1026,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Correlate traces ↔ metrics ↔ logs
 
 **Tasks:**
-- [ ] Create `lab/experiments/opentelemetry-tutorial/`
+- [ ] Create `experiments/scenarios/opentelemetry-tutorial/`
 - [ ] Deploy OpenTelemetry Collector
 - [ ] Deploy Tempo (using MinIO for storage) or Jaeger as trace backend
 - [ ] Build multi-service demo app (3+ services):
@@ -1065,7 +1065,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Configure long-term retention with object storage
 
 **Tasks:**
-- [ ] Create `lab/experiments/thanos-tutorial/`
+- [ ] Create `experiments/scenarios/thanos-tutorial/`
 - [ ] Deploy Thanos components:
   - [ ] Sidecar (alongside Prometheus)
   - [ ] Store Gateway (for object storage queries)
@@ -1107,7 +1107,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Compare with legacy Ingress
 
 **Tasks:**
-- [ ] Create `lab/experiments/gateway-api-tutorial/`
+- [ ] Create `experiments/scenarios/gateway-api-tutorial/`
 - [ ] Deploy Gateway API implementation:
   - [ ] **Contour** (work requirement - Envoy-based)
   - [ ] Envoy Gateway (alternative)
@@ -1151,7 +1151,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Make informed controller selection
 
 **Tasks:**
-- [ ] Create `lab/experiments/ingress-comparison/`
+- [ ] Create `experiments/scenarios/ingress-comparison/`
 - [ ] Deploy and configure:
   - [ ] **Contour** (work requirement - Envoy-based, Gateway API native)
   - [ ] Nginx Ingress Controller
@@ -1181,7 +1181,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Evaluate managed vs self-hosted options
 
 **Tasks:**
-- [ ] Create `lab/experiments/api-gateway-tutorial/`
+- [ ] Create `experiments/scenarios/api-gateway-tutorial/`
 - [ ] Deploy Kong or Ambassador (or use Envoy Gateway)
 - [ ] Implement API management features:
   - [ ] API key authentication
@@ -1262,7 +1262,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement security with mTLS
 
 **Tasks:**
-- [ ] Create `lab/experiments/istio-tutorial/`
+- [ ] Create `experiments/scenarios/istio-tutorial/`
 - [ ] Install Istio (istioctl or Helm)
 - [ ] Enable sidecar injection (namespace label)
 - [ ] Deploy sample microservices app
@@ -1298,7 +1298,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Evaluate for different use cases
 
 **Tasks:**
-- [ ] Create `lab/experiments/linkerd-tutorial/`
+- [ ] Create `experiments/scenarios/linkerd-tutorial/`
 - [ ] Install Linkerd (CLI + control plane)
 - [ ] Inject proxies into workloads
 - [ ] Deploy same sample app as Istio experiment
@@ -1329,7 +1329,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Evaluate Cilium for CNI + service mesh
 
 **Tasks:**
-- [ ] Create `lab/experiments/cilium-tutorial/`
+- [ ] Create `experiments/scenarios/cilium-tutorial/`
 - [ ] Install Cilium as CNI with service mesh features
 - [ ] Deploy sample app (no sidecars needed)
 - [ ] Configure:
@@ -1360,7 +1360,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Design for geographic distribution
 
 **Tasks:**
-- [ ] Create `lab/experiments/cross-cluster-networking/`
+- [ ] Create `experiments/scenarios/cross-cluster-networking/`
 - [ ] Evaluate and implement option:
   - [ ] **Cilium ClusterMesh** (if using Cilium CNI) OR
   - [ ] **Submariner** (CNI-agnostic)
@@ -1448,7 +1448,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement common messaging patterns
 
 **Tasks:**
-- [ ] Create `lab/experiments/kafka-tutorial/`
+- [ ] Create `experiments/scenarios/kafka-tutorial/`
 - [ ] Deploy Strimzi operator via ArgoCD
 - [ ] Create Kafka cluster (KafkaCluster CRD)
 - [ ] Configure:
@@ -1484,7 +1484,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Compare with Kafka use cases
 
 **Tasks:**
-- [ ] Create `lab/experiments/rabbitmq-tutorial/`
+- [ ] Create `experiments/scenarios/rabbitmq-tutorial/`
 - [ ] Deploy RabbitMQ Cluster Operator
 - [ ] Create RabbitMQ cluster (RabbitmqCluster CRD)
 - [ ] Configure:
@@ -1520,7 +1520,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Compare with Kafka and RabbitMQ
 
 **Tasks:**
-- [ ] Create `lab/experiments/nats-tutorial/`
+- [ ] Create `experiments/scenarios/nats-tutorial/`
 - [ ] Deploy NATS with JetStream enabled
 - [ ] Core NATS patterns:
   - [ ] Pub/sub (fire and forget)
@@ -1552,7 +1552,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Compare managed vs self-hosted
 
 **Tasks:**
-- [ ] Create `lab/experiments/cloud-messaging/`
+- [ ] Create `experiments/scenarios/cloud-messaging/`
 - [ ] Create XRD: SimpleQueue
   - [ ] Abstracts AWS SQS and Azure Service Bus
   - [ ] Common interface for both clouds
@@ -1577,7 +1577,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement common coordination patterns
 
 **Tasks:**
-- [ ] Create `lab/experiments/distributed-coordination/`
+- [ ] Create `experiments/scenarios/distributed-coordination/`
 - [ ] ZooKeeper deep dive:
   - [ ] Deploy ZooKeeper ensemble (3+ nodes)
   - [ ] Understand znodes, watches, ephemeral nodes
@@ -1629,7 +1629,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Handle graceful shutdown correctly
 
 **Tasks:**
-- [ ] Create `lab/experiments/rolling-update-tutorial/`
+- [ ] Create `experiments/scenarios/rolling-update-tutorial/`
 - [ ] Build app with slow startup and graceful shutdown
 - [ ] Test parameter combinations:
   - [ ] maxSurge/maxUnavailable variations
@@ -1658,7 +1658,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Handle rollback scenarios
 
 **Tasks:**
-- [ ] Create `lab/experiments/blue-green-tutorial/`
+- [ ] Create `experiments/scenarios/blue-green-tutorial/`
 - [ ] Implement blue-green with:
   - [ ] Kubernetes Services (label selector swap)
   - [ ] Gateway API traffic switching
@@ -1690,7 +1690,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement metric-based promotion/rollback
 
 **Tasks:**
-- [ ] Create `lab/experiments/canary-tutorial/`
+- [ ] Create `experiments/scenarios/canary-tutorial/`
 - [ ] Install Argo Rollouts
 - [ ] Configure Rollout resource:
   - [ ] Traffic splitting steps (5% → 25% → 50% → 100%)
@@ -1721,7 +1721,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Use ApplicationSets for multi-cluster
 
 **Tasks:**
-- [ ] Create `lab/experiments/argocd-patterns/`
+- [ ] Create `experiments/scenarios/argocd-patterns/`
 - [ ] Sync strategies:
   - [ ] Auto-sync vs manual
   - [ ] Self-heal behavior
@@ -1751,7 +1751,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Combine with deployment strategies
 
 **Tasks:**
-- [ ] Create `lab/experiments/feature-flags-tutorial/`
+- [ ] Create `experiments/scenarios/feature-flags-tutorial/`
 - [ ] Deploy feature flag service:
   - [ ] Flagsmith (self-hosted) OR
   - [ ] OpenFeature with flagd
@@ -1789,7 +1789,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Tune for responsiveness vs stability
 
 **Tasks:**
-- [ ] Create `lab/experiments/hpa-tutorial/`
+- [ ] Create `experiments/scenarios/hpa-tutorial/`
 - [ ] Build test app with configurable CPU/memory load
 - [ ] Configure HPA scenarios:
   - [ ] CPU-based scaling
@@ -1824,7 +1824,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement scale-to-zero
 
 **Tasks:**
-- [ ] Create `lab/experiments/keda-tutorial/`
+- [ ] Create `experiments/scenarios/keda-tutorial/`
 - [ ] Install KEDA
 - [ ] Implement scalers:
   - [ ] Prometheus scaler (custom metrics)
@@ -1856,7 +1856,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement resource optimization workflow
 
 **Tasks:**
-- [ ] Create `lab/experiments/vpa-tutorial/`
+- [ ] Create `experiments/scenarios/vpa-tutorial/`
 - [ ] Install VPA
 - [ ] Configure VPA modes:
   - [ ] Off (recommendations only)
@@ -1884,7 +1884,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Optimize for cost and performance
 
 **Tasks:**
-- [ ] Create `lab/experiments/cluster-autoscaler-tutorial/`
+- [ ] Create `experiments/scenarios/cluster-autoscaler-tutorial/`
 - [ ] Implement Cluster Autoscaler (AKS/EKS):
   - [ ] Node pool configuration
   - [ ] Scale-down policies
@@ -1923,7 +1923,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Automate tenant lifecycle
 
 **Tasks:**
-- [ ] Create `lab/experiments/multi-tenancy-production/`
+- [ ] Create `experiments/scenarios/multi-tenancy-production/`
 - [ ] Build on Phase 3.8 security foundations:
   - [ ] Verify isolation from Phase 3.8 still holds
   - [ ] Add resource management layer
@@ -1969,7 +1969,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Create cost optimization automation
 
 **Tasks:**
-- [ ] Create `lab/experiments/finops-implementation/`
+- [ ] Create `experiments/scenarios/finops-implementation/`
 - [ ] Deploy full Kubecost or OpenCost:
   - [ ] Integration with cloud billing APIs
   - [ ] Azure Cost Management connection
@@ -2013,7 +2013,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement backup and recovery
 
 **Tasks:**
-- [ ] Create `lab/experiments/postgres-tutorial/`
+- [ ] Create `experiments/scenarios/postgres-tutorial/`
 - [ ] Deploy CloudNativePG operator
 - [ ] Create PostgreSQL cluster:
   - [ ] Primary + replicas
@@ -2047,7 +2047,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement caching patterns
 
 **Tasks:**
-- [ ] Create `lab/experiments/redis-tutorial/`
+- [ ] Create `experiments/scenarios/redis-tutorial/`
 - [ ] Deploy Redis operator (Spotahome or similar)
 - [ ] Create Redis deployments:
   - [ ] Standalone (development)
@@ -2081,7 +2081,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Design RTO/RPO strategies
 
 **Tasks:**
-- [ ] Create `lab/experiments/backup-dr-tutorial/`
+- [ ] Create `experiments/scenarios/backup-dr-tutorial/`
 - [ ] Deploy Velero:
   - [ ] Configure backup storage (S3/Azure Blob)
   - [ ] Install plugins (AWS, Azure, CSI)
@@ -2117,7 +2117,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Integrate with GitOps workflows
 
 **Tasks:**
-- [ ] Create `lab/experiments/schema-migration-tutorial/`
+- [ ] Create `experiments/scenarios/schema-migration-tutorial/`
 - [ ] Deploy migration tool:
   - [ ] Flyway OR Liquibase
 - [ ] Implement migration patterns:
@@ -2155,7 +2155,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Build AI-powered operational tools
 
 **Tasks:**
-- [ ] Create `lab/experiments/ai-analysis-tutorial/`
+- [ ] Create `experiments/scenarios/ai-analysis-tutorial/`
 - [ ] Deploy AI infrastructure:
   - [ ] Ollama or vLLM for local inference
   - [ ] Model serving (Llama 3, Mistral, or similar)
@@ -2186,7 +2186,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Implement model versioning and serving
 
 **Tasks:**
-- [ ] Create `lab/experiments/kubeflow-tutorial/`
+- [ ] Create `experiments/scenarios/kubeflow-tutorial/`
 - [ ] Deploy Kubeflow components:
   - [ ] Kubeflow Pipelines
   - [ ] Katib (hyperparameter tuning)
@@ -2220,7 +2220,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Configure model monitoring
 
 **Tasks:**
-- [ ] Create `lab/experiments/kserve-tutorial/`
+- [ ] Create `experiments/scenarios/kserve-tutorial/`
 - [ ] Deploy KServe:
   - [ ] Serverless inference
   - [ ] RawDeployment mode comparison
@@ -2254,7 +2254,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Evaluate different vector DB options
 
 **Tasks:**
-- [ ] Create `lab/experiments/vector-db-tutorial/`
+- [ ] Create `experiments/scenarios/vector-db-tutorial/`
 - [ ] Deploy vector databases:
   - [ ] Qdrant (Kubernetes-native)
   - [ ] Weaviate OR Milvus (comparison)
@@ -2294,7 +2294,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Make data-driven database selection
 
 **Tasks:**
-- [ ] Create `lab/experiments/database-benchmark/`
+- [ ] Create `experiments/scenarios/database-benchmark/`
 - [ ] Deploy databases via Crossplane/operators:
   - [ ] PostgreSQL (CloudNativePG)
   - [ ] MySQL (via operator)
@@ -2323,7 +2323,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Inform technology selection
 
 **Tasks:**
-- [ ] Create `lab/experiments/messaging-benchmark/`
+- [ ] Create `experiments/scenarios/messaging-benchmark/`
 - [ ] Deploy all three brokers (from Phase 7)
 - [ ] Build benchmarking clients
 - [ ] Test scenarios:
@@ -2350,7 +2350,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Inform mesh selection
 
 **Tasks:**
-- [ ] Create `lab/experiments/mesh-benchmark/`
+- [ ] Create `experiments/scenarios/mesh-benchmark/`
 - [ ] Deploy baseline app (no mesh)
 - [ ] Deploy same app with:
   - [ ] Istio
@@ -2378,7 +2378,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Portfolio piece for runtime expertise
 
 **Tasks:**
-- [ ] Create `lab/experiments/runtime-benchmark/`
+- [ ] Create `experiments/scenarios/runtime-benchmark/`
 - [ ] Build identical API in:
   - [ ] Go (net/http)
   - [ ] Rust (Axum)
@@ -2409,7 +2409,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 **Goal:** Measure application resilience to pod failures
 
 **Tasks:**
-- [ ] Create `lab/experiments/chaos-pod-failure/`
+- [ ] Create `experiments/scenarios/chaos-pod-failure/`
 - [ ] Deploy Chaos Mesh
 - [ ] Test scenarios:
   - [ ] Single pod kill
@@ -2425,7 +2425,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 **Goal:** Test application behavior under network issues
 
 **Tasks:**
-- [ ] Create `lab/experiments/chaos-network/`
+- [ ] Create `experiments/scenarios/chaos-network/`
 - [ ] Test with Chaos Mesh NetworkChaos:
   - [ ] Latency injection (50ms, 200ms, 500ms)
   - [ ] Packet loss (1%, 5%, 20%)
@@ -2443,7 +2443,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 **Goal:** Test infrastructure-level failures
 
 **Tasks:**
-- [ ] Create `lab/experiments/chaos-infrastructure/`
+- [ ] Create `experiments/scenarios/chaos-infrastructure/`
 - [ ] Test scenarios:
   - [ ] Graceful node drain
   - [ ] Sudden node failure
@@ -2470,7 +2470,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Handle artifacts and parameters
 
 **Tasks:**
-- [ ] Create `lab/experiments/argo-workflows-tutorial/`
+- [ ] Create `experiments/scenarios/argo-workflows-tutorial/`
 - [ ] Workflow patterns:
   - [ ] Sequential steps
   - [ ] Parallel execution
@@ -2509,7 +2509,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Integrate with Argo Workflows
 
 **Tasks:**
-- [ ] Create `lab/experiments/argo-events-tutorial/`
+- [ ] Create `experiments/scenarios/argo-events-tutorial/`
 - [ ] Deploy Argo Events
 - [ ] Configure EventSources:
   - [ ] Webhook (HTTP triggers)
@@ -2545,7 +2545,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Design hybrid CI/CD architectures
 
 **Tasks:**
-- [ ] Create `lab/experiments/advanced-cicd/`
+- [ ] Create `experiments/scenarios/advanced-cicd/`
 - [ ] Argo Workflows for CI:
   - [ ] Build pipelines as workflows
   - [ ] Parallel test execution
@@ -2584,7 +2584,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Integrate with existing platform components
 
 **Tasks:**
-- [ ] Create `lab/experiments/backstage-tutorial/`
+- [ ] Create `experiments/scenarios/backstage-tutorial/`
 - [ ] Deploy Backstage:
   - [ ] Helm chart or ArgoCD Application
   - [ ] PostgreSQL backend (via CloudNativePG from Phase 10)
@@ -2622,7 +2622,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 - Measure developer productivity
 
 **Tasks:**
-- [ ] Create `lab/experiments/self-service-infra/`
+- [ ] Create `experiments/scenarios/self-service-infra/`
 - [ ] Golden paths:
   - [ ] New service creation (Backstage template → repo → CI/CD → deployed)
   - [ ] Database provisioning (Backstage → Crossplane claim → ready)
@@ -2785,7 +2785,7 @@ helm install argocd argo/argo-cd -n argocd --create-namespace -f hub/bootstrap/a
 
 **Experiment Structure:**
 ```
-lab/experiments/<name>/
+experiments/scenarios/<name>/
 ├── experiment.yaml              # Metadata (cluster providers, overlays)
 ├── orchestrator/
 │   ├── cluster.yaml            # Orchestrator cluster config

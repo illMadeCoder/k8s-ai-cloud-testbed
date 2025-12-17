@@ -1,0 +1,32 @@
+# Hello App Experiment - Target
+# Deploys the custom hello-app for load testing
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hello-app-experiment
+  namespace: argocd
+  labels:
+    experiment: hello-app
+    cluster: target
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Deploy hello-app manifests
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: experiments/components/components/apps/hello-app/k8s
+    # Deploy k6 test scripts ConfigMap
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      path: experiments/scenarios/hello-app/k6
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: hello-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

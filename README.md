@@ -88,7 +88,7 @@ illm-k8s-lab/
 │
 ├── lab/                   # Experiments and workload catalog
 │   ├── experiments/       # Experiment definitions
-│   └── workload-catalog/  # Reusable ArgoCD components
+│   └── components/  # Reusable ArgoCD components
 │   ├── _template/         # Template for new experiments
 │   └── <experiment-name>/
 │       ├── argocd/              # ArgoCD applications (one per cluster)
@@ -212,7 +212,7 @@ task exp:deploy:prod NAME=http-baseline
 task exp:kubeconfig:prod NAME=http-baseline
 
 # Connect to specific cluster
-KUBECONFIG=lab/experiments/http-baseline/terraform/prod/kubeconfig-target kubectl get pods
+KUBECONFIG=experiments/scenarios/http-baseline/terraform/prod/kubeconfig-target kubectl get pods
 
 # Run test manually
 task exp:run:prod NAME=http-baseline TARGET=http://<ip> USERS=10
@@ -309,7 +309,7 @@ images/my-app/
 
 1. **Copy the template:**
    ```bash
-   cp -r lab/experiments/_template lab/experiments/my-experiment
+   cp -r experiments/scenarios/_template experiments/scenarios/my-experiment
    ```
 
 2. **Replace placeholders** in all files:
@@ -325,7 +325,7 @@ images/my-app/
 4. **Test locally:**
    ```bash
    task exp:deploy:minikube NAME=my-experiment
-   kubectl create -f lab/experiments/my-experiment/workflow/experiment.yaml
+   kubectl create -f experiments/scenarios/my-experiment/workflow/experiment.yaml
    task exp:undeploy:minikube NAME=my-experiment
    ```
 
@@ -346,7 +346,7 @@ images/my-app/
 
 1. **Create directory structure:**
    ```bash
-   mkdir -p lab/experiments/my-experiment/{argocd,terraform/prod,workflow,k6}
+   mkdir -p experiments/scenarios/my-experiment/{argocd,terraform/prod,workflow,k6}
    ```
 
 2. **Define clusters** in `terraform/prod/main.tf`:

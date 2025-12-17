@@ -1,0 +1,50 @@
+---
+# Crossplane Providers ArgoCD Application
+# Installs Azure and AWS provider families for multi-cloud resource management
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crossplane-providers
+  namespace: argocd
+  labels:
+    layer: core
+    component: crossplane
+  annotations:
+    # Deploy after Crossplane core is ready
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  ignoreDifferences:
+    - group: pkg.crossplane.io
+      kind: Provider
+      jqPathExpressions:
+        - .status
+    - group: pkg.crossplane.io
+      kind: ProviderRevision
+      jqPathExpressions:
+        - .status
+  source:
+    repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    targetRevision: HEAD
+    path: experiments/components/components/infrastructure/crossplane-providers
+    directory:
+      recurse: true
+      exclude: 'providers.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: crossplane-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
