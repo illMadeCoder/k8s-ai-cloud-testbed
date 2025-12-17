@@ -1,118 +1,92 @@
 version: '3'
 
-# Hub Cluster - Convenience tasks
+# Hub Cluster Bootstrap
 #
-# These wrap the bootstrap commands for ease of use.
-# You can also run the commands directly without Task.
-#
-# Bootstrap:
-#   kind create cluster --name hub --wait 60s
-#   helm install argocd argo/argo-cd -n argocd --create-namespace \
-#     -f bootstrap/argocd-values-kind.yaml
-#   kubectl apply -f bootstrap/hub-application.yaml
+# Usage:
+#   task bootstrap:kind    # Full setup (cluster, ArgoCD, DNS)
+#   task destroy           # Tear down
 
 silent: true
 
 vars:
   HUB_CLUSTER: hub
   ARGOCD_NAMESPACE: argocd
+  DNS_IP: 172.19.255.200
 
 tasks:
   bootstrap:kind:
-    desc: Bootstrap hub on Kind
+    desc: Bootstrap hub on Kind (full setup)
     cmds:
+      # Create cluster
       - |
-        echo "Creating Kind cluster..."
+        echo "=== Creating Kind cluster ==="
         kind create cluster --name {{.HUB_CLUSTER}} --wait 60s || true
         kubectl config use-context kind-{{.HUB_CLUSTER}}
+
+      # Install ArgoCD
       - |
-        echo "Installing ArgoCD..."
+        echo "=== Installing ArgoCD ==="
         helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
         helm repo update argo
         helm upgrade --install argocd argo/argo-cd \
           -n {{.ARGOCD_NAMESPACE}} --create-namespace \
           -f {{.TASKFILE_DIR}}/bootstrap/argocd-values-kind.yaml
+
+      # Apply hub application
       - |
-        echo "Applying hub application..."
+        echo "=== Applying hub application ==="
         kubectl apply -f {{.TASKFILE_DIR}}/bootstrap/hub-application.yaml
-      - task: status
+
+      # Wait for DNS stack
       - |
-        echo ""
-        echo "=== Next Steps ==="
-        echo "1. Wait for services: task wait"
-        echo "2. Configure DNS:     task dns (requires sudo)"
-        echo "3. Test access:       curl -k https://argocd-server.argocd.k8s.local"
-
-  status:
-    desc: Show hub status
-    cmds:
-      - |
-        echo "=== Hub Status ==="
-        kubectl get applications -n {{.ARGOCD_NAMESPACE}} 2>/dev/null || echo "ArgoCD not installed"
-
-  password:
-    desc: Get ArgoCD admin password
-    cmds:
-      - kubectl -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
-
-  ui:
-    desc: Port-forward ArgoCD UI
-    cmds:
-      - echo "https://localhost:8080 (admin / $(kubectl -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d))"
-      - kubectl port-forward svc/argocd-server -n {{.ARGOCD_NAMESPACE}} 8080:443
-
-  wait:
-    desc: Wait for all hub services to be ready
-    cmds:
-      - |
-        echo "Waiting for hub applications to sync..."
+        echo "=== Waiting for services ==="
+        echo "Waiting for dns-stack to be healthy..."
         until kubectl get application dns-stack -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null | grep -q "Healthy"; do
-          echo "Waiting for dns-stack..."
           sleep 5
         done
-        echo "dns-stack ready!"
-      - |
+        echo "dns-stack healthy!"
+
         echo "Waiting for k8s_gateway LoadBalancer..."
-        until kubectl get svc dns-stack-k8s-gateway -n dns-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null | grep -q "172.19.255.200"; do
-          echo "Waiting for LoadBalancer IP..."
+        until kubectl get svc dns-stack-k8s-gateway -n dns-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null | grep -q "{{.DNS_IP}}"; do
           sleep 2
         done
-        echo "k8s_gateway ready at 172.19.255.200"
+        echo "k8s_gateway ready at {{.DNS_IP}}"
 
-  dns:
-    desc: Configure host DNS to resolve *.k8s.local
-    vars:
-      DNS_IP: 172.19.255.200
-    cmds:
+      # Configure host DNS
       - |
-        echo "Configuring DNS for k8s.local → {{.DNS_IP}}"
-
-        # Check if already configured
+        echo "=== Configuring host DNS ==="
         if grep -q "{{.DNS_IP}}" /etc/resolv.conf 2>/dev/null; then
           echo "Already configured"
-          exit 0
-        fi
-
-        # Add k8s_gateway as first nameserver
-        if grep -q "nameserver" /etc/resolv.conf; then
-          sudo sed -i '0,/nameserver/s/nameserver/nameserver {{.DNS_IP}}\nnameserver/' /etc/resolv.conf
         else
-          echo "nameserver {{.DNS_IP}}" | sudo tee -a /etc/resolv.conf
+          if grep -q "nameserver" /etc/resolv.conf; then
+            sudo sed -i '0,/nameserver/s/nameserver/nameserver {{.DNS_IP}}\nnameserver/' /etc/resolv.conf
+          else
+            echo "nameserver {{.DNS_IP}}" | sudo tee -a /etc/resolv.conf
+          fi
+          echo "DNS configured"
         fi
 
-        echo "DNS configured. Test with: dig argocd-server.argocd.k8s.local"
-
-  dns:status:
-    desc: Test DNS resolution
-    cmds:
+      # Verify
       - |
-        echo "Testing k8s.local resolution..."
-        dig +short argocd-server.argocd.k8s.local || echo "Failed - is dns-stack running?"
         echo ""
-        echo "Testing external resolution (fallthrough)..."
-        dig +short google.com || echo "Failed - check fallthrough config"
+        echo "=== Bootstrap Complete ==="
+        kubectl get applications -n {{.ARGOCD_NAMESPACE}}
+        echo ""
+        echo "ArgoCD UI: https://argocd-server.argocd.k8s.local"
+        echo "Password:  $(kubectl -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
 
   destroy:
     desc: Destroy Kind hub cluster
     cmds:
       - kind delete cluster --name {{.HUB_CLUSTER}}
+
+  # Helper tasks (optional)
+  status:
+    desc: Show hub status
+    cmds:
+      - kubectl get applications -n {{.ARGOCD_NAMESPACE}} 2>/dev/null || echo "ArgoCD not installed"
+
+  password:
+    desc: Get ArgoCD admin password
+    cmds:
+      - kubectl -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
