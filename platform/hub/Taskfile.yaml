@@ -1,0 +1,62 @@
+version: '3'
+
+# Hub Cluster - Convenience tasks
+#
+# These wrap the bootstrap commands for ease of use.
+# You can also run the commands directly without Task.
+#
+# Bootstrap:
+#   kind create cluster --name hub --wait 60s
+#   helm install argocd argo/argo-cd -n argocd --create-namespace \
+#     -f platform/hub/bootstrap/argocd-values-kind.yaml
+#   kubectl apply -f platform/hub/bootstrap/hub-application.yaml
+
+silent: true
+
+vars:
+  HUB_CLUSTER: hub
+  ARGOCD_NAMESPACE: argocd
+
+tasks:
+  bootstrap:kind:
+    desc: Bootstrap hub on Kind
+    cmds:
+      - |
+        echo "Creating Kind cluster..."
+        kind create cluster --name {{.HUB_CLUSTER}} --wait 60s || true
+        kubectl config use-context kind-{{.HUB_CLUSTER}}
+      - |
+        echo "Installing ArgoCD..."
+        helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
+        helm repo update argo
+        helm upgrade --install argocd argo/argo-cd \
+          -n {{.ARGOCD_NAMESPACE}} --create-namespace \
+          -f platform/hub/bootstrap/argocd-values-kind.yaml \
+          --wait
+      - |
+        echo "Applying hub application..."
+        kubectl apply -f platform/hub/bootstrap/hub-application.yaml
+      - task: status
+
+  status:
+    desc: Show hub status
+    cmds:
+      - |
+        echo "=== Hub Status ==="
+        kubectl get applications -n {{.ARGOCD_NAMESPACE}} 2>/dev/null || echo "ArgoCD not installed"
+
+  password:
+    desc: Get ArgoCD admin password
+    cmds:
+      - kubectl -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
+
+  ui:
+    desc: Port-forward ArgoCD UI
+    cmds:
+      - echo "https://localhost:8080 (admin / $(kubectl -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d))"
+      - kubectl port-forward svc/argocd-server -n {{.ARGOCD_NAMESPACE}} 8080:443
+
+  destroy:
+    desc: Destroy Kind hub cluster
+    cmds:
+      - kind delete cluster --name {{.HUB_CLUSTER}}

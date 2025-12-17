@@ -1,0 +1,30 @@
+# MetalLB Configuration for Kind
+#
+# Deploys IPAddressPool and L2Advertisement after MetalLB is ready.
+# Sync wave 0 ensures this runs after metallb (wave -1).
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metallb-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+    environment: kind
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    targetRevision: HEAD
+    path: platform/hub/app-of-apps/kind/manifests/metallb-config
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: metallb-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

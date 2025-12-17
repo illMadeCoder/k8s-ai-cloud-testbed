@@ -1,0 +1,23 @@
+# k8s_gateway values for Kind
+#
+# Provides DNS resolution for LoadBalancer and Ingress resources.
+# Query: dig @<service-ip> <service>.<namespace>.k8s.local
+
+# Domain served by this DNS server
+domain: k8s.local
+
+# Watch all namespaces for Services/Ingresses
+watchedResources:
+  - Ingress
+  - Service
+
+# Expose via LoadBalancer (cloud-provider-kind assigns IP)
+service:
+  type: LoadBalancer
+  port: 53
+
+# Fallback DNS for non-k8s.local queries
+fallthrough:
+  enabled: true
+  zones:
+    - .

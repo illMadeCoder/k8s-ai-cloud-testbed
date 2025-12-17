@@ -1,0 +1,39 @@
+# MetalLB for Kind
+#
+# Provides LoadBalancer capability for Kind clusters.
+# Assigns IPs from a configured range on the Kind docker network.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metallb
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+    environment: kind
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"  # Deploy before other apps need LoadBalancer
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://metallb.github.io/metallb
+      chart: metallb
+      targetRevision: 0.14.9
+      helm:
+        valueFiles:
+          - $values/platform/hub/app-of-apps/kind/values/metallb.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: metallb-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

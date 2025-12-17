@@ -1,0 +1,37 @@
+# ArgoCD self-management
+#
+# After bootstrap via Helm, ArgoCD manages its own configuration via GitOps.
+# Changes to ArgoCD config should be made in Git, not via helm upgrade.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+    environment: kind
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 7.7.5
+      helm:
+        valueFiles:
+          - $values/platform/hub/app-of-apps/kind/values/argocd.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

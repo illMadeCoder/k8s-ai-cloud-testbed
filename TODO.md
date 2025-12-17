@@ -145,52 +145,74 @@ git push → GitHub webhook → Cloudflare Tunnel → ArgoCD → sync
 
 **Directory Structure:**
 ```
-platform/
-├── hub/
-│   ├── bootstrap/
-│   │   ├── Taskfile.yaml        # task hub:bootstrap
-│   │   ├── argocd-install.yaml  # Minimal ArgoCD for bootstrap
-│   │   └── root-app.yaml        # App-of-apps → gitops/
-│   ├── gitops/
-│   │   ├── root-app-of-apps.yaml
-│   │   ├── argocd/              # ArgoCD manages itself
-│   │   ├── cloudflared/         # Tunnel for webhook delivery
-│   │   ├── openbao/
-│   │   ├── harbor/
-│   │   └── cert-manager/
-│   └── overlays/
-│       ├── kind/                 # Laptop dev (NodePort, local storage)
-│       ├── k3s/                  # Lightweight home lab
-│       ├── talos/                # Immutable home lab
-│       └── cloud/                # AKS/EKS/GKE (LoadBalancer, cloud storage)
-└── orchestrator/                 # Reusable orchestrator bootstrap
-    ├── bootstrap/
-    │   ├── Taskfile.yaml        # Reused by experiments
-    │   └── argocd-install.yaml
-    └── gitops/
-        ├── argocd/
-        └── argo-workflows/
+platform/hub/
+├── Taskfile.yaml                      # Convenience tasks (optional)
+├── bootstrap/
+│   ├── argocd-values-kind.yaml        # ArgoCD + app-of-apps reference
+│   ├── argocd-values-talos.yaml
+│   └── argocd-values-cloud.yaml
+└── app-of-apps/
+    ├── kind/                          # Kind-specific services
+    │   ├── kustomization.yaml
+    │   ├── argocd.yaml                # ArgoCD self-manages
+    │   ├── dns-stack.yaml             # CoreDNS + etcd + ExternalDNS
+    │   └── values/
+    ├── talos/                         # Talos-specific services
+    │   ├── kustomization.yaml
+    │   ├── argocd.yaml
+    │   ├── dns-stack.yaml
+    │   ├── metallb.yaml               # LoadBalancer for bare metal
+    │   └── values/
+    └── cloud/                         # Cloud-specific services
+        ├── kustomization.yaml
+        ├── argocd.yaml
+        ├── external-dns.yaml          # Route53/CloudDNS/Azure DNS
+        └── values/
+
+experiments/
+└── <experiment-name>/
+    ├── orchestrator/                  # Per-experiment orchestrator (ephemeral)
+    └── target/                        # Target cluster workloads
+```
+
+**Adaptor Layer (provides consistent capabilities across environments):**
+| Capability | Kind | Talos | Cloud |
+|------------|------|-------|-------|
+| LoadBalancer | MetalLB | MetalLB | native |
+| DNS | k8s_gateway (CoreDNS plugin) | k8s_gateway | ExternalDNS → cloud DNS |
+
+**Bootstrap (one command per environment):**
+```bash
+# Kind
+kind create cluster --name hub
+helm install argocd argo/argo-cd -n argocd --create-namespace -f platform/hub/bootstrap/argocd-values-kind.yaml
+# ArgoCD deploys: MetalLB → dns-stack → other services (all GitOps)
+
+# Talos (cluster already exists)
+helm install argocd argo/argo-cd -n argocd --create-namespace -f platform/hub/bootstrap/argocd-values-talos.yaml
+
+# Cloud (cluster already exists)
+helm install argocd argo/argo-cd -n argocd --create-namespace -f platform/hub/bootstrap/argocd-values-cloud.yaml
 ```
 
 **Tasks (in order):**
-1. [ ] Create `platform/hub/` directory structure
-2. [ ] Create `platform/orchestrator/` reusable bootstrap
-3. [ ] Design Taskfile for hub bootstrap
-4. [ ] Create Kustomize overlays per environment (Kind, K3s, Talos, Cloud)
-5. [ ] Bootstrap ArgoCD (imperative install, then self-managed via GitOps)
-6. [ ] Create root app-of-apps for hub services
-7. [ ] Deploy OpenBao via ArgoCD (sync wave 1)
-8. [ ] Configure Cloudflare Tunnel for webhook delivery:
+1. [x] Create `platform/hub/` directory structure
+2. [x] Create ArgoCD bootstrap values with app-of-apps reference
+3. [x] Create Kind app-of-apps with ArgoCD self-management
+4. [x] Add MetalLB to Kind app-of-apps (LoadBalancer capability)
+5. [x] Add dns-stack to Kind app-of-apps (k8s_gateway for DNS)
+6. [ ] Test Kind hub bootstrap
+6. [ ] Deploy OpenBao via ArgoCD
+7. [ ] Configure Cloudflare Tunnel for webhook delivery:
    - [ ] Create tunnel in Cloudflare Zero Trust (manual or Terraform)
    - [ ] Store tunnel token in OpenBao
-   - [ ] Deploy cloudflared via ArgoCD (sync wave 2, after OpenBao)
+   - [ ] Deploy cloudflared via ArgoCD (after OpenBao)
    - [ ] Configure GitHub webhook to tunnel URL
-9. [ ] Deploy Harbor via ArgoCD (sync wave 2)
-10. [ ] Create ArgoCD ApplicationSet for experiment auto-discovery
-11. [ ] Design Taskfile for experiment lifecycle (`exp:run`, `exp:teardown`)
-12. [ ] Document three-tier architecture
-13. [ ] **ADR:** Document hub cluster pattern and three-tier architecture
-14. [ ] **ADR:** Document GitOps webhook delivery (see `docs/adrs/ADR-003-gitops-webhook-delivery.md`)
+8. [ ] Deploy Harbor via ArgoCD
+9. [ ] Create ArgoCD ApplicationSet for experiment auto-discovery
+10. [ ] Create Talos app-of-apps (add MetalLB)
+11. [ ] Create Cloud app-of-apps (ExternalDNS for cloud provider)
+12. [ ] **ADR:** Document hub cluster pattern and adaptor layer
 
 ---
 

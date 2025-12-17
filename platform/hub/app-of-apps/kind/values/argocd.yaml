@@ -1,0 +1,8 @@
+# ArgoCD values for Kind hub (GitOps-managed)
+#
+# This is the ongoing config - changes here are synced by ArgoCD.
+# The bootstrap values file is only used for initial install.
+
+server:
+  service:
+    type: LoadBalancer  # cloud-provider-kind assigns IP
