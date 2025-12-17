@@ -4,15 +4,10 @@ silent: true
 
 includes:
   local: ./tasks/local.yaml
-  cloud: ./tasks/cloud.yaml
+  lab: ./lab/Taskfile.yaml
 
 tasks:
   default:
     desc: List available tasks
     cmds:
       - task --list
-
-  list:exp:
-    desc: List available experiments
-    cmds:
-      - tree experiments -L 1 -d --noreport 2>/dev/null || ls -d experiments/*/

@@ -28,7 +28,7 @@ ArgoCD serves as the GitOps engine for all Kubernetes resources, while GitLab CI
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │              core-infrastructure (App-of-Apps)                   │   │
-│  │              workload-catalog/core-app-of-apps.yaml              │   │
+│  │              lab/workload-catalog/core-app-of-apps.yaml          │   │
 │  └───────────────────────────┬─────────────────────────────────────┘   │
 │                              │                                          │
 │       ┌──────────────────────┼──────────────────────┐                  │
@@ -45,7 +45,7 @@ ArgoCD serves as the GitOps engine for all Kubernetes resources, while GitLab CI
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    Stack Applications                            │   │
-│  │                    workload-catalog/stacks/                      │   │
+│  │                    lab/workload-catalog/stacks/                  │   │
 │  ├─────────────────────────────┬───────────────────────────────────┤   │
 │  │       stack-elk             │          stack-loki               │   │
 │  │  (eck-operator + elk-stack) │    (loki + promtail)              │   │
@@ -53,7 +53,7 @@ ArgoCD serves as the GitOps engine for all Kubernetes resources, while GitLab CI
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                  Experiment Applications                         │   │
-│  │                  experiments/{name}/{cluster}/argocd/            │   │
+│  │                  lab/experiments/{name}/{cluster}/argocd/        │   │
 │  ├─────────────────┬─────────────────┬─────────────────────────────┤   │
 │  │  http-baseline  │   hello-app     │    multi-cloud-demo         │   │
 │  │  (target/loadgen)│   (target)     │    (target + crossplane)    │   │
@@ -64,7 +64,7 @@ ArgoCD serves as the GitOps engine for all Kubernetes resources, while GitLab CI
 
 ### Root Application
 
-**File:** `workload-catalog/core-app-of-apps.yaml`
+**File:** `lab/workload-catalog/core-app-of-apps.yaml`
 
 The root Application uses multi-source configuration to selectively deploy platform components:
 
@@ -84,7 +84,7 @@ spec:
     # Each source deploys a specific component category
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: workload-catalog/components/core/cert-manager
+      path: lab/lab/workload-catalog/components/core/cert-manager
       directory:
         recurse: false
         include: 'cert-manager*.yaml'
@@ -104,11 +104,11 @@ spec:
 
 Stacks group related components that are deployed together:
 
-**File:** `workload-catalog/stacks/elk.yaml`
+**File:** `lab/workload-catalog/stacks/elk.yaml`
 - Deploys ECK Operator + ELK Stack as a unit
 - Used when full Elasticsearch logging is needed
 
-**File:** `workload-catalog/stacks/loki.yaml`
+**File:** `lab/workload-catalog/stacks/loki.yaml`
 - Deploys Loki + Promtail for lightweight logging
 - Alternative to ELK for simpler use cases
 
@@ -130,7 +130,7 @@ spec:
       helm:
         releaseName: cert-manager
         valueFiles:
-          - $values/workload-catalog/components/core/cert-manager/values.yaml
+          - $values/lab/lab/workload-catalog/components/core/cert-manager/values.yaml
 
     # Source 2: Git repository (creates $values reference)
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
@@ -144,9 +144,9 @@ spec:
 3. Enables separation of chart definition from deployment values
 
 **Examples:**
-- `workload-catalog/components/core/cert-manager/cert-manager.yaml`
-- `workload-catalog/components/infrastructure/vault/vault.yaml`
-- `workload-catalog/components/observability/prometheus-stack/kube-prometheus-stack.yaml`
+- `lab/lab/workload-catalog/components/core/cert-manager/cert-manager.yaml`
+- `lab/lab/workload-catalog/components/infrastructure/vault/vault.yaml`
+- `lab/lab/workload-catalog/components/observability/prometheus-stack/kube-prometheus-stack.yaml`
 
 ### Directory-Based Selective Sync
 
@@ -309,7 +309,7 @@ Required alongside `ignoreDifferences` configuration.
 Each experiment follows a consistent layout:
 
 ```
-experiments/{experiment-name}/
+lab/experiments/{experiment-name}/
 ├── target/                         # Target cluster (app under test)
 │   ├── argocd/
 │   │   └── app.yaml               # ArgoCD Application
@@ -358,7 +358,7 @@ spec:
 
 ### Example: http-baseline
 
-**Target Application** (`experiments/http-baseline/target/argocd/app.yaml`):
+**Target Application** (`lab/experiments/http-baseline/target/argocd/app.yaml`):
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -373,13 +373,13 @@ spec:
   sources:
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: workload-catalog/components/apps/demo-app/k8s
+      path: lab/lab/workload-catalog/components/apps/demo-app/k8s
       directory:
         recurse: false
         include: 'deployment.yaml'
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: experiments/http-baseline/target/argocd
+      path: lab/experiments/http-baseline/target/argocd
       directory:
         recurse: false
         include: 'nodeport-service.yaml'
@@ -401,7 +401,7 @@ spec:
 ### Directory Structure
 
 ```
-workload-catalog/components/
+lab/workload-catalog/components/
 ├── apps/              # Business applications
 │   ├── demo-app/
 │   └── hello-app/

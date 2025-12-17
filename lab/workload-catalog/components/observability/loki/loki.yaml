@@ -21,7 +21,7 @@ spec:
       ref: values
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: workload-catalog/components/observability/loki
+      path: lab/workload-catalog/components/observability/loki
       directory:
         include: '*-httproute.yaml'
   destination:

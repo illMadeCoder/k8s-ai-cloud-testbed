@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
     targetRevision: HEAD
-    path: workload-catalog/components/core/argocd
+    path: lab/workload-catalog/components/core/argocd
     directory:
       include: '*-httproute.yaml'
   destination:

@@ -16,11 +16,11 @@ spec:
     # Deploy hello-app manifests
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: workload-catalog/components/apps/hello-app/k8s
+      path: lab/workload-catalog/components/apps/hello-app/k8s
     # Deploy k6 test scripts ConfigMap
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: experiments/hello-app/k6
+      path: lab/experiments/hello-app/k6
   destination:
     server: https://kubernetes.default.svc
     namespace: hello-app

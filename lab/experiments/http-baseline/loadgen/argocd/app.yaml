@@ -16,7 +16,7 @@ spec:
     # k6 scripts configmap (experiment-specific test scenarios)
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: experiments/http-baseline/loadgen/argocd
+      path: lab/experiments/http-baseline/loadgen/argocd
       directory:
         recurse: false
         include: 'k6-scripts.yaml'

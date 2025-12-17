@@ -5,7 +5,7 @@ silent: true
 vars:
   ORCHESTRATOR_CLUSTER: orchestrator
   ARGOCD_NAMESPACE: argocd
-  ARGOCD_VALUES: workload-catalog/components/core/argocd/values.yaml
+  ARGOCD_VALUES: lab/workload-catalog/components/core/argocd/values.yaml
   # Container names for local infrastructure
   CPK_CONTAINER: cloud-provider-kind
   DNSMASQ_CONTAINER: kind-dnsmasq
@@ -176,7 +176,7 @@ tasks:
         fi
       - echo ""
       - echo "Deploying core infrastructure..."
-      - kubectl apply -f workload-catalog/core-app-of-apps.yaml
+      - kubectl apply -f lab/workload-catalog/core-app-of-apps.yaml
       - task: password
 
   reset:
@@ -241,7 +241,8 @@ tasks:
           echo "Usage: task local:deploy -- <path> [path...]"
           echo ""
           echo "Examples:"
-          echo "  task local:deploy -- argocd-apps/core-app-of-apps.yaml argocd-apps/stacks/loki.yaml"
+          echo "  task local:deploy -- lab/workload-catalog/core-app-of-apps.yaml"
+          echo "  task local:deploy -- lab/workload-catalog/stacks/loki.yaml"
           exit 1
         fi
 
@@ -258,219 +259,3 @@ tasks:
         echo "Waiting for ArgoCD to sync..."
         sleep 5
         kubectl --context kind-{{.ORCHESTRATOR_CLUSTER}} get applications -n argocd
-
-  # =============================================================================
-  # Experiment Lifecycle
-  # =============================================================================
-  conduct:
-    desc: "Conduct experiment: task local:conduct -- <experiment-path>"
-    cmds:
-      # Ensure infrastructure is running
-      - task: _ensure-cloud-provider-kind
-      - task: _ensure-dnsmasq
-      - |
-        if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task local:conduct -- <experiment-path> [USERS=10] [DURATION=60s]"
-          exit 1
-        fi
-
-        EXP_PATH="{{.CLI_ARGS}}"
-        EXP_NAME=$(basename "$EXP_PATH")
-        WORKFLOW_FILE="$EXP_PATH/workflow/experiment.yaml"
-
-        if [ ! -f "$WORKFLOW_FILE" ]; then
-          echo "ERROR: Workflow not found at $WORKFLOW_FILE"
-          exit 1
-        fi
-
-        USERS={{.USERS | default "10"}}
-        DURATION={{.DURATION | default "60s"}}
-
-        echo "=============================================="
-        echo "  CONDUCTING EXPERIMENT: $EXP_NAME"
-        echo "=============================================="
-        echo "  Users: $USERS"
-        echo "  Duration: $DURATION"
-        echo ""
-
-        # Step 1: Discover clusters from experiment folders
-        echo "=== Step 1/5: Discovering clusters ==="
-        CLUSTERS=""
-        for cluster_dir in "$EXP_PATH"/*/; do
-          if [ -f "$cluster_dir/cluster.yaml" ]; then
-            cluster_name=$(basename "$cluster_dir")
-            CLUSTERS="$CLUSTERS $cluster_name"
-            echo "  Found: $cluster_name"
-          fi
-        done
-
-        if [ -z "$CLUSTERS" ]; then
-          echo "ERROR: No clusters found (no */cluster.yaml files)"
-          exit 1
-        fi
-
-        # Step 2: Create kind clusters for experiment
-        echo ""
-        echo "=== Step 2/5: Creating experiment clusters ==="
-        for cluster in $CLUSTERS; do
-          full_name="${EXP_NAME}-${cluster}"
-          if kind get clusters 2>/dev/null | grep -q "^${full_name}$"; then
-            echo "  Cluster '$full_name' already exists"
-          else
-            echo "  Creating cluster '$full_name'..."
-            kind create cluster --name "$full_name" --wait 60s
-          fi
-        done
-
-        # Step 3: Register clusters with ArgoCD on orchestrator
-        echo ""
-        echo "=== Step 3/5: Registering clusters with ArgoCD ==="
-        for cluster in $CLUSTERS; do
-          full_name="${EXP_NAME}-${cluster}"
-          echo "  Registering: $full_name"
-
-          # Get the cluster's internal Docker IP (for cross-cluster communication)
-          CLUSTER_CONTEXT="kind-${full_name}"
-          CONTAINER_NAME="${full_name}-control-plane"
-          CLUSTER_IP=$(docker inspect "$CONTAINER_NAME" | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
-          CLUSTER_SERVER="https://${CLUSTER_IP}:6443"
-          CLUSTER_CA=$(kubectl config view --raw -o jsonpath="{.clusters[?(@.name=='${CLUSTER_CONTEXT}')].cluster.certificate-authority-data}")
-
-          # Create service account on target cluster for ArgoCD
-          kubectl --context "$CLUSTER_CONTEXT" create serviceaccount argocd-manager -n kube-system 2>/dev/null || true
-          kubectl --context "$CLUSTER_CONTEXT" create clusterrolebinding argocd-manager --clusterrole=cluster-admin --serviceaccount=kube-system:argocd-manager 2>/dev/null || true
-
-          # Create SA token secret
-          cat > /tmp/sa-token.yaml << 'ENDOFFILE'
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: argocd-manager-token
-          namespace: kube-system
-          annotations:
-            kubernetes.io/service-account.name: argocd-manager
-        type: kubernetes.io/service-account-token
-        ENDOFFILE
-          kubectl --context "$CLUSTER_CONTEXT" apply -f /tmp/sa-token.yaml
-          sleep 2
-          TOKEN=$(kubectl --context "$CLUSTER_CONTEXT" -n kube-system get secret argocd-manager-token -o jsonpath='{.data.token}' | base64 -d)
-
-          # Register with ArgoCD on orchestrator
-          cat > /tmp/cluster-secret.yaml << ENDOFFILE
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: cluster-${cluster}
-          namespace: argocd
-          labels:
-            argocd.argoproj.io/secret-type: cluster
-        type: Opaque
-        stringData:
-          name: "${cluster}"
-          server: "${CLUSTER_SERVER}"
-          config: |
-            {
-              "bearerToken": "${TOKEN}",
-              "tlsClientConfig": {
-                "insecure": true
-              }
-            }
-        ENDOFFILE
-          kubectl --context kind-{{.ORCHESTRATOR_CLUSTER}} apply -f /tmp/cluster-secret.yaml
-          echo "    Registered: $cluster -> $CLUSTER_SERVER"
-        done
-
-        # Step 4: Deploy ArgoCD apps from orchestrator to experiment clusters
-        echo ""
-        echo "=== Step 4/5: Deploying apps via ArgoCD ==="
-        for cluster in $CLUSTERS; do
-          full_name="${EXP_NAME}-${cluster}"
-          cluster_dir="$EXP_PATH/$cluster"
-          argocd_dir="$cluster_dir/argocd"
-
-          # Apply ArgoCD Application manifests to orchestrator (they sync the rest)
-          if [ -d "$argocd_dir" ] && [ -f "$argocd_dir/app.yaml" ]; then
-            echo "  Applying to orchestrator: app.yaml -> $full_name"
-            kubectl --context kind-{{.ORCHESTRATOR_CLUSTER}} apply -f "$argocd_dir/app.yaml"
-          fi
-        done
-
-        # Wait for ArgoCD to sync
-        echo "  Waiting for sync..."
-        sleep 15
-      - task: _update-dns
-      - |
-        EXP_PATH="{{.CLI_ARGS}}"
-        EXP_NAME=$(basename "$EXP_PATH")
-
-        # Step 5: Run workflow on orchestrator
-        echo ""
-        echo "=== Step 5/6: Running workflow on orchestrator ==="
-        kubectl config use-context kind-{{.ORCHESTRATOR_CLUSTER}}
-
-        # Determine target URL (target cluster's Docker IP + NodePort)
-        TARGET_CONTAINER="${EXP_NAME}-target-control-plane"
-        TARGET_IP=$(docker inspect "$TARGET_CONTAINER" | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
-        TARGET_URL="http://${TARGET_IP}:30080"
-        echo "  Target URL: $TARGET_URL"
-
-        WORKFLOW_NAME=$(argo submit "$WORKFLOW_FILE" \
-          -p users="$USERS" \
-          -p duration="$DURATION" \
-          -p target-url="$TARGET_URL" \
-          -o name -n argo-workflows 2>/dev/null || \
-          kubectl create -f "$WORKFLOW_FILE" -o name)
-        echo "  Workflow: $WORKFLOW_NAME"
-
-        echo "  Waiting for workflow completion..."
-        argo wait "$WORKFLOW_NAME" -n argo-workflows 2>/dev/null || \
-          kubectl wait "$WORKFLOW_NAME" --for=condition=Completed --timeout=30m -n argo-workflows
-
-        echo ""
-        echo "=== Workflow Results ==="
-        argo get "$WORKFLOW_NAME" -n argo-workflows 2>/dev/null || \
-          kubectl get "$WORKFLOW_NAME" -n argo-workflows -o yaml
-
-        # Step 6: Cleanup experiment clusters
-        echo ""
-        echo "=== Step 6/6: Cleaning up experiment clusters ==="
-        for cluster in $CLUSTERS; do
-          full_name="${EXP_NAME}-${cluster}"
-          echo "  Deleting cluster: $full_name"
-          kind delete cluster --name "$full_name"
-        done
-
-        kubectl config use-context kind-{{.ORCHESTRATOR_CLUSTER}}
-
-        echo ""
-        echo "=============================================="
-        echo "  EXPERIMENT COMPLETE"
-        echo "=============================================="
-
-  destroy:
-    desc: "Destroy experiment clusters: task local:destroy -- <experiment-path>"
-    cmds:
-      - |
-        if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task local:destroy -- <experiment-path>"
-          echo ""
-          echo "Example: task local:destroy -- experiments/http-baseline"
-          exit 1
-        fi
-
-        EXP_PATH="{{.CLI_ARGS}}"
-        EXP_NAME=$(basename "$EXP_PATH")
-
-        echo "Destroying experiment clusters for: $EXP_NAME"
-        for cluster_dir in "$EXP_PATH"/*/; do
-          if [ -f "$cluster_dir/cluster.yaml" ]; then
-            cluster_name=$(basename "$cluster_dir")
-            full_name="${EXP_NAME}-${cluster_name}"
-            if kind get clusters 2>/dev/null | grep -q "^${full_name}$"; then
-              echo "  Deleting: $full_name"
-              kind delete cluster --name "$full_name"
-            fi
-          fi
-        done
-
-        echo "Done."

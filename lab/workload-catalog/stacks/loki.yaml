@@ -16,7 +16,7 @@ spec:
     # Logs - Loki
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: workload-catalog/components/observability/loki
+      path: lab/workload-catalog/components/observability/loki
       directory:
         recurse: false
         include: 'loki.yaml'
@@ -24,7 +24,7 @@ spec:
     # Logs - Promtail (log shipper for Loki)
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: workload-catalog/components/observability/promtail
+      path: lab/workload-catalog/components/observability/promtail
       directory:
         recurse: false
         include: 'promtail.yaml'

@@ -23,7 +23,7 @@ spec:
       ref: values
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: workload-catalog/components/observability/elk-stack
+      path: lab/workload-catalog/components/observability/elk-stack
       directory:
         include: '{*-httproute.yaml,*-rbac.yaml}'
   destination:

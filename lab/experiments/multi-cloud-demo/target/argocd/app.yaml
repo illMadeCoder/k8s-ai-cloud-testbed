@@ -17,19 +17,19 @@ spec:
     # Deploy demo application
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: workload-catalog/components/apps/demo-app
+      path: lab/workload-catalog/components/apps/demo-app
       directory:
         exclude: 'demo-app.yaml'
 
     # Deploy Crossplane claims for this experiment
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: experiments/multi-cloud-demo/crossplane
+      path: lab/experiments/multi-cloud-demo/crossplane
 
     # Deploy k6 scripts ConfigMap
     - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
       targetRevision: HEAD
-      path: experiments/multi-cloud-demo/k6
+      path: lab/experiments/multi-cloud-demo/k6
 
   destination:
     server: https://kubernetes.default.svc

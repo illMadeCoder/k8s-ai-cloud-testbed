@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
     targetRevision: HEAD
-    path: workload-catalog/components/apps/demo-app/k8s
+    path: lab/workload-catalog/components/apps/demo-app/k8s
   destination:
     server: https://kubernetes.default.svc
     namespace: demo

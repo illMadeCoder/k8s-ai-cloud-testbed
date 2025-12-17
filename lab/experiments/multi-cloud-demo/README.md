@@ -62,11 +62,11 @@ task exp:deploy NAME=multi-cloud-demo CLOUD=both
 
 ```bash
 # Azure
-cd experiments/multi-cloud-demo/terraform/azure
+cd lab/experiments/multi-cloud-demo/terraform/azure
 terraform init && terraform apply
 
 # AWS
-cd experiments/multi-cloud-demo/terraform/aws
+cd lab/experiments/multi-cloud-demo/terraform/aws
 terraform init && terraform apply
 ```
 
@@ -96,7 +96,7 @@ demo        demo-cache   redis    small   demo-cache.redis.cache...   6380   azu
 task exp:destroy NAME=multi-cloud-demo CLOUD=azure
 
 # Via Terraform
-cd experiments/multi-cloud-demo/terraform/azure
+cd lab/experiments/multi-cloud-demo/terraform/azure
 terraform destroy
 ```
 

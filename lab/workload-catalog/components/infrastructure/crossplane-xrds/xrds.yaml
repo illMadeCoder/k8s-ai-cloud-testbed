@@ -29,7 +29,7 @@ spec:
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
     targetRevision: HEAD
-    path: workload-catalog/components/infrastructure/crossplane-xrds/definitions
+    path: lab/workload-catalog/components/infrastructure/crossplane-xrds/definitions
     directory:
       recurse: true
   destination:

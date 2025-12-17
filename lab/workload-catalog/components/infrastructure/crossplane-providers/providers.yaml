@@ -28,7 +28,7 @@ spec:
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
     targetRevision: HEAD
-    path: workload-catalog/components/infrastructure/crossplane-providers
+    path: lab/workload-catalog/components/infrastructure/crossplane-providers
     directory:
       recurse: true
       exclude: 'providers.yaml'
