@@ -3,8 +3,9 @@ version: '3'
 silent: true
 
 includes:
-  hub: ./hub/Taskfile.yaml
-  experiments: ./experiments/Taskfile.yaml
+  kind: ./kind/Taskfile.yaml
+  # talos: ./talos/Taskfile.yaml  # future
+  # cloud: ./cloud/Taskfile.yaml  # future
 
 tasks:
   default:

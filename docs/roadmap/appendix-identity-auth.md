@@ -541,3 +541,65 @@
 - [ ] **ADR:** Document identity security monitoring strategy
 
 ---
+
+### B.12 API Keys & Personal Access Tokens
+
+**Goal:** Understand non-interactive authentication mechanisms for developers and automation
+
+**Learning objectives:**
+- Understand when to use API keys vs OAuth vs PATs
+- Implement secure API key management
+- Design PAT systems with appropriate scoping
+
+**Tasks:**
+- [ ] Create `experiments/scenarios/api-key-management/`
+- [ ] API keys fundamentals:
+  - [ ] What API keys are (shared secrets, not user-bound)
+  - [ ] API keys vs OAuth tokens (no user context, no expiration by default)
+  - [ ] Use cases: public APIs, rate limiting, billing attribution
+  - [ ] When NOT to use API keys (user data access, sensitive operations)
+- [ ] API key security:
+  - [ ] Generation (CSPRNG, sufficient entropy, 256+ bits)
+  - [ ] Storage (hash server-side, never store plaintext)
+  - [ ] Prefix patterns for identification (sk_live_, pk_test_)
+  - [ ] Key rotation without downtime
+  - [ ] Revocation mechanisms
+- [ ] API key scoping:
+  - [ ] Read vs write permissions
+  - [ ] Resource-level restrictions
+  - [ ] IP allowlisting
+  - [ ] Rate limiting per key
+- [ ] Personal Access Tokens (PATs):
+  - [ ] PATs as user-scoped credentials for automation
+  - [ ] Difference from API keys (user context, audit trail)
+  - [ ] GitHub/GitLab PAT patterns
+  - [ ] Fine-grained vs classic tokens
+- [ ] PAT implementation:
+  - [ ] Token generation and display (show once)
+  - [ ] Scope selection UI
+  - [ ] Expiration policies (required vs optional)
+  - [ ] Token naming/description for management
+  - [ ] Last used tracking
+- [ ] PAT security:
+  - [ ] Hashing (like passwords)
+  - [ ] Binding to user lifecycle (delete on user deletion)
+  - [ ] Scope validation on every request
+  - [ ] Activity logging
+- [ ] Service accounts vs PATs:
+  - [ ] When to use service accounts (CI/CD, automation)
+  - [ ] When to use PATs (personal scripts, testing)
+  - [ ] Shared credentials anti-pattern
+- [ ] API key/PAT in practice:
+  - [ ] Header patterns (Authorization: Bearer, X-API-Key)
+  - [ ] Query parameter risks (logs, referrer leakage)
+  - [ ] Client SDK patterns
+- [ ] Management UI:
+  - [ ] List active tokens
+  - [ ] Revoke individual tokens
+  - [ ] Bulk revocation
+  - [ ] Usage analytics
+- [ ] Implement API key service
+- [ ] Implement PAT system with scoping
+- [ ] **ADR:** Document API key vs OAuth vs PAT selection criteria
+
+---
