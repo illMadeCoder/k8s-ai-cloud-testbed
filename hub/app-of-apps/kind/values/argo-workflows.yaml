@@ -26,8 +26,7 @@ server:
   authMode: server
 
   # Expose via LoadBalancer for Kind
-  service:
-    type: LoadBalancer
+  serviceType: LoadBalancer
 
   resources:
     requests:
