@@ -118,10 +118,10 @@ Validate            Platform Engineering     Synthesis
 - [x] Add MetalLB to Kind app-of-apps
 - [x] Add dns-stack to Kind app-of-apps
 - [x] Add Argo Workflows to Kind app-of-apps
-- [ ] Test Kind hub bootstrap end-to-end
+- [x] Test Kind hub bootstrap end-to-end
+- [x] Update `kind:conduct` for orchestrator pattern (parallel provisioning)
 - [ ] Deploy OpenBao via ArgoCD
 - [ ] Deploy Crossplane via ArgoCD
-- [ ] Update `kind:conduct` for orchestrator pattern
 - [ ] Configure Cloudflare Tunnel for webhooks
 
 See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.

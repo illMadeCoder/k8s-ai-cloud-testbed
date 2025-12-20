@@ -2,6 +2,102 @@
 
 *The crown jewel. After mastering infrastructure, security, observability, and operations - we finally examine what actually serves the traffic. This phase synthesizes everything into understanding complete distributed web systems.*
 
+### 16.0 Performance Engineering Fundamentals
+
+**Goal:** Establish the mental models and vocabulary for measuring and reasoning about system performance
+
+*Before benchmarking anything, understand how to measure, what to measure, and how to interpret results. This is the foundation for everything else in this phase.*
+
+**Learning objectives:**
+- Master SLI/SLO/SLA hierarchy and how to apply it to web services
+- Understand latency distributions, not just averages
+- Learn the key metrics every SRE must know
+- Build intuition for performance analysis
+
+**SLI/SLO/SLA for Web Services:**
+
+| Concept | Definition | Example |
+|---------|------------|---------|
+| **SLI** (Indicator) | The metric you measure | p99 latency, error rate, throughput |
+| **SLO** (Objective) | Internal target for the SLI | p99 latency < 200ms, 99.9% success |
+| **SLA** (Agreement) | Contractual commitment + consequences | 99.9% uptime or credits issued |
+
+**Key Performance Metrics:**
+
+| Metric | What It Tells You | Why It Matters |
+|--------|-------------------|----------------|
+| **Latency** | Time to complete a request | User experience, timeout risk |
+| **Throughput** | Requests per second | Capacity, cost efficiency |
+| **Saturation** | How "full" the service is | Headroom, scaling triggers |
+| **Errors** | Failure rate | Reliability, user trust |
+
+**Latency Deep Dive:**
+
+| Latency Type | Definition | When It Matters |
+|--------------|------------|-----------------|
+| **Average (mean)** | Sum / count | Almost never - hides problems |
+| **Median (p50)** | 50th percentile | Typical user experience |
+| **p95** | 95th percentile | Most users' worst case |
+| **p99** | 99th percentile | SLO boundary, tail starts |
+| **p99.9** | 99.9th percentile | True tail latency |
+| **Max** | Worst observed | Timeout tuning, outliers |
+
+*"If you're not measuring percentiles, you're not measuring latency."*
+
+**Why Tail Latency Matters:**
+
+```
+At 1000 req/s with p99 = 500ms:
+  - 10 requests per second take > 500ms
+  - Over a day: 864,000 slow requests
+  - If each user makes 10 requests: 1 in 10 users hit the tail per session
+```
+
+**The RED Method (for request-driven services):**
+- **R**ate - requests per second
+- **E**rrors - failed requests per second
+- **D**uration - latency distribution
+
+**The USE Method (for resources):**
+- **U**tilization - % time resource is busy
+- **S**aturation - queue depth, backpressure
+- **E**rrors - error events
+
+**Foundational Laws:**
+
+| Law | Formula | Implication |
+|-----|---------|-------------|
+| **Little's Law** | L = λW (queue = rate × time) | More latency = more in-flight requests = more memory |
+| **Amdahl's Law** | Speedup limited by serial portion | Know your bottleneck before optimizing |
+| **Universal Scalability Law** | Contention + coherence costs | Why systems don't scale linearly |
+
+**Tasks:**
+- [ ] Create `experiments/scenarios/perf-fundamentals/`
+- [ ] SLI selection exercise:
+  - [ ] Define SLIs for a typical web API
+  - [ ] Choose appropriate percentiles for SLOs
+  - [ ] Calculate error budgets from SLOs
+- [ ] Latency distribution analysis:
+  - [ ] Generate synthetic latency data (normal, bimodal, long-tail)
+  - [ ] Visualize percentile distributions
+  - [ ] Understand histogram vs heatmap representations
+- [ ] Saturation experiments:
+  - [ ] Load until saturation (find the knee)
+  - [ ] Measure queue depth growth
+  - [ ] Observe latency explosion at saturation
+- [ ] Little's Law validation:
+  - [ ] Measure concurrent connections at various loads
+  - [ ] Verify L = λW relationship
+- [ ] Create SLO dashboard template:
+  - [ ] SLI current value
+  - [ ] SLO threshold
+  - [ ] Error budget remaining
+  - [ ] Burn rate
+- [ ] Document performance measurement methodology
+- [ ] **ADR:** SLO philosophy and percentile selection
+
+---
+
 ### 16.1 Concurrency & Threading Models
 
 **Goal:** Deeply understand how different concurrency models handle load

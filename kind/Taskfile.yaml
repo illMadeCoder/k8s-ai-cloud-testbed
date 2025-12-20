@@ -145,13 +145,17 @@ tasks:
         echo ""
 
         # Step 1: Discover clusters from experiment folders
-        echo "=== Step 1/5: Discovering clusters ==="
+        echo "=== Step 1/6: Discovering clusters ==="
         CLUSTERS=""
+        HAS_ORCHESTRATOR=false
         for cluster_dir in "$EXP_PATH"/*/; do
           if [ -f "$cluster_dir/cluster.yaml" ]; then
             cluster_name=$(basename "$cluster_dir")
             CLUSTERS="$CLUSTERS $cluster_name"
             echo "  Found: $cluster_name"
+            if [ "$cluster_name" = "orchestrator" ]; then
+              HAS_ORCHESTRATOR=true
+            fi
           fi
         done
 
@@ -160,25 +164,93 @@ tasks:
           exit 1
         fi
 
-        # Step 2: Create kind clusters for experiment
+        if [ "$HAS_ORCHESTRATOR" = "true" ]; then
+          echo "  Mode: Orchestrator pattern (workflow runs on orchestrator)"
+        else
+          echo "  Mode: Hub pattern (workflow runs on hub)"
+        fi
+
+        # Step 2: Create kind clusters IN PARALLEL
         echo ""
-        echo "=== Step 2/5: Creating experiment clusters ==="
+        echo "=== Step 2/6: Creating experiment clusters (parallel) ==="
+        PIDS=""
         for cluster in $CLUSTERS; do
           full_name="${EXP_NAME}-${cluster}"
           if kind get clusters 2>/dev/null | grep -q "^${full_name}$"; then
             echo "  Cluster '$full_name' already exists"
           else
             echo "  Creating cluster '$full_name'..."
-            kind create cluster --name "$full_name" --wait 60s
+            kind create cluster --name "$full_name" --wait 60s &
+            PIDS="$PIDS $!"
           fi
         done
 
-        # Step 3: Register clusters with ArgoCD on hub
+        # Wait for all cluster creations
+        if [ -n "$PIDS" ]; then
+          echo "  Waiting for parallel cluster creation..."
+          for pid in $PIDS; do
+            wait $pid || { echo "ERROR: Cluster creation failed (pid $pid)"; exit 1; }
+          done
+          echo "  All clusters created!"
+        fi
+
+        # Step 3: Bootstrap orchestrator if present
         echo ""
-        echo "=== Step 3/5: Registering clusters with ArgoCD ==="
+        echo "=== Step 3/6: Bootstrapping orchestrator ==="
+        if [ "$HAS_ORCHESTRATOR" = "true" ]; then
+          ORCH_NAME="${EXP_NAME}-orchestrator"
+          ORCH_CONTEXT="kind-${ORCH_NAME}"
+
+          echo "  Installing ArgoCD on orchestrator..."
+          helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
+          helm repo update argo >/dev/null
+          helm upgrade --install argocd argo/argo-cd \
+            --kube-context "$ORCH_CONTEXT" \
+            -n argocd --create-namespace \
+            --set server.service.type=NodePort \
+            --set configs.params."server\.insecure"=true \
+            --wait --timeout 3m
+
+          echo "  Installing Argo Workflows on orchestrator..."
+          helm upgrade --install argo-workflows argo/argo-workflows \
+            --kube-context "$ORCH_CONTEXT" \
+            -n argo-workflows --create-namespace \
+            --set controller.containerRuntimeExecutor=emissary \
+            --set controller.workflowDefaults.spec.serviceAccountName=argo-workflow \
+            --set server.enabled=true \
+            --set server.authMode=server \
+            --set server.serviceType=NodePort \
+            --set workflow.serviceAccount.create=true \
+            --set workflow.serviceAccount.name=argo-workflow \
+            --set workflow.rbac.create=true \
+            --wait --timeout 3m
+
+          echo "  Orchestrator bootstrapped!"
+        else
+          echo "  No orchestrator cluster - using hub"
+        fi
+
+        # Step 4: Register clusters with ArgoCD
+        echo ""
+        echo "=== Step 4/6: Registering clusters with ArgoCD ==="
+
+        # Determine which cluster runs ArgoCD
+        if [ "$HAS_ORCHESTRATOR" = "true" ]; then
+          ARGOCD_CONTEXT="kind-${EXP_NAME}-orchestrator"
+          ARGOCD_CLUSTER="${EXP_NAME}-orchestrator"
+        else
+          ARGOCD_CONTEXT="kind-{{.HUB_CLUSTER}}"
+          ARGOCD_CLUSTER="{{.HUB_CLUSTER}}"
+        fi
+
         for cluster in $CLUSTERS; do
+          # Skip registering orchestrator with itself
+          if [ "$cluster" = "orchestrator" ] && [ "$HAS_ORCHESTRATOR" = "true" ]; then
+            continue
+          fi
+
           full_name="${EXP_NAME}-${cluster}"
-          echo "  Registering: $full_name"
+          echo "  Registering: $full_name with ArgoCD on $ARGOCD_CLUSTER"
 
           CLUSTER_CONTEXT="kind-${full_name}"
           CONTAINER_NAME="${full_name}-control-plane"
@@ -222,21 +294,26 @@ tasks:
               }
             }
         ENDOFFILE
-          kubectl --context kind-{{.HUB_CLUSTER}} apply -f /tmp/cluster-secret.yaml
+          kubectl --context "$ARGOCD_CONTEXT" apply -f /tmp/cluster-secret.yaml
           echo "    Registered: $cluster -> $CLUSTER_SERVER"
         done
 
-        # Step 4: Deploy ArgoCD apps
+        # Step 5: Deploy ArgoCD apps
         echo ""
-        echo "=== Step 4/5: Deploying apps via ArgoCD ==="
+        echo "=== Step 5/6: Deploying apps via ArgoCD ==="
         for cluster in $CLUSTERS; do
+          # Skip orchestrator (it doesn't get app deployments, it runs them)
+          if [ "$cluster" = "orchestrator" ]; then
+            continue
+          fi
+
           full_name="${EXP_NAME}-${cluster}"
           cluster_dir="$EXP_PATH/$cluster"
           argocd_dir="$cluster_dir/argocd"
 
           if [ -d "$argocd_dir" ] && [ -f "$argocd_dir/app.yaml" ]; then
             echo "  Applying: app.yaml -> $full_name"
-            kubectl --context kind-{{.HUB_CLUSTER}} apply -f "$argocd_dir/app.yaml"
+            kubectl --context "$ARGOCD_CONTEXT" apply -f "$argocd_dir/app.yaml"
           fi
         done
 
@@ -248,9 +325,25 @@ tasks:
         EXP_PATH="experiments/scenarios/$EXP_NAME"
         WORKFLOW_FILE="$EXP_PATH/workflow/experiment.yaml"
 
+        # Determine orchestrator mode
+        HAS_ORCHESTRATOR=false
+        if [ -d "$EXP_PATH/orchestrator" ] && [ -f "$EXP_PATH/orchestrator/cluster.yaml" ]; then
+          HAS_ORCHESTRATOR=true
+        fi
+
         echo ""
-        echo "=== Step 5/5: Running workflow ==="
-        kubectl config use-context kind-{{.HUB_CLUSTER}}
+        echo "=== Step 6/6: Running workflow ==="
+
+        # Determine which cluster runs the workflow
+        if [ "$HAS_ORCHESTRATOR" = "true" ]; then
+          WORKFLOW_CONTEXT="kind-${EXP_NAME}-orchestrator"
+          echo "  Running on: orchestrator"
+        else
+          WORKFLOW_CONTEXT="kind-{{.HUB_CLUSTER}}"
+          echo "  Running on: hub"
+        fi
+
+        kubectl config use-context "$WORKFLOW_CONTEXT"
 
         TARGET_CONTAINER="${EXP_NAME}-target-control-plane"
         TARGET_IP=$(docker inspect "$TARGET_CONTAINER" | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
