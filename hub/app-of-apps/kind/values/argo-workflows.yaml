@@ -30,8 +30,8 @@ server:
   # Production should use sso
   authMode: server
 
-  # Expose via LoadBalancer for Kind
-  serviceType: LoadBalancer
+  # Expose via NodePort (LoadBalancer IP reserved for dns-stack)
+  serviceType: NodePort
 
   resources:
     requests:
