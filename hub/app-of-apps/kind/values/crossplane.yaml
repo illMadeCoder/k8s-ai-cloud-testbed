@@ -1,0 +1,32 @@
+# Crossplane Helm values for Kind hub
+#
+# Minimal config for local development. Providers will be
+# installed separately to provision cloud infrastructure.
+
+# Resource limits for Kind
+resourcesCrossplane:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+resourcesRBACManager:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Enable leader election for HA (even in dev, good practice)
+leaderElection: true
+
+# Metrics for observability
+metrics:
+  enabled: true
+
+# Args for debugging (can disable in production)
+args:
+  - --debug

@@ -1,0 +1,58 @@
+# OpenBao Helm values for Kind hub
+#
+# Development mode for local testing. NOT for production.
+# Uses in-memory storage and auto-unseals.
+
+global:
+  enabled: true
+
+server:
+  # Dev mode: auto-unseals, in-memory storage, root token = "root"
+  # Perfect for local development, NOT for production
+  dev:
+    enabled: true
+    devRootToken: "root"
+
+  # Resource limits for Kind
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  # Expose via LoadBalancer for Kind
+  service:
+    type: LoadBalancer
+
+  # Data storage (ignored in dev mode, but set for reference)
+  dataStorage:
+    enabled: false
+
+  # Standalone mode (no HA for local dev)
+  standalone:
+    enabled: true
+
+  # HA disabled for local dev
+  ha:
+    enabled: false
+
+# Injector for automatic secret injection into pods
+injector:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+# CSI provider for mounting secrets as volumes
+csi:
+  enabled: false
+
+# UI enabled
+ui:
+  enabled: true

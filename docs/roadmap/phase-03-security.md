@@ -159,7 +159,18 @@
   - [ ] Secret rotation workflow
   - [ ] Audit logging
   - [ ] Backup and recovery
-- [ ] Compare all three approaches:
+- [ ] ArgoCD Vault Plugin (AVP):
+  - [ ] Install AVP as ArgoCD plugin
+  - [ ] Use placeholders in manifests: `<path:secret/data/foo#bar>`
+  - [ ] Compare with ESO approach (sync-time vs runtime)
+  - [ ] Understand trade-offs:
+    - AVP: secrets never in etcd, but requires ArgoCD rebuild
+    - ESO: creates K8s Secrets, but simpler ArgoCD setup
+- [ ] Compare all four approaches:
+  - [ ] Sealed Secrets: simple, cluster-bound
+  - [ ] SOPS: portable, key management overhead
+  - [ ] ESO: central store, creates K8s Secrets
+  - [ ] AVP: central store, no K8s Secrets, sync-time substitution
   - [ ] When to use each
   - [ ] Migration paths
 - [ ] Document ESO + OpenBao patterns

@@ -1,0 +1,37 @@
+# OpenBao for Hub
+#
+# Secrets management for the hub cluster. Provides a secure store
+# for credentials, API keys, and other sensitive data.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openbao
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+    environment: kind
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://openbao.github.io/openbao-helm
+      chart: openbao
+      targetRevision: 0.19.3
+      helm:
+        valueFiles:
+          - $values/hub/app-of-apps/kind/values/openbao.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openbao
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
