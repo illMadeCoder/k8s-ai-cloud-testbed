@@ -1,0 +1,17 @@
+# TLS Certificate for ArgoCD
+#
+# Uses Let's Encrypt via Cloudflare DNS-01 challenge.
+# Outputs to argocd-server-tls which ArgoCD automatically uses.
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argocd-server-tls
+  namespace: argocd
+spec:
+  secretName: argocd-server-tls
+  dnsNames:
+    - argocd.illmlab.xyz
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer

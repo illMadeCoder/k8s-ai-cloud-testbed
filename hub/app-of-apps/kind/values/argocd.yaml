@@ -7,18 +7,3 @@ server:
   service:
     type: LoadBalancer
     loadBalancerIP: 172.19.255.201  # Reserve .200 for DNS
-
-  # Use Let's Encrypt certificate from cert-manager
-  volumeMounts:
-    - name: argocd-tls
-      mountPath: /app/tls
-      readOnly: true
-
-  volumes:
-    - name: argocd-tls
-      secret:
-        secretName: argocd-tls
-
-  extraArgs:
-    - --tls-cert-file=/app/tls/tls.crt
-    - --tls-private-key-file=/app/tls/tls.key
