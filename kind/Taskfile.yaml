@@ -33,6 +33,10 @@ tasks:
     desc: Bootstrap hub on Kind (full setup)
     cmds:
       - |
+        echo "=== Preparing persistent storage ==="
+        mkdir -p ~/.illmlab/openbao-data
+        chmod 777 ~/.illmlab/openbao-data
+      - |
         echo "=== Creating Kind cluster ==="
         kind create cluster --name {{.HUB_CLUSTER}} --config kind/cluster-config.yaml --wait 60s || true
         kubectl config use-context kind-{{.HUB_CLUSTER}}
