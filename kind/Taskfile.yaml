@@ -17,6 +17,9 @@ vars:
   HUB_CLUSTER: hub
   ARGOCD_NAMESPACE: argocd
   DNS_IP: 172.19.255.200
+  # OpenBao persistence
+  OPENBAO_KEYS_FILE: ~/.illmlab/openbao-keys.json
+  OPENBAO_NAMESPACE: openbao
   # Infrastructure containers
   CPK_CONTAINER: cloud-provider-kind
   DNSMASQ_CONTAINER: kind-dnsmasq
@@ -31,7 +34,7 @@ tasks:
     cmds:
       - |
         echo "=== Creating Kind cluster ==="
-        kind create cluster --name {{.HUB_CLUSTER}} --wait 60s || true
+        kind create cluster --name {{.HUB_CLUSTER}} --config kind/cluster-config.yaml --wait 60s || true
         kubectl config use-context kind-{{.HUB_CLUSTER}}
       - |
         echo "=== Installing ArgoCD ==="
@@ -56,6 +59,96 @@ tasks:
           sleep 2
         done
         echo "k8s_gateway ready at {{.DNS_IP}}"
+      - |
+        echo "=== Initializing OpenBao ==="
+        echo "Waiting for OpenBao to be ready..."
+        until kubectl get application openbao -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null | grep -q "Healthy"; do
+          sleep 5
+        done
+        echo "OpenBao application healthy!"
+
+        # Wait for pod to be running
+        until kubectl get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; do
+          sleep 2
+        done
+        echo "OpenBao pod running!"
+
+        # Get OpenBao address
+        OPENBAO_POD=$(kubectl get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}')
+
+        # Check if already initialized
+        INIT_STATUS=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- bao status -format=json 2>/dev/null | jq -r '.initialized' || echo "false")
+
+        KEYS_FILE="{{.OPENBAO_KEYS_FILE}}"
+        KEYS_FILE="${KEYS_FILE/#\~/$HOME}"
+
+        if [ "$INIT_STATUS" = "false" ]; then
+          echo "Initializing OpenBao (first time setup)..."
+          INIT_OUTPUT=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- bao operator init -key-shares=1 -key-threshold=1 -format=json)
+          echo "$INIT_OUTPUT" > "$KEYS_FILE"
+          chmod 600 "$KEYS_FILE"
+          echo "Keys saved to $KEYS_FILE"
+        else
+          echo "OpenBao already initialized"
+        fi
+
+        # Check if sealed
+        SEALED=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- bao status -format=json 2>/dev/null | jq -r '.sealed')
+
+        if [ "$SEALED" = "true" ]; then
+          if [ -f "$KEYS_FILE" ]; then
+            echo "Unsealing OpenBao..."
+            UNSEAL_KEY=$(jq -r '.unseal_keys_b64[0]' "$KEYS_FILE")
+            kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- bao operator unseal "$UNSEAL_KEY" > /dev/null
+            echo "OpenBao unsealed!"
+          else
+            echo "ERROR: OpenBao is sealed but no keys file found at $KEYS_FILE"
+            exit 1
+          fi
+        else
+          echo "OpenBao already unsealed"
+        fi
+
+        # Show status
+        ROOT_TOKEN=$(jq -r '.root_token' "$KEYS_FILE" 2>/dev/null || echo "unknown")
+        echo "OpenBao ready! Root token: $ROOT_TOKEN"
+      - |
+        echo "=== Configuring OpenBao ==="
+        KEYS_FILE="{{.OPENBAO_KEYS_FILE}}"
+        KEYS_FILE="${KEYS_FILE/#\~/$HOME}"
+        ROOT_TOKEN=$(jq -r '.root_token' "$KEYS_FILE")
+        OPENBAO_POD=$(kubectl get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}')
+
+        # Enable KV v2 secrets engine (if not already enabled)
+        kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- env BAO_TOKEN="$ROOT_TOKEN" bao secrets enable -path=secret -version=2 kv 2>/dev/null || echo "KV engine already enabled"
+
+        # Check if Cloudflare token exists in OpenBao
+        CF_EXISTS=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- env BAO_TOKEN="$ROOT_TOKEN" bao kv get secret/cloudflare 2>/dev/null && echo "yes" || echo "no")
+
+        if [ "$CF_EXISTS" = "no" ]; then
+          echo ""
+          echo "Cloudflare API token not found in OpenBao."
+          echo "To store it, run:"
+          echo "  kubectl exec -n openbao \$(kubectl get pods -n openbao -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}') -- \\"
+          echo "    env BAO_TOKEN=\"$ROOT_TOKEN\" bao kv put secret/cloudflare api-token=\"YOUR_TOKEN\""
+          echo ""
+        else
+          echo "Cloudflare token already stored in OpenBao"
+        fi
+
+        # Wait for external-secrets namespace to exist
+        echo "Waiting for external-secrets namespace..."
+        until kubectl get ns external-secrets 2>/dev/null; do
+          sleep 2
+        done
+
+        # Create/update openbao-token secret for ESO
+        echo "Configuring ESO authentication..."
+        kubectl create secret generic openbao-token \
+          -n external-secrets \
+          --from-literal=token="$ROOT_TOKEN" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        echo "ESO configured with OpenBao token"
       - |
         echo "=== Configuring host DNS ==="
         if grep -q "{{.DNS_IP}}" /etc/resolv.conf 2>/dev/null; then
@@ -100,6 +193,48 @@ tasks:
     desc: Get ArgoCD admin password
     cmds:
       - kubectl --context kind-{{.HUB_CLUSTER}} -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
+
+  secret:
+    desc: "Store secret in OpenBao: task kind:secret -- <path> <key>=<value> [key2=value2...]"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task kind:secret -- <path> <key>=<value> [key2=value2...]"
+          echo ""
+          echo "Examples:"
+          echo "  task kind:secret -- cloudflare api-token=abc123"
+          echo "  task kind:secret -- github token=xyz user=myuser"
+          exit 1
+        fi
+
+        KEYS_FILE="{{.OPENBAO_KEYS_FILE}}"
+        KEYS_FILE="${KEYS_FILE/#\~/$HOME}"
+
+        if [ ! -f "$KEYS_FILE" ]; then
+          echo "ERROR: OpenBao keys file not found at $KEYS_FILE"
+          echo "Run 'task kind:bootstrap' first."
+          exit 1
+        fi
+
+        ROOT_TOKEN=$(jq -r '.root_token' "$KEYS_FILE")
+        OPENBAO_POD=$(kubectl --context kind-{{.HUB_CLUSTER}} get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}')
+
+        # Parse arguments: first is path, rest are key=value pairs
+        ARGS=({{.CLI_ARGS}})
+        SECRET_PATH="${ARGS[0]}"
+        unset ARGS[0]
+
+        # Build key=value arguments
+        KV_ARGS=""
+        for arg in "${ARGS[@]}"; do
+          KV_ARGS="$KV_ARGS $arg"
+        done
+
+        echo "Storing secret at: secret/$SECRET_PATH"
+        kubectl --context kind-{{.HUB_CLUSTER}} exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao kv put "secret/$SECRET_PATH" $KV_ARGS
+
+        echo "Secret stored successfully!"
 
   # =============================================================================
   # Experiment Lifecycle

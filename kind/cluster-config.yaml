@@ -1,0 +1,17 @@
+# Kind cluster configuration for hub
+#
+# Includes extraMounts for persistent OpenBao storage.
+# Data in ~/.illmlab/openbao-data survives cluster deletion.
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+nodes:
+  - role: control-plane
+    extraMounts:
+      # OpenBao persistent storage
+      # Maps host directory to node, OpenBao PV will use hostPath to this location
+      - hostPath: /home/illm/.illmlab/openbao-data
+        containerPath: /mnt/openbao-data
+        readOnly: false
+        propagation: Bidirectional

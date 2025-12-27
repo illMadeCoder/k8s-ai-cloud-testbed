@@ -1,17 +1,19 @@
 # OpenBao Helm values for Kind hub
 #
-# Development mode for local testing. NOT for production.
-# Uses in-memory storage and auto-unseals.
+# Uses file storage with hostPath for persistence across cluster recreations.
+# Data persists in ~/.illmlab/openbao-data on the host.
+#
+# After bootstrap, OpenBao needs to be initialized and unsealed:
+#   - First run: `bao operator init` (saves keys to ~/.illmlab/openbao-keys.json)
+#   - Subsequent runs: `bao operator unseal` with saved keys
 
 global:
   enabled: true
 
 server:
-  # Dev mode: auto-unseals, in-memory storage, root token = "root"
-  # Perfect for local development, NOT for production
+  # Disable dev mode - use real storage
   dev:
-    enabled: true
-    devRootToken: "root"
+    enabled: false
 
   # Resource limits for Kind
   resources:
@@ -26,17 +28,43 @@ server:
   service:
     type: LoadBalancer
 
-  # Data storage (ignored in dev mode, but set for reference)
+  # File storage configuration
   dataStorage:
-    enabled: false
+    enabled: true
+    size: 1Gi
+    storageClass: null  # Use default
+    accessMode: ReadWriteOnce
 
   # Standalone mode (no HA for local dev)
   standalone:
     enabled: true
+    config: |
+      ui = true
+
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      storage "file" {
+        path = "/vault/data"
+      }
 
   # HA disabled for local dev
   ha:
     enabled: false
+
+  # Use hostPath volume for persistence across cluster recreations
+  volumes:
+    - name: openbao-persistent
+      hostPath:
+        path: /mnt/openbao-data
+        type: DirectoryOrCreate
+
+  volumeMounts:
+    - name: openbao-persistent
+      mountPath: /vault/data
 
 # Injector for automatic secret injection into pods
 injector:
