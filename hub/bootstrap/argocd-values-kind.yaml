@@ -1,12 +1,15 @@
-# ArgoCD values for Kind hub cluster
+# ArgoCD values for Kind hub cluster (bootstrap only)
 #
-# Bootstrap:
-#   kind create cluster --name hub
-#   helm install argocd argo/argo-cd -n argocd --create-namespace \
-#     -f hub/bootstrap/argocd-values-kind.yaml
-#   kubectl apply -f hub/bootstrap/hub-application.yaml
+# Used by: task kind:bootstrap
+# After bootstrap, ArgoCD manages itself via hub/app-of-apps/kind/values/argocd.yaml
+#
+# ENVIRONMENT CONFIG: If changing Kind network, also update:
+#   - hub/app-of-apps/kind/manifests/metallb-config/kustomization.yaml (POOL_RANGE)
+#   - hub/app-of-apps/kind/values/argocd.yaml (loadBalancerIP)
+#   - hub/app-of-apps/kind/values/dns-stack.yaml (loadBalancerIP)
+#   - kind/Taskfile.yaml (DNS_IP)
 
 server:
   service:
     type: LoadBalancer
-    loadBalancerIP: 172.19.255.201  # Reserve .200 for DNS
+    loadBalancerIP: 172.19.255.201  # ArgoCD gets .201, DNS gets .200

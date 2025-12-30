@@ -1,0 +1,59 @@
+# Kustomization for Cert-Manager Config
+#
+# Uses replacements to inject environment-specific values.
+# Edit the ConfigMap below to customize domain and email.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cluster-issuer.yaml
+  - argocd-certificate.yaml
+
+# Environment-specific values
+# Change these to match your domain and email
+configMapGenerator:
+  - name: cert-manager-env
+    namespace: cert-manager
+    literals:
+      - ACME_EMAIL=admin@illmlab.xyz
+      - ARGOCD_DOMAIN=argocd.illmlab.xyz
+    options:
+      disableNameSuffixHash: true
+
+replacements:
+  # Replace email in letsencrypt-prod ClusterIssuer
+  - source:
+      kind: ConfigMap
+      name: cert-manager-env
+      fieldPath: data.ACME_EMAIL
+    targets:
+      - select:
+          kind: ClusterIssuer
+          name: letsencrypt-prod
+        fieldPaths:
+          - spec.acme.email
+
+  # Replace email in letsencrypt-staging ClusterIssuer
+  - source:
+      kind: ConfigMap
+      name: cert-manager-env
+      fieldPath: data.ACME_EMAIL
+    targets:
+      - select:
+          kind: ClusterIssuer
+          name: letsencrypt-staging
+        fieldPaths:
+          - spec.acme.email
+
+  # Replace domain in ArgoCD Certificate
+  - source:
+      kind: ConfigMap
+      name: cert-manager-env
+      fieldPath: data.ARGOCD_DOMAIN
+    targets:
+      - select:
+          kind: Certificate
+          name: argocd-server-tls
+        fieldPaths:
+          - spec.dnsNames.0

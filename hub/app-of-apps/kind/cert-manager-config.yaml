@@ -2,6 +2,9 @@
 #
 # Deploys ClusterIssuers for Let's Encrypt after cert-manager is ready.
 # Sync wave 0 ensures this runs after cert-manager (wave -2).
+#
+# Uses Kustomize for environment-specific domain/email configuration.
+# To change domain/email, edit: manifests/cert-manager-config/kustomization.yaml
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application

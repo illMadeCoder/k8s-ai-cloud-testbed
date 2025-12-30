@@ -16,6 +16,11 @@ silent: true
 vars:
   HUB_CLUSTER: hub
   ARGOCD_NAMESPACE: argocd
+  # ENVIRONMENT CONFIG: If changing Kind network, also update:
+  #   - hub/app-of-apps/kind/manifests/metallb-config/kustomization.yaml (POOL_RANGE)
+  #   - hub/app-of-apps/kind/values/dns-stack.yaml (loadBalancerIP)
+  #   - hub/app-of-apps/kind/values/argocd.yaml (loadBalancerIP)
+  #   - hub/bootstrap/argocd-values-kind.yaml (loadBalancerIP)
   DNS_IP: 172.19.255.200
   # OpenBao persistence
   OPENBAO_KEYS_FILE: ~/.illmlab/openbao-keys.json

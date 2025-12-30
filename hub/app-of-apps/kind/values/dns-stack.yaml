@@ -2,6 +2,11 @@
 #
 # Provides DNS resolution for LoadBalancer and Ingress resources.
 # Query: dig @<service-ip> <service>.<namespace>.k8s.local
+#
+# ENVIRONMENT CONFIG: If changing Kind network, also update:
+#   - manifests/metallb-config/kustomization.yaml (POOL_RANGE)
+#   - values/argocd.yaml (loadBalancerIP)
+#   - kind/Taskfile.yaml (DNS_IP)
 
 # Domain served by this DNS server
 domain: k8s.local
@@ -12,10 +17,11 @@ watchedResources:
   - Service
 
 # Expose via LoadBalancer with fixed IP for predictable DNS config
+# Must be within MetalLB pool range (see manifests/metallb-config/kustomization.yaml)
 service:
   type: LoadBalancer
   port: 53
-  loadBalancerIP: 172.19.255.200
+  loadBalancerIP: 172.19.255.200  # DNS gets .200
 
 # Fallback DNS for non-k8s.local queries
 fallthrough:

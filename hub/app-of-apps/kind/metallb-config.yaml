@@ -2,6 +2,9 @@
 #
 # Deploys IPAddressPool and L2Advertisement after MetalLB is ready.
 # Sync wave 0 ensures this runs after metallb (wave -1).
+#
+# Uses Kustomize for environment-specific IP configuration.
+# To change IP range, edit: manifests/metallb-config/kustomization.yaml
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application

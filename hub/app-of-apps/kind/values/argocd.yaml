@@ -2,8 +2,15 @@
 #
 # This is the ongoing config - changes here are synced by ArgoCD.
 # The bootstrap values file is only used for initial install.
+#
+# ENVIRONMENT CONFIG: If changing Kind network, also update:
+#   - manifests/metallb-config/kustomization.yaml (POOL_RANGE)
+#   - values/dns-stack.yaml (loadBalancerIP)
+#   - hub/bootstrap/argocd-values-kind.yaml (loadBalancerIP)
+#   - kind/Taskfile.yaml (DNS_IP)
 
 server:
   service:
     type: LoadBalancer
-    loadBalancerIP: 172.19.255.201  # Reserve .200 for DNS
+    # Must be within MetalLB pool range (see manifests/metallb-config/kustomization.yaml)
+    loadBalancerIP: 172.19.255.201  # ArgoCD gets .201, DNS gets .200
