@@ -22,12 +22,12 @@ spec:
     spec:
       containers:
         - name: smee-client
-          image: deltaprojects/smee-client:1.2.3
-          env:
-            - name: SMEE_SOURCE
-              value: "PLACEHOLDER_SMEE_URL"
-            - name: SMEE_TARGET
-              value: "http://argocd-server.argocd.svc.cluster.local/api/webhook"
+          image: twalter/smee-client:latest
+          args:
+            - --url
+            - "PLACEHOLDER_SMEE_URL"
+            - --target
+            - "http://argocd-server.argocd.svc.cluster.local/api/webhook"
           resources:
             requests:
               cpu: 10m
