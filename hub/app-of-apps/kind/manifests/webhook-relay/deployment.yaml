@@ -28,7 +28,10 @@ spec:
             - "--url"
             - "PLACEHOLDER_SMEE_URL"
             - "--target"
-            - "http://argocd-server.argocd.svc.cluster.local/api/webhook"
+            - "https://argocd-server.argocd.svc.cluster.local/api/webhook"
+          env:
+            - name: NODE_TLS_REJECT_UNAUTHORIZED
+              value: "0"
           resources:
             requests:
               cpu: 10m
