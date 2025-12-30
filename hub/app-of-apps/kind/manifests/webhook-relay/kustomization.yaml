@@ -20,7 +20,7 @@ configMapGenerator:
   - name: webhook-relay-env
     namespace: argocd
     literals:
-      - SMEE_URL=https://smee.io/IFl6olNLFvdnSwIS
+      - SMEE_URL=https://smee.io/9UsxkA4arh5BMoY
     options:
       disableNameSuffixHash: true
 
