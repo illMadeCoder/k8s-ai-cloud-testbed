@@ -50,6 +50,10 @@ workflow:
   rbac:
     create: true
 
-# Use minio for artifact storage (can add later)
-# For now, workflows will use emptyDir or outputs
+# Artifact storage disabled for Phase 1 (simple workflows don't need it)
+# MinIO will be added in Phase 4.3 (Observability) for:
+#   - Argo Workflows artifacts
+#   - Loki log chunks
+#   - Thanos metrics
+#   - Tempo traces
 useDefaultArtifactRepo: false

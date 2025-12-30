@@ -27,6 +27,6 @@ leaderElection: true
 metrics:
   enabled: true
 
-# Args for debugging (can disable in production)
-args:
-  - --debug
+# Debug logging for local development - remove for production
+# args:
+#   - --debug

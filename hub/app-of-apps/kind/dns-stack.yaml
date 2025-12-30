@@ -1,8 +1,10 @@
 # DNS Stack for Kind
 #
 # k8s_gateway - CoreDNS with k8s_gateway plugin for LoadBalancer/Ingress DNS.
-# Queries Kubernetes API directly, no etcd needed.
+# Queries Kubernetes API directly, no etcd needed. Simpler than external-dns
+# for local development since it doesn't require cloud DNS provider access.
 #
+# Namespace: dns-system (custom, groups DNS-related services)
 # Usage: dig @<coredns-loadbalancer-ip> -p 53 argocd-server.argocd.k8s.local
 
 apiVersion: argoproj.io/v1alpha1
