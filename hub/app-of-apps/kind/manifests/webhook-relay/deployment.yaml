@@ -22,16 +22,17 @@ spec:
     spec:
       containers:
         - name: smee-client
-          image: twalter/smee-client:latest
+          image: node:20-alpine
+          command: ["npx", "smee-client"]
           args:
-            - -u
+            - "--url"
             - "PLACEHOLDER_SMEE_URL"
-            - -t
+            - "--target"
             - "http://argocd-server.argocd.svc.cluster.local/api/webhook"
           resources:
             requests:
               cpu: 10m
-              memory: 32Mi
+              memory: 64Mi
             limits:
               cpu: 100m
-              memory: 64Mi
+              memory: 128Mi
