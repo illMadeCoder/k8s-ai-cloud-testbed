@@ -123,11 +123,8 @@ Validate            Platform Engineering     Synthesis
 - [x] Add OpenBao to Kind app-of-apps
 - [x] Add Crossplane to Kind app-of-apps
 - [x] Test full hub bootstrap with all components
-- [ ] *(Optional)* Configure webhooks for instant sync (smee.io or Cloudflare Tunnel)
+- [x] Configure webhooks for instant sync (smee.io relay)
 
-**Phase 1 Core Complete** - Hub bootstraps with ArgoCD, Argo Workflows, OpenBao, Crossplane, MetalLB, dns-stack.
+**Phase 1 Complete** - Hub bootstraps with ArgoCD, Argo Workflows, OpenBao, Crossplane, MetalLB, dns-stack, webhook relay.
 
 See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
-# Webhook test Tue Dec 23 08:29:22 EST 2025
-# Webhook test Tue Dec 30 14:56:45 EST 2025
-# Webhook test 2 Tue Dec 30 15:00:37 EST 2025
