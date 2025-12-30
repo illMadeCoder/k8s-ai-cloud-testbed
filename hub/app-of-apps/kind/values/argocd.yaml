@@ -14,3 +14,13 @@ server:
     type: LoadBalancer
     # Must be within MetalLB pool range (see manifests/metallb-config/kustomization.yaml)
     loadBalancerIP: 172.19.255.201  # ArgoCD gets .201, DNS gets .200
+
+# Webhook Configuration
+# GitHub webhook secret - must match the secret configured in GitHub repo settings
+# Store in OpenBao: task kind:secret -- github/argocd-webhook secret=<your-secret>
+configs:
+  secret:
+    # Reference webhook secret from argocd-webhook-secret Secret (created by ExternalSecret)
+    # If not using ESO, set directly: githubSecret: "your-webhook-secret"
+    extra:
+      webhook.github.secret: $argocd-webhook-secret:webhook-secret

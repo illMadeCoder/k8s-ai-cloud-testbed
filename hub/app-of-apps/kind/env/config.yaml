@@ -49,3 +49,23 @@
 #   - values/dns-stack.yaml (domain)
 #   - kind/Taskfile.yaml (DNSMASQ_DOMAIN)
 # Value: k8s.local
+
+# ============================================================================
+# Webhook Configuration (GitHub -> smee.io -> ArgoCD)
+# ============================================================================
+
+# smee.io Channel URL
+# File: manifests/webhook-relay/kustomization.yaml
+# Value: SMEE_URL=https://smee.io/<your-channel-id>
+#
+# Setup:
+#   1. Go to https://smee.io/new in browser
+#   2. Copy the channel URL
+#   3. Update kustomization.yaml
+#   4. Configure GitHub webhook to point to smee.io URL
+
+# GitHub Webhook Secret (stored in OpenBao)
+# OpenBao path: secret/github/argocd-webhook
+# Store with: task kind:secret -- github/argocd-webhook secret=<your-secret>
+#
+# The same secret must be configured in GitHub repo webhook settings.

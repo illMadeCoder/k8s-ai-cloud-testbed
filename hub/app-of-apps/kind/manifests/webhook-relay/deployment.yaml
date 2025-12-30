@@ -1,0 +1,37 @@
+# smee-client deployment for webhook relay
+#
+# Connects outbound to smee.io and forwards webhooks to ArgoCD.
+# Update SMEE_URL in kustomization.yaml with your channel URL.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smee-client
+  namespace: argocd
+  labels:
+    app: smee-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smee-client
+  template:
+    metadata:
+      labels:
+        app: smee-client
+    spec:
+      containers:
+        - name: smee-client
+          image: deltaprojects/smee-client:1.2.3
+          env:
+            - name: SMEE_SOURCE
+              value: "PLACEHOLDER_SMEE_URL"
+            - name: SMEE_TARGET
+              value: "http://argocd-server.argocd.svc.cluster.local/api/webhook"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
