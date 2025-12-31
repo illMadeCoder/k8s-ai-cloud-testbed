@@ -62,11 +62,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Run Trivy vulnerability scanner
         if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -80,7 +84,7 @@ jobs:
       - name: Update deployment manifest
         if: github.event_name != 'pull_request'
         run: |
-          sed -i "s|image: ghcr.io/.*/cicd-sample:.*|image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|" \
+          sed -i "s|image: ghcr.io/.*/cicd-sample:.*|image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}|" \
             experiments/components/apps/cicd-sample/k8s/deployment.yaml
 
       - name: Commit manifest changes
@@ -88,11 +92,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
 
           if git diff --quiet experiments/components/apps/cicd-sample/k8s/deployment.yaml; then
             echo "No changes to commit"
           else
             git add experiments/components/apps/cicd-sample/k8s/deployment.yaml
-            git commit -m "chore(cicd-sample): update image to ${{ github.sha }}"
+            git commit -m "chore(cicd-sample): update image to ${{ steps.sha.outputs.short }}"
             git push
           fi
