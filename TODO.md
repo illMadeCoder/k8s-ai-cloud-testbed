@@ -156,8 +156,28 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 - [x] Fix external-secrets-config Degraded (remove circular PushSecret)
 - [x] All apps now Synced and Healthy
 
+---
+
+## Phase 2.1: CI/CD Fundamentals (2025-12-31)
+
+### Directory Refactoring
+
+- [x] Flatten `experiments/components/components/` to `experiments/components/`
+- [x] Update 30 path references across YAML files and docs
+
+### CI/CD Pipeline
+
+- [x] Create `cicd-sample` Go app with version endpoint
+- [x] Create GitHub Actions workflow (`.github/workflows/cicd-sample.yaml`)
+- [x] Trivy vulnerability scanning → GitHub Security tab
+- [x] Auto-update K8s manifest with new image SHA
+- [x] Document in [ADR-006](docs/adrs/ADR-006-cicd-pipeline.md)
+- [x] Create [cicd-fundamentals experiment](experiments/scenarios/cicd-fundamentals/)
+
 ### Next Steps
 
-- [ ] Phase 2: CI/CD & Supply Chain
-- [ ] Add more experiments (canary, chaos, etc.)
+- [ ] Phase 2.2: Container Image Security (SBOM with Syft)
+- [ ] Phase 2.3: Image Signing (Cosign + Sigstore)
+- [ ] Phase 2.4: Registry & Artifact Management
+- [ ] Re-enable Let's Encrypt after rate limit reset (~Jan 1)
 - [ ] Set up Talos home lab cluster
