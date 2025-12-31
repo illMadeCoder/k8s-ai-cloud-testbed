@@ -21,3 +21,27 @@ roleRef:
   kind: ClusterRole
   name: argocd-app-reader
   apiGroup: rbac.authorization.k8s.io
+---
+# RBAC to allow Argo Workflows to read pods cluster-wide
+# Required for experiment workflows that wait for pods in experiment namespaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-reader
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-workflow-pod-reader
+subjects:
+  - kind: ServiceAccount
+    name: argo-workflow
+    namespace: argo-workflows
+roleRef:
+  kind: ClusterRole
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
