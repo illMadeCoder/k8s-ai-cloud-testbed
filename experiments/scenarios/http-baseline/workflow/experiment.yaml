@@ -1,5 +1,5 @@
 # HTTP Baseline Experiment Workflow
-# Waits for ArgoCD sync, runs load test, signals completion
+# Full lifecycle: wait for sync, run load test, cleanup resources
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
@@ -10,8 +10,11 @@ metadata:
 spec:
   serviceAccountName: argo-workflow
   entrypoint: run-experiment
+  onExit: cleanup
   arguments:
     parameters:
+      - name: experiment-name
+        value: "http-baseline"
       - name: users
         value: "10"
       - name: duration
@@ -36,7 +39,7 @@ spec:
                 - name: target-url
                   value: "{{workflow.parameters.target-url}}"
 
-        - - name: signal-complete
+        - - name: report-results
             template: complete
 
     # Wait for ArgoCD application to be synced and healthy
@@ -47,24 +50,17 @@ spec:
         args:
           - |
             echo "Waiting for ArgoCD app 'http-baseline-target' to be healthy..."
-
-            # Wait up to 3 minutes for app to sync and become healthy
             for i in $(seq 1 36); do
               HEALTH=$(kubectl get application http-baseline-target -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
               SYNC=$(kubectl get application http-baseline-target -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
-
               echo "  Attempt $i: Health=$HEALTH, Sync=$SYNC"
-
               if [ "$HEALTH" = "Healthy" ] && [ "$SYNC" = "Synced" ]; then
                 echo "ArgoCD app is healthy and synced!"
                 exit 0
               fi
-
               sleep 5
             done
-
-            echo "ERROR: Timeout waiting for ArgoCD app to become healthy"
-            kubectl get application http-baseline-target -n argocd -o yaml
+            echo "ERROR: Timeout waiting for ArgoCD app"
             exit 1
 
     # Run k6 load test
@@ -84,8 +80,6 @@ spec:
           - DURATION={{inputs.parameters.duration}}
           - -e
           - TARGET_URL={{inputs.parameters.target-url}}
-          - --out
-          - json=/tmp/results.json
           - /scripts/baseline.js
         volumeMounts:
           - name: k6-scripts
@@ -95,13 +89,39 @@ spec:
           configMap:
             name: k6-scripts
 
-    # Signal completion
+    # Report results
     - name: complete
       container:
         image: busybox
         command: [sh, -c]
         args:
           - |
-            echo "Experiment complete!"
-            echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "Status: SUCCESS"
+            echo "========================================"
+            echo "  EXPERIMENT COMPLETE"
+            echo "  Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "  Status: {{workflow.status}}"
+            echo "========================================"
+
+    # Cleanup - runs on exit (success or failure)
+    - name: cleanup
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            EXP="{{workflow.parameters.experiment-name}}"
+            echo "========================================"
+            echo "  CLEANUP: $EXP"
+            echo "========================================"
+
+            echo "Deleting ArgoCD Applications..."
+            kubectl delete application ${EXP}-target -n argocd --ignore-not-found=true
+            kubectl delete application ${EXP}-loadgen -n argocd --ignore-not-found=true
+
+            echo "Deleting k6 ConfigMap..."
+            kubectl delete configmap k6-scripts -n argo-workflows --ignore-not-found=true
+
+            echo "Deleting cluster secret..."
+            kubectl delete secret cluster-target -n argocd --ignore-not-found=true
+
+            echo "Cleanup complete. Kind cluster deletion handled by Taskfile."

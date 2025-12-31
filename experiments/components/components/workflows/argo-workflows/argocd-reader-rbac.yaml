@@ -1,25 +1,31 @@
-# RBAC to allow Argo Workflows to read ArgoCD Applications
-# Required for experiment workflows that poll ArgoCD app health/sync status
+# RBAC to allow Argo Workflows to manage ArgoCD Applications
+# Required for experiment workflows to poll status and cleanup after completion
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: argocd-app-reader
+  name: argocd-app-manager
 rules:
   - apiGroups: ["argoproj.io"]
     resources: ["applications"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: argo-workflow-argocd-reader
+  name: argo-workflow-argocd-manager
 subjects:
   - kind: ServiceAccount
     name: argo-workflow
     namespace: argo-workflows
 roleRef:
   kind: ClusterRole
-  name: argocd-app-reader
+  name: argocd-app-manager
   apiGroup: rbac.authorization.k8s.io
 ---
 # RBAC to allow Argo Workflows to read pods cluster-wide

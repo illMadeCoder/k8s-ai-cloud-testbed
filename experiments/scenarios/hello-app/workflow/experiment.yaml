@@ -1,5 +1,5 @@
 # Hello App Experiment Workflow
-# Deploys custom app, runs smoke test, reports results
+# Full lifecycle: wait for sync, run smoke test, cleanup resources
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
@@ -10,8 +10,11 @@ metadata:
 spec:
   serviceAccountName: argo-workflow
   entrypoint: run-experiment
+  onExit: cleanup
   arguments:
     parameters:
+      - name: experiment-name
+        value: "hello-app"
       - name: users
         value: "5"
       - name: duration
@@ -36,8 +39,8 @@ spec:
                 - name: target-url
                   value: "{{workflow.parameters.target-url}}"
 
-        - - name: complete
-            template: report-complete
+        - - name: report-results
+            template: complete
 
     # Wait for pods to be ready
     - name: wait-argocd-healthy
@@ -77,13 +80,38 @@ spec:
             name: hello-app-k6-scripts
 
     # Report completion
-    - name: report-complete
+    - name: complete
       container:
         image: busybox
         command: [sh, -c]
         args:
           - |
             echo "========================================"
-            echo "Hello App Experiment Complete"
-            echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "  EXPERIMENT COMPLETE"
+            echo "  Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "  Status: {{workflow.status}}"
             echo "========================================"
+
+    # Cleanup - runs on exit (success or failure)
+    - name: cleanup
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            EXP="{{workflow.parameters.experiment-name}}"
+            echo "========================================"
+            echo "  CLEANUP: $EXP"
+            echo "========================================"
+
+            echo "Deleting ArgoCD Applications..."
+            kubectl delete application ${EXP}-experiment -n argocd --ignore-not-found=true
+            kubectl delete application ${EXP}-loadgen -n argocd --ignore-not-found=true
+
+            echo "Deleting k6 ConfigMap..."
+            kubectl delete configmap ${EXP}-k6-scripts -n argo-workflows --ignore-not-found=true
+
+            echo "Deleting cluster secret..."
+            kubectl delete secret cluster-target -n argocd --ignore-not-found=true
+
+            echo "Cleanup complete. Kind cluster deletion handled by Taskfile."
