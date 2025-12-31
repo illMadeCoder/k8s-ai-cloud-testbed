@@ -36,6 +36,7 @@ spec:
       kind: CustomResourceDefinition
       jsonPointers:
         - /status
+        - /metadata/annotations
   syncPolicy:
     automated:
       prune: true
