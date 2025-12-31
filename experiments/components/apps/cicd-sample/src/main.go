@@ -30,7 +30,7 @@ func main() {
 		if podName == "" {
 			podName = "unknown"
 		}
-		fmt.Fprintf(w, "Hello from cicd-sample! Pod: %s\n", podName)
+		fmt.Fprintf(w, "Hello from cicd-sample v1! Pod: %s\n", podName)
 	})
 
 	// Liveness probe
