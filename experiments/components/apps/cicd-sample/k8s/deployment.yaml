@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: cicd-sample
-          image: ghcr.io/illmadecoder/cicd-sample:773a18c
+          image: ghcr.io/illmadecoder/cicd-sample:44baef6
           ports:
             - containerPort: 8080
           env:
