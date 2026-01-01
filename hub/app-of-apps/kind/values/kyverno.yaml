@@ -1,0 +1,47 @@
+# Kyverno values for Kind cluster
+# Minimal config for learning environment
+
+# Admission controller config
+admissionController:
+  replicas: 1
+  resources:
+    limits:
+      memory: 384Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Background controller for generate/mutate policies
+backgroundController:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Cleanup controller
+cleanupController:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Reports controller
+reportsController:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Enable policy reports
+features:
+  policyReports:
+    enabled: true
