@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
-  - httproute.yaml
+  # - httproute.yaml  # Requires Gateway API CRDs
 
 images:
   - name: ghcr.io/illmadecoder/hello-app
