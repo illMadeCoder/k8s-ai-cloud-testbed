@@ -85,6 +85,21 @@ jobs:
           done
           cosign sign --yes ${images}
 
+      - name: Generate SBOM with Syft
+        if: github.event_name != 'pull_request'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner_lc }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.short_sha }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Attest SBOM to image
+        if: github.event_name != 'pull_request'
+        run: |
+          cosign attest --yes --predicate sbom.spdx.json \
+            --type spdxjson \
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner_lc }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+
       - name: Run Trivy vulnerability scanner
         if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@master
@@ -99,6 +114,11 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
+
+      - name: Validate Kubernetes manifests
+        uses: docker://ghcr.io/yannh/kubeconform:latest
+        with:
+          args: "-summary -output json experiments/components/apps/cicd-sample/k8s/"
 
       - name: Update deployment manifest
         if: github.event_name != 'pull_request'
