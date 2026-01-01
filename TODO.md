@@ -42,8 +42,8 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 
 | Phase | Topic | Status | Details |
 |-------|-------|--------|---------|
-| 1 | [Platform Bootstrap & GitOps](docs/roadmap/phase-01-platform-bootstrap.md) | In Progress | Hub, orchestrator, Argo Workflows, Talos, GitLab CI |
-| 2 | [CI/CD & Supply Chain](docs/roadmap/phase-02-cicd-supply-chain.md) | Not Started | Image building, scanning, SBOM, signing |
+| 1 | [Platform Bootstrap & GitOps](docs/roadmap/phase-01-platform-bootstrap.md) | Complete | Hub, orchestrator, Argo Workflows, Talos, GitLab CI |
+| 2 | [CI/CD & Supply Chain](docs/roadmap/phase-02-cicd-supply-chain.md) | Complete | Image building, scanning, SBOM, signing, Image Updater |
 | 3 | [Security Foundations](docs/roadmap/phase-03-security.md) | Not Started | Secrets, RBAC, admission control, policy |
 | 4 | [Observability](docs/roadmap/phase-04-observability.md) | Not Started | Metrics, logging, tracing, dashboards |
 | 5 | [Traffic Management](docs/roadmap/phase-05-traffic-management.md) | Not Started | Ingress, load balancing, DNS |
@@ -193,9 +193,18 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 - [x] Verify signed images from ghcr.io/illmadecoder/* pass
 - [x] Policy in Audit mode (ready for Enforce when needed)
 
+### ArgoCD Image Updater
+
+- [x] Add ArgoCD Image Updater to hub
+- [x] Configure cicd-sample app with image updater annotations
+- [x] Add Kustomize support for Image Updater compatibility
+- [x] Remove git-push from CI pipeline (CI decoupled from cluster)
+- [x] Test end-to-end flow: CI → GHCR → Image Updater → ArgoCD sync
+
+**Phase 2 Complete** - CI/CD pipeline with supply chain security, automatic image updates via ArgoCD Image Updater.
+
 ### Next Steps
 
-- [ ] Phase 2.4: Registry & Artifact Management (optional)
-- [ ] Phase 2.5: Testing Strategies (kubeconform done, others optional)
 - [ ] Re-enable Let's Encrypt after rate limit reset
 - [ ] Set up Talos home lab cluster
+- [ ] Phase 3: Security Foundations
