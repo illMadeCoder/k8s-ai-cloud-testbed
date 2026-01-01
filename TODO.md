@@ -174,10 +174,28 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 - [x] Document in [ADR-006](docs/adrs/ADR-006-cicd-pipeline.md)
 - [x] Create [cicd-fundamentals experiment](experiments/scenarios/cicd-fundamentals/)
 
+---
+
+## Phase 2.2-2.3: Supply Chain Security (2026-01-01)
+
+### Image Signing & SBOM
+
+- [x] Add keyless Cosign signing to CI pipeline
+- [x] Generate SBOM with Syft (SPDX format)
+- [x] Attest SBOM to image with Cosign
+- [x] Add manifest validation with kubeconform
+- [x] Document in [ADR-007](docs/adrs/ADR-007-supply-chain-security.md)
+
+### Admission Control (Kyverno)
+
+- [x] Deploy Kyverno via ArgoCD
+- [x] Create ClusterPolicy for image signature verification
+- [x] Verify signed images from ghcr.io/illmadecoder/* pass
+- [x] Policy in Audit mode (ready for Enforce when needed)
+
 ### Next Steps
 
-- [ ] Phase 2.2: Container Image Security (SBOM with Syft)
-- [ ] Phase 2.3: Image Signing (Cosign + Sigstore)
-- [ ] Phase 2.4: Registry & Artifact Management
-- [ ] Re-enable Let's Encrypt after rate limit reset (~Jan 1)
+- [ ] Phase 2.4: Registry & Artifact Management (optional)
+- [ ] Phase 2.5: Testing Strategies (kubeconform done, others optional)
+- [ ] Re-enable Let's Encrypt after rate limit reset
 - [ ] Set up Talos home lab cluster
