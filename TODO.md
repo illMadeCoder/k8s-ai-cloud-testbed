@@ -202,7 +202,15 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 - [x] Test end-to-end flow: CI → GHCR → Image Updater → ArgoCD sync
 - [x] Use SHA-based continuous deployment (not semver - apps are per-component, not repo-level)
 
-**Phase 2.1-2.3 Complete** - CI/CD pipeline with supply chain security, continuous deployment via Image Updater.
+### Auto-Detection & Dependency Updates
+
+- [x] Create generic `build-components.yaml` workflow (auto-detects changed Dockerfiles)
+- [x] Matrix-based parallel builds for multiple app changes
+- [x] Flat image naming: `ghcr.io/illmadecoder/{app-name}`
+- [x] Configure Renovate for automated dependency updates
+- [x] Remove Dependabot (Renovate supports glob patterns, scales to hundreds of apps)
+
+**Phase 2 Complete** - CI/CD pipeline with supply chain security, auto-detection builds, continuous deployment via Image Updater, Renovate for dependency updates.
 
 ### Next Steps
 
