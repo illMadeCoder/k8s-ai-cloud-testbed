@@ -1,0 +1,189 @@
+name: Build Components
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'experiments/components/**/Dockerfile'
+      - 'experiments/components/**/src/**'
+      - 'experiments/components/**/go.mod'
+      - 'experiments/components/**/go.sum'
+      - 'experiments/components/**/package.json'
+      - 'experiments/components/**/Cargo.toml'
+      - 'experiments/components/**/requirements.txt'
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Specific app to build (leave empty for auto-detect)'
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.detect.outputs.apps }}
+      has_apps: ${{ steps.detect.outputs.has_apps }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed apps
+        id: detect
+        run: |
+          if [ -n "${{ github.event.inputs.app }}" ]; then
+            # Manual trigger with specific app
+            echo "apps=[\"${{ github.event.inputs.app }}\"]" >> $GITHUB_OUTPUT
+            echo "has_apps=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Find changed files
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD)
+
+          # Extract unique app directories that have Dockerfiles
+          APPS=$(echo "$CHANGED" | \
+            grep -E '^experiments/components/' | \
+            sed -E 's|^experiments/components/([^/]+/[^/]+)/.*|\1|' | \
+            sort -u | \
+            while read dir; do
+              if [ -f "experiments/components/$dir/Dockerfile" ]; then
+                # Get just the app name (last component)
+                basename "$dir"
+              fi
+            done | \
+            sort -u | \
+            jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "Detected apps: $APPS"
+          echo "apps=$APPS" >> $GITHUB_OUTPUT
+
+          if [ "$APPS" = "[]" ] || [ -z "$APPS" ]; then
+            echo "has_apps=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_apps=true" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: detect
+    if: needs.detect.outputs.has_apps == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.detect.outputs.apps) }}
+
+    permissions:
+      packages: write
+      security-events: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find app path
+        id: path
+        run: |
+          # Find the directory containing this app's Dockerfile
+          APP_PATH=$(find experiments/components -type f -name Dockerfile -path "*/${{ matrix.app }}/*" | head -1 | xargs dirname)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: Could not find Dockerfile for ${{ matrix.app }}"
+            exit 1
+          fi
+          echo "path=$APP_PATH" >> $GITHUB_OUTPUT
+          echo "Found app at: $APP_PATH"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get build time
+        id: date
+        run: echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.app }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.path.outputs.path }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.sha }}
+            BUILD_TIME=${{ steps.date.outputs.date }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,scope=${{ matrix.app }},mode=max
+
+      - name: Get short SHA and lowercase owner
+        id: vars
+        run: |
+          echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "owner_lc=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Sign image with Cosign (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
+
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner_lc }}/${{ matrix.app }}:${{ steps.vars.outputs.short_sha }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Attest SBOM to image
+        run: |
+          cosign attest --yes --predicate sbom.spdx.json \
+            --type spdxjson \
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner_lc }}/${{ matrix.app }}@${{ steps.build.outputs.digest }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner_lc }}/${{ matrix.app }}:${{ steps.vars.outputs.short_sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: ${{ matrix.app }}
+
+      - name: Validate Kubernetes manifests
+        if: hashFiles(format('{0}/k8s/*.yaml', steps.path.outputs.path)) != ''
+        uses: docker://ghcr.io/yannh/kubeconform:latest
+        with:
+          args: "-summary -output json -skip Kustomization ${{ steps.path.outputs.path }}/k8s/"

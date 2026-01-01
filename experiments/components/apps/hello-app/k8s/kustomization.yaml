@@ -4,7 +4,8 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
+  - httproute.yaml
 
 images:
-  - name: ghcr.io/illmadecoder/cicd-sample
-    newTag: 2cf41db
+  - name: ghcr.io/illmadecoder/hello-app
+    newTag: latest

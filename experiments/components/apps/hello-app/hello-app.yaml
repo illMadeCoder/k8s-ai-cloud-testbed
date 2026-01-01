@@ -1,14 +1,29 @@
+# ArgoCD Application for hello-app
+#
+# Image Updater annotations configure automatic image updates:
+# - Watches ghcr.io/illmadecoder/hello-app for new SHA tags
+# - Updates Application spec directly (write-back: argocd)
+# - Continuous deployment: every push auto-deploys
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: hello-app
   namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: components
+  annotations:
+    # Image Updater - continuous deployment via SHA tags
+    argocd-image-updater.argoproj.io/image-list: hello-app=ghcr.io/illmadecoder/hello-app
+    argocd-image-updater.argoproj.io/hello-app.update-strategy: newest-build
+    argocd-image-updater.argoproj.io/hello-app.allow-tags: regexp:^[a-f0-9]{7}$
+    argocd-image-updater.argoproj.io/write-back-method: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
     targetRevision: HEAD
     path: experiments/components/apps/hello-app/k8s
   destination:
