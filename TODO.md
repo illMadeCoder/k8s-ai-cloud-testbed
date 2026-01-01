@@ -200,14 +200,9 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 - [x] Add Kustomize support for Image Updater compatibility
 - [x] Remove git-push from CI pipeline (CI decoupled from cluster)
 - [x] Test end-to-end flow: CI → GHCR → Image Updater → ArgoCD sync
+- [x] Use SHA-based continuous deployment (not semver - apps are per-component, not repo-level)
 
-### Semver Tagging
-
-- [x] Add semver tag support to CI workflow (v1.0.0 → 1.0.0, 1.0, 1)
-- [x] Configure Image Updater with semver strategy (~1 constraint)
-- [x] Test semver release: git tag v1.0.0 → Image Updater → deployment
-
-**Phase 2 Complete** - CI/CD pipeline with supply chain security, automatic image updates via ArgoCD Image Updater.
+**Phase 2.1-2.3 Complete** - CI/CD pipeline with supply chain security, continuous deployment via Image Updater.
 
 ### Next Steps
 
