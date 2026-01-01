@@ -2,8 +2,8 @@
 #
 # Image Updater annotations configure automatic image updates:
 # - Watches ghcr.io/illmadecoder/cicd-sample for new tags
-# - Updates deployment.yaml in git (write-back: git)
-# - Uses latest tag matching short SHA pattern
+# - Updates Application spec directly (write-back: argocd)
+# - Uses latest tag matching short SHA pattern (7-char git SHA)
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -16,10 +16,9 @@ metadata:
   annotations:
     # Image Updater configuration
     argocd-image-updater.argoproj.io/image-list: cicd-sample=ghcr.io/illmadecoder/cicd-sample
-    argocd-image-updater.argoproj.io/cicd-sample.update-strategy: latest
+    argocd-image-updater.argoproj.io/cicd-sample.update-strategy: newest-build
     argocd-image-updater.argoproj.io/cicd-sample.allow-tags: regexp:^[a-f0-9]{7}$
-    argocd-image-updater.argoproj.io/write-back-method: git
-    argocd-image-updater.argoproj.io/git-branch: main
+    argocd-image-updater.argoproj.io/write-back-method: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
