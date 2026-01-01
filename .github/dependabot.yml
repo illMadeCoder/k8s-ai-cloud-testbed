@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # GitHub Actions - keep workflow dependencies up to date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps):"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Docker - update base images in component Dockerfiles
+  - package-ecosystem: "docker"
+    directory: "/experiments/components/apps/hello-app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps):"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  # Note: Dependabot limitations for this repo:
+  # - Requires explicit directory per Dockerfile (doesn't scale to 100s of apps)
+  # - No Helm chart version updates
+  # - No Kubernetes manifest image updates
+  #
+  # Consider Renovate for:
+  # - Glob patterns for Dockerfiles
+  # - Helm chart updates
+  # - ArgoCD Application image references
+  # - More flexible grouping/scheduling
