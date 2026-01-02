@@ -1,0 +1,8 @@
+# Target cluster for Prometheus tutorial
+# Runs kube-prometheus-stack and metrics-app
+size: medium
+provider: kind
+
+# This cluster needs more resources for Prometheus stack
+# nodes: 2
+# memory: 4Gi

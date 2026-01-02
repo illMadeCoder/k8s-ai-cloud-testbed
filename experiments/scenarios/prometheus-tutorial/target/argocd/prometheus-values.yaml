@@ -1,0 +1,97 @@
+# kube-prometheus-stack values for prometheus-tutorial experiment
+# Minimal footprint for Kind cluster tutorial
+
+prometheus:
+  prometheusSpec:
+    retention: 2h  # Short retention for tutorial
+    storageSpec: {}  # EmptyDir for ephemeral clusters
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    # Scrape all ServiceMonitors regardless of labels
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+    podMonitorNamespaceSelector: {}
+
+grafana:
+  enabled: true
+  adminPassword: admin
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # Expose Grafana via NodePort for easy access
+  service:
+    type: NodePort
+    nodePort: 30030
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  tls:
+    enabled: false
+  admissionWebhooks:
+    enabled: false
+
+# Standard exporters
+nodeExporter:
+  enabled: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+kube-state-metrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# Kubernetes component monitors (some disabled in Kind)
+kubeApiServer:
+  enabled: true
+kubelet:
+  enabled: true
+kubeControllerManager:
+  enabled: false  # Not accessible in Kind
+kubeScheduler:
+  enabled: false  # Not accessible in Kind
+kubeProxy:
+  enabled: false  # Not accessible in Kind
+kubeEtcd:
+  enabled: false  # Not accessible in Kind
+coreDns:
+  enabled: true

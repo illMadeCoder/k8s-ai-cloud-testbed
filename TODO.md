@@ -215,8 +215,23 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 
 **Phase 2 Complete** - CI/CD pipeline with supply chain security, auto-detection builds, continuous deployment via Image Updater, Renovate for dependency updates.
 
+---
+
+## Phase 3.1: Prometheus & Grafana (In Progress)
+
+### Observability Foundation
+
+- [x] Fix prometheus-stack component path references
+- [x] Create `metrics-app` with custom Prometheus metrics (Counter, Gauge, Histogram, Summary)
+- [x] Create ServiceMonitor for scrape discovery
+- [x] Create `prometheus-tutorial` experiment scenario
+- [x] Document PromQL patterns in experiment README
+- [ ] Test experiment end-to-end with `task kind:conduct -- prometheus-tutorial`
+- [ ] Build Grafana RED dashboard for metrics-app
+
 ### Next Steps
 
 - [ ] Re-enable Let's Encrypt after rate limit reset
 - [ ] Set up Talos home lab cluster
-- [ ] Phase 3: Security Foundations
+- [ ] Phase 3.2: SLOs & Error Budgets (Sloth/Pyrra)
+- [ ] Phase 3.3: MinIO Object Storage

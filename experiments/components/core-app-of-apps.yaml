@@ -13,7 +13,7 @@ spec:
   project: default
   sources:
     # TLS/Certificate management
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/components/core/cert-manager
       directory:
@@ -21,7 +21,7 @@ spec:
         include: 'cert-manager*.yaml'
 
     # Gateway/Ingress
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/components/core/gateway-api
       directory:
@@ -29,7 +29,7 @@ spec:
         include: 'gateway-api.yaml'
 
     # Metrics - Prometheus/Grafana
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/components/observability/prometheus-stack
       directory:
@@ -37,7 +37,7 @@ spec:
         include: 'kube-prometheus-stack.yaml'
 
     # Traces - OpenTelemetry
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/components/observability/otel-collector
       directory:
@@ -45,7 +45,7 @@ spec:
         include: 'otel-collector.yaml'
 
     # Storage - MinIO (S3-compatible)
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/components/storage/minio
       directory:
@@ -53,7 +53,7 @@ spec:
         include: 'minio.yaml'
 
     # Workflows - Argo Workflows
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/components/workflows/argo-workflows
       directory:
@@ -61,7 +61,7 @@ spec:
         include: 'argo-workflows.yaml'
 
     # Load Testing - K6
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/components/workflows/k6
       directory:

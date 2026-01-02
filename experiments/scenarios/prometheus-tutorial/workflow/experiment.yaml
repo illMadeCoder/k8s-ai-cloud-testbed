@@ -1,0 +1,159 @@
+---
+# Prometheus Tutorial Workflow
+# Generates load on metrics-app and validates Prometheus scraping
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: prometheus-tutorial-
+  namespace: argo-workflows
+spec:
+  entrypoint: prometheus-tutorial
+  serviceAccountName: argo-workflow
+  arguments:
+    parameters:
+      - name: target-url
+        value: "http://metrics-app.demo.svc.cluster.local"
+      - name: duration
+        value: "60s"
+      - name: users
+        value: "5"
+  templates:
+    - name: prometheus-tutorial
+      dag:
+        tasks:
+          - name: wait-for-prometheus
+            template: wait-prometheus
+          - name: wait-for-metrics-app
+            template: wait-app
+          - name: generate-load
+            template: load-generator
+            dependencies: [wait-for-prometheus, wait-for-metrics-app]
+          - name: validate-metrics
+            template: validate
+            dependencies: [generate-load]
+
+    - name: wait-prometheus
+      container:
+        image: curlimages/curl:8.5.0
+        command: [sh, -c]
+        args:
+          - |
+            echo "Waiting for Prometheus to be ready..."
+            for i in $(seq 1 60); do
+              if curl -sf http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090/-/ready; then
+                echo "Prometheus is ready!"
+                exit 0
+              fi
+              echo "Attempt $i/60..."
+              sleep 5
+            done
+            echo "Prometheus did not become ready in time"
+            exit 1
+
+    - name: wait-app
+      container:
+        image: curlimages/curl:8.5.0
+        command: [sh, -c]
+        args:
+          - |
+            echo "Waiting for metrics-app to be ready..."
+            for i in $(seq 1 60); do
+              if curl -sf http://metrics-app.demo.svc.cluster.local/ready; then
+                echo "metrics-app is ready!"
+                exit 0
+              fi
+              echo "Attempt $i/60..."
+              sleep 5
+            done
+            echo "metrics-app did not become ready in time"
+            exit 1
+
+    - name: load-generator
+      container:
+        image: grafana/k6:latest
+        command: [k6, run, -]
+        args: []
+        stdin: true
+        stdinOnce: true
+      inputs:
+        artifacts:
+          - name: k6-script
+            path: /scripts/load.js
+            raw:
+              data: |
+                import http from 'k6/http';
+                import { check, sleep } from 'k6';
+
+                export const options = {
+                  vus: {{workflow.parameters.users}},
+                  duration: '{{workflow.parameters.duration}}',
+                };
+
+                const BASE_URL = '{{workflow.parameters.target-url}}';
+
+                export default function () {
+                  // Hit various endpoints to generate diverse metrics
+                  const endpoints = ['/', '/slow', '/error', '/process'];
+                  const endpoint = endpoints[Math.floor(Math.random() * endpoints.length)];
+
+                  const res = http.get(`${BASE_URL}${endpoint}`);
+
+                  check(res, {
+                    'status is ok': (r) => r.status === 200 || r.status === 500,
+                    'response time < 3s': (r) => r.timings.duration < 3000,
+                  });
+
+                  sleep(0.5);
+                }
+
+    - name: validate
+      container:
+        image: curlimages/curl:8.5.0
+        command: [sh, -c]
+        args:
+          - |
+            echo "=== Validating Prometheus Metrics ==="
+            PROM_URL="http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090"
+
+            echo ""
+            echo "1. Checking http_requests_total counter..."
+            RESULT=$(curl -s "$PROM_URL/api/v1/query?query=http_requests_total")
+            if echo "$RESULT" | grep -q '"__name__":"http_requests_total"'; then
+              echo "   ✓ http_requests_total is being scraped"
+            else
+              echo "   ✗ http_requests_total not found"
+            fi
+
+            echo ""
+            echo "2. Checking request_duration_seconds histogram..."
+            RESULT=$(curl -s "$PROM_URL/api/v1/query?query=request_duration_seconds_bucket")
+            if echo "$RESULT" | grep -q '"__name__":"request_duration_seconds_bucket"'; then
+              echo "   ✓ request_duration_seconds histogram is being scraped"
+            else
+              echo "   ✗ request_duration_seconds not found"
+            fi
+
+            echo ""
+            echo "3. Checking active_connections gauge..."
+            RESULT=$(curl -s "$PROM_URL/api/v1/query?query=active_connections")
+            if echo "$RESULT" | grep -q '"__name__":"active_connections"'; then
+              echo "   ✓ active_connections gauge is being scraped"
+            else
+              echo "   ✗ active_connections not found"
+            fi
+
+            echo ""
+            echo "4. Query: Request rate (last 1 minute)..."
+            curl -s "$PROM_URL/api/v1/query?query=rate(http_requests_total[1m])" | \
+              jq -r '.data.result[] | "   \(.metric.path): \(.value[1]) req/s"' 2>/dev/null || \
+              echo "   No data yet or jq not available"
+
+            echo ""
+            echo "5. Query: 95th percentile latency..."
+            curl -s "$PROM_URL/api/v1/query?query=histogram_quantile(0.95,rate(request_duration_seconds_bucket[1m]))" | \
+              jq -r '.data.result[] | "   \(.metric.path): \(.value[1])s"' 2>/dev/null || \
+              echo "   No data yet or jq not available"
+
+            echo ""
+            echo "=== Validation Complete ==="
+            echo "Access Grafana at: http://<node-ip>:30030 (admin/admin)"

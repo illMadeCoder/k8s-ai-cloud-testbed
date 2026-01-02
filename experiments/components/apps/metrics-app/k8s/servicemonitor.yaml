@@ -1,0 +1,23 @@
+---
+# ServiceMonitor for Prometheus Operator to scrape metrics-app
+# This creates a scrape configuration in Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: metrics-app
+  labels:
+    app: metrics-app
+    # Match the serviceMonitorSelector in kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: metrics-app
+  namespaceSelector:
+    matchNames:
+      - demo
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics
+      scrapeTimeout: 10s

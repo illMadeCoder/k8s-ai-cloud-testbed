@@ -1,33 +1,37 @@
----
+# Prometheus Tutorial - Target Cluster App
+# Deploys kube-prometheus-stack and metrics-app for observability learning
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: elk-stack
+  name: prometheus-tutorial-target
   namespace: argocd
+  labels:
+    experiment: prometheus-tutorial
+    cluster: target
   finalizers:
     - resources-finalizer.argocd.argoproj.io
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   sources:
-    - repoURL: https://helm.elastic.co
-      chart: eck-stack
-      targetRevision: 0.17.0
+    # kube-prometheus-stack (Prometheus, Grafana, Alertmanager)
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 79.9.0
       helm:
-        releaseName: elk
+        releaseName: kube-prometheus-stack
         valueFiles:
-          - $values/experiments/components/observability/elk-stack/values.yaml
+          - $values/experiments/scenarios/prometheus-tutorial/target/argocd/prometheus-values.yaml
+    # Values reference
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       ref: values
+    # metrics-app deployment
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
-      path: experiments/components/observability/elk-stack
-      directory:
-        include: '{*-httproute.yaml,*-rbac.yaml}'
+      path: experiments/components/apps/metrics-app/k8s
+
   destination:
-    server: https://kubernetes.default.svc
+    name: target
     namespace: observability
   syncPolicy:
     automated:

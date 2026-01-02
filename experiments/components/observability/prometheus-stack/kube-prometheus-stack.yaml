@@ -32,11 +32,11 @@ spec:
       helm:
         releaseName: kube-prometheus-stack
         valueFiles:
-          - $values/argocd-apps/components/observability/prometheus-stack/values.yaml
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+          - $values/experiments/components/observability/prometheus-stack/values.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       ref: values
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/components/observability/prometheus-stack
       directory:

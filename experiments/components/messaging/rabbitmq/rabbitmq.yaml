@@ -15,8 +15,8 @@ spec:
       helm:
         releaseName: rabbitmq
         valueFiles:
-          - $values/argocd-apps/components/messaging/rabbitmq/values.yaml
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+          - $values/experiments/components/messaging/rabbitmq/values.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       ref: values
   destination:

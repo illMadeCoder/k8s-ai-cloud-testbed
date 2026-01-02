@@ -15,19 +15,19 @@ spec:
   project: default
   sources:
     # Deploy demo application
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/components/apps/demo-app
       directory:
         exclude: 'demo-app.yaml'
 
     # Deploy Crossplane claims for this experiment
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/scenarios/multi-cloud-demo/crossplane
 
     # Deploy k6 scripts ConfigMap
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-lab.git
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/scenarios/multi-cloud-demo/k6
 
