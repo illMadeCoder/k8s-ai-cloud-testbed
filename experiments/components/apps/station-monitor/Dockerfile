@@ -20,13 +20,22 @@ FROM alpine:3.18
 
 RUN apk --no-cache add ca-certificates
 
-WORKDIR /root/
+# Create non-root user
+RUN addgroup -g 65532 -S appgroup && \
+    adduser -u 65532 -S appuser -G appgroup
 
-# Copy the binary from builder
-COPY --from=builder /app/station-monitor .
+WORKDIR /app
+
+# Copy the binary from builder with proper ownership
+COPY --from=builder --chown=65532:65532 /app/station-monitor .
+
+# Ensure executable
+RUN chmod +x /app/station-monitor
+
+USER 65532:65532
 
 # Expose port
 EXPOSE 8080
 
 # Run the application
-CMD ["./station-monitor"]
+CMD ["/app/station-monitor"]
