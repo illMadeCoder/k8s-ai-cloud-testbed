@@ -841,6 +841,7 @@ tasks:
             PROM_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n observability kube-prometheus-stack-prometheus -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
             GRAFANA_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n observability kube-prometheus-stack-grafana -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
             METRICS_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n demo metrics-app -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+            STATION_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n station station-monitor -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
 
             if [ -n "$PROM_IP" ] && [ -n "$GRAFANA_IP" ] && [ -n "$METRICS_IP" ]; then
               break
@@ -861,9 +862,12 @@ tasks:
           echo "  $(grep '^title:' "$TUTORIAL_FILE" | cut -d'"' -f2)"
           echo "=============================================="
           echo ""
-          echo "  Prometheus:  http://${PROM_IP}:9090"
-          echo "  Grafana:     http://${GRAFANA_IP}:80  (admin/admin)"
-          echo "  Metrics App: http://${METRICS_IP}:80"
+          echo "  Prometheus:      http://${PROM_IP}:9090"
+          echo "  Grafana:         http://${GRAFANA_IP}:80  (admin/admin)"
+          echo "  Metrics App:     http://${METRICS_IP}:80"
+          if [ -n "$STATION_IP" ]; then
+          echo "  Station Monitor: http://${STATION_IP}:80  [SECTOR 12]"
+          fi
           echo ""
           echo "----------------------------------------------"
 

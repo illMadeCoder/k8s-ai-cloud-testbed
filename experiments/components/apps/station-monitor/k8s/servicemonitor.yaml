@@ -1,0 +1,20 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: station-monitor
+  namespace: station
+  labels:
+    app: station-monitor
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: station-monitor
+  namespaceSelector:
+    matchNames:
+      - station
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics

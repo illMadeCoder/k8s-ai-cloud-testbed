@@ -1,64 +1,109 @@
 # Tutorial configuration
 # When this file exists, `task kind:conduct` runs in interactive mode
 
-title: "Prometheus & Grafana Tutorial"
+title: "CLOUDBREAK STATION - Systems Monitoring Division"
 description: |
-  Learn Prometheus metrics collection, PromQL queries, and Grafana dashboards.
+  Prometheus & Grafana orientation for new Systems Monitoring Technicians.
+  Weyland-Ishimura Corp. Standard Training Protocol. See README.md for full orientation.
 
 instructions: |
-  ## Getting Started
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  CLOUDBREAK STATION          ║  SYSTEMS MONITORING TERMINAL          ║
+  ╠══════════════════════════════════════════════════════════════════════╣
+  ║  Welcome, Technician. Your orientation begins now.                   ║
+  ║  Station status: NOMINAL (probably)                                  ║
+  ╚══════════════════════════════════════════════════════════════════════╝
 
-  1. Open Prometheus UI in your browser (URL shown above)
-  2. Open Grafana UI in your browser (URL shown above)
-     - Login with: admin / admin
+  ## Quick Start
 
-  ## Try These PromQL Queries
-
-  In Prometheus UI, go to Graph tab and try:
-
-  ### Request Rate
-  ```
-  rate(http_requests_total[1m])
-  ```
-
-  ### Error Rate
-  ```
-  sum(rate(http_requests_total{status=~"5.."}[1m])) / sum(rate(http_requests_total[1m]))
-  ```
-
-  ### 95th Percentile Latency
-  ```
-  histogram_quantile(0.95, rate(request_duration_seconds_bucket[1m]))
-  ```
-
-  ### Latency by Endpoint
-  ```
-  histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket[1m])) by (path, le))
-  ```
-
-  ## Generate Load
-
-  The metrics-app IP is shown above. Generate traffic with:
+  Set your endpoint IPs:
   ```bash
-  # Replace METRICS_IP with the metrics-app IP shown above
-  METRICS_IP=<metrics-app-ip>
+  export METRICS_IP=<metrics-app-ip-shown-above>     # Training simulator
+  export STATION_IP=<station-monitor-ip-shown-above> # Live station feed
+  ```
+
+  Access monitoring terminals:
+  - Prometheus Array (URL shown above)
+  - Grafana Terminal (URL shown above) - Access code: admin / admin
+
+  ## Two Monitoring Systems
+
+  **Metrics App** (demo namespace) - Standard training simulator
+  **Station Monitor** (station namespace) - Live Cloudbreak telemetry
+
+  ## Simulate Station Activity (Become The Threat)
+
+  ### Training Mode (metrics-app)
+  ```bash
   for i in {1..50}; do
-    curl -s http://$METRICS_IP/
-    curl -s http://$METRICS_IP/slow
-    curl -s http://$METRICS_IP/error
-    curl -s http://$METRICS_IP/process
-    sleep 0.3
+    curl -s http://$METRICS_IP/           # Normal operations
+    curl -s http://$METRICS_IP/slow &     # Overloaded systems
+    curl -s http://$METRICS_IP/error      # Cascade failures
+    sleep 0.2
   done
   ```
 
-  ## Explore Grafana Dashboards
+  ### SECTOR 12 INVESTIGATION (station-monitor)
+  ```bash
+  # Access Sector 12 monitoring (70% failure rate)
+  for i in {1..20}; do curl -s http://$STATION_IP/sector12; done
 
-  1. Go to Dashboards in the left menu
-  2. Browse pre-built dashboards:
-     - Kubernetes / Compute Resources / Cluster
-     - Kubernetes / Compute Resources / Namespace (Pods)
-     - Node Exporter / Nodes
+  # Check the beacon signal (something is transmitting...)
+  curl http://$STATION_IP/beacon
 
-  ## When You're Done
+  # Compare with normal sectors
+  curl http://$STATION_IP/sectors/1
+  curl http://$STATION_IP/sectors/2
+  curl http://$STATION_IP/sectors/3
+  ```
 
-  Press ENTER to tear down the experiment.
+  ## Station Metrics (PromQL)
+
+  Crew complement (this number should not decrease):
+  ```
+  station_crew_complement
+  ```
+
+  Sector 12 anomaly count:
+  ```
+  station_anomaly_detections_total
+  ```
+
+  Containment integrity (should be 1.0):
+  ```
+  station_containment_integrity
+  ```
+
+  Beacon signal strength (what is transmitting?):
+  ```
+  station_beacon_signal_strength
+  ```
+
+  Life support by sector:
+  ```
+  station_life_support_efficiency
+  ```
+
+  ## Full Orientation Materials
+
+  The complete training covers 16 modules across 6 sections:
+  - Part 1: Foundations (routine systems check)
+  - Part 2: PromQL Mastery (anomalies appearing)
+  - Part 3: SRE Methodology (incident reports filed)
+  - Part 4: Production Patterns (emergency protocols)
+  - Part 5: Grafana Dashboards (see everything)
+  - Part 6: Sector 12 Investigation [CLASSIFIED]
+
+  Access full orientation:
+  ```bash
+  cat experiments/scenarios/prometheus-tutorial/README.md | less
+  ```
+
+  ## End Session
+
+  Press ENTER when your shift is complete.
+
+  ─────────────────────────────────────────────────────────────────────
+  NOTE: If you hear unusual sounds from the maintenance shafts,
+        please log an acoustic anomaly report. Do not investigate.
+  ─────────────────────────────────────────────────────────────────────
