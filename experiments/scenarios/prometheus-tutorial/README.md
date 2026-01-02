@@ -44,73 +44,44 @@ The `metrics-app` provides these endpoints:
 | `/health` | Liveness probe |
 | `/ready` | Readiness probe |
 
-## Running the Experiment
-
-### Interactive Mode (Recommended for Learning)
-
-Deploy the experiment for hands-on exploration:
+## Running the Tutorial
 
 ```bash
-# From repo root - deploys and leaves running for you to explore
-task kind:deploy -- prometheus-tutorial
-```
-
-This deploys the full stack and outputs access URLs. The cluster stays running so you can:
-- Explore Prometheus UI and try PromQL queries
-- Build dashboards in Grafana
-- Experiment with the metrics-app endpoints
-
-When done:
-```bash
-task kind:destroy -- prometheus-tutorial
-```
-
-### Automated Mode
-
-Run the full experiment workflow (deploys, tests, tears down):
-
-```bash
+# From repo root
 task kind:conduct -- prometheus-tutorial
 ```
 
-The workflow will:
-1. Deploy kube-prometheus-stack and metrics-app
-2. Wait for Prometheus and the app to be ready
-3. Generate load across all endpoints using k6
-4. Validate that metrics are being scraped
-5. Output sample PromQL query results
-6. Tear down the cluster
+This will:
+1. Create a Kind cluster with kube-prometheus-stack and metrics-app
+2. Wait for LoadBalancer IPs to be assigned
+3. Display access URLs and tutorial instructions
+4. Wait for you to explore (the tutorial stays running)
+5. **Press Ctrl+C when done** - this triggers automatic cleanup
+
+## What You'll Learn
+
+- Navigate Prometheus UI and execute PromQL queries
+- Understand the four metric types: Counter, Gauge, Histogram, Summary
+- Build queries for rate, percentiles, and error rates
+- Explore pre-built Grafana dashboards
+- Optionally create your own dashboards
 
 ## Accessing Services
 
-After deploying with `kind:deploy`, get the target cluster node IP:
-
-```bash
-# Get cluster node IP
-CLUSTER_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' --context kind-prometheus-tutorial-target)
-echo "Cluster IP: $CLUSTER_IP"
-```
-
-### Browser Access (NodePort)
+Services are exposed via LoadBalancer (MetalLB locally, cloud LB in production):
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **Prometheus** | `http://${CLUSTER_IP}:30090` | None |
-| **Grafana** | `http://${CLUSTER_IP}:30030` | admin / admin |
+| **Prometheus** | Shown during tutorial | None |
+| **Grafana** | Shown during tutorial | admin / admin |
 
 ### Port-Forward Alternative
 
-If NodePort isn't accessible:
+If LoadBalancer IPs aren't available:
 
 ```bash
-# Switch to target cluster context
-kubectl config use-context kind-prometheus-tutorial-target
-
-# Access Prometheus
-kubectl port-forward -n observability svc/kube-prometheus-stack-prometheus 9090:9090
-
-# Access Grafana
-kubectl port-forward -n observability svc/kube-prometheus-stack-grafana 3000:80
+kubectl --context kind-prometheus-tutorial-target port-forward -n observability svc/kube-prometheus-stack-prometheus 9090:9090
+kubectl --context kind-prometheus-tutorial-target port-forward -n observability svc/kube-prometheus-stack-grafana 3000:80
 ```
 
 ## PromQL Tutorial Queries

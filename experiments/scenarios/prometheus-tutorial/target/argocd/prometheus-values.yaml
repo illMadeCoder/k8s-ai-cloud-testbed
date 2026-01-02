@@ -2,10 +2,9 @@
 # Minimal footprint for Kind cluster tutorial
 
 prometheus:
-  # Expose Prometheus UI via NodePort for browser access
+  # Expose Prometheus UI via LoadBalancer (MetalLB locally, cloud LB in prod)
   service:
-    type: NodePort
-    nodePort: 30090
+    type: LoadBalancer
   prometheusSpec:
     retention: 2h  # Short retention for tutorial
     storageSpec: {}  # EmptyDir for ephemeral clusters
@@ -34,10 +33,9 @@ grafana:
     limits:
       cpu: 200m
       memory: 256Mi
-  # Expose Grafana via NodePort for easy access
+  # Expose Grafana via LoadBalancer (MetalLB locally, cloud LB in prod)
   service:
-    type: NodePort
-    nodePort: 30030
+    type: LoadBalancer
 
 alertmanager:
   enabled: true

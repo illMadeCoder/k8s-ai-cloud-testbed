@@ -533,17 +533,33 @@ tasks:
             echo "  Context: kind-${full_name}"
             echo "  API: https://${CLUSTER_IP}:6443"
 
-            # Check for common NodePort services
-            GRAFANA_PORT=$(kubectl --context "kind-${full_name}" get svc -A -o json 2>/dev/null | \
-              jq -r '.items[] | select(.metadata.name | contains("grafana")) | .spec.ports[0].nodePort // empty' | head -1)
-            PROM_PORT=$(kubectl --context "kind-${full_name}" get svc -A -o json 2>/dev/null | \
-              jq -r '.items[] | select(.metadata.name | contains("prometheus") and (.metadata.name | contains("operator") | not)) | select(.spec.type=="NodePort") | .spec.ports[0].nodePort // empty' | head -1)
+            # Check for LoadBalancer services first, then NodePort
+            GRAFANA_LB=$(kubectl --context "kind-${full_name}" get svc -A -o json 2>/dev/null | \
+              jq -r '.items[] | select(.metadata.name | contains("grafana")) | select(.spec.type=="LoadBalancer") | .status.loadBalancer.ingress[0].ip // empty' | head -1)
+            PROM_LB=$(kubectl --context "kind-${full_name}" get svc -A -o json 2>/dev/null | \
+              jq -r '.items[] | select(.metadata.name | contains("prometheus") and (.metadata.name | contains("operator") | not)) | select(.spec.type=="LoadBalancer") | .status.loadBalancer.ingress[0].ip // empty' | head -1)
 
-            if [ -n "$GRAFANA_PORT" ]; then
-              echo "  Grafana: http://${CLUSTER_IP}:${GRAFANA_PORT} (admin/admin)"
+            if [ -n "$GRAFANA_LB" ]; then
+              echo "  Grafana: http://${GRAFANA_LB}:80 (admin/admin)"
             fi
-            if [ -n "$PROM_PORT" ]; then
-              echo "  Prometheus: http://${CLUSTER_IP}:${PROM_PORT}"
+            if [ -n "$PROM_LB" ]; then
+              echo "  Prometheus: http://${PROM_LB}:9090"
+            fi
+
+            # Fallback to NodePort if no LoadBalancer
+            if [ -z "$GRAFANA_LB" ]; then
+              GRAFANA_PORT=$(kubectl --context "kind-${full_name}" get svc -A -o json 2>/dev/null | \
+                jq -r '.items[] | select(.metadata.name | contains("grafana")) | .spec.ports[0].nodePort // empty' | head -1)
+              if [ -n "$GRAFANA_PORT" ]; then
+                echo "  Grafana: http://${CLUSTER_IP}:${GRAFANA_PORT} (admin/admin)"
+              fi
+            fi
+            if [ -z "$PROM_LB" ]; then
+              PROM_PORT=$(kubectl --context "kind-${full_name}" get svc -A -o json 2>/dev/null | \
+                jq -r '.items[] | select(.metadata.name | contains("prometheus") and (.metadata.name | contains("operator") | not)) | select(.spec.type=="NodePort") | .spec.ports[0].nodePort // empty' | head -1)
+              if [ -n "$PROM_PORT" ]; then
+                echo "  Prometheus: http://${CLUSTER_IP}:${PROM_PORT}"
+              fi
             fi
           fi
         done
@@ -572,8 +588,10 @@ tasks:
           exit 1
         fi
 
-        if [ ! -f "$WORKFLOW_FILE" ]; then
-          echo "ERROR: Workflow not found at $WORKFLOW_FILE"
+        # Check for tutorial.yaml or workflow file
+        TUTORIAL_FILE="$EXP_PATH/tutorial.yaml"
+        if [ ! -f "$TUTORIAL_FILE" ] && [ ! -f "$WORKFLOW_FILE" ]; then
+          echo "ERROR: No tutorial.yaml or workflow/experiment.yaml found"
           exit 1
         fi
 
@@ -766,71 +784,152 @@ tasks:
       - |
         EXP_NAME="{{.CLI_ARGS}}"
         EXP_PATH="experiments/scenarios/$EXP_NAME"
+        TUTORIAL_FILE="$EXP_PATH/tutorial.yaml"
         WORKFLOW_FILE="$EXP_PATH/workflow/experiment.yaml"
 
-        # Determine orchestrator mode
-        HAS_ORCHESTRATOR=false
-        if [ -d "$EXP_PATH/orchestrator" ] && [ -f "$EXP_PATH/orchestrator/cluster.yaml" ]; then
-          HAS_ORCHESTRATOR=true
-        fi
+        # Check if this is a tutorial (interactive mode)
+        if [ -f "$TUTORIAL_FILE" ]; then
+          echo ""
+          echo "=== Step 6/6: Interactive Tutorial ==="
+          echo ""
 
-        echo ""
-        echo "=== Step 6/6: Running workflow ==="
+          # Get target cluster context
+          TARGET_CONTEXT="kind-${EXP_NAME}-target"
 
-        # Determine which cluster runs the workflow
-        if [ "$HAS_ORCHESTRATOR" = "true" ]; then
-          WORKFLOW_CONTEXT="kind-${EXP_NAME}-orchestrator"
-          echo "  Running on: orchestrator"
-        else
-          WORKFLOW_CONTEXT="kind-{{.HUB_CLUSTER}}"
-          echo "  Running on: hub"
-        fi
+          # Wait for LoadBalancer IPs to be assigned
+          echo "Waiting for services to get LoadBalancer IPs..."
+          for i in $(seq 1 60); do
+            PROM_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n observability kube-prometheus-stack-prometheus -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+            GRAFANA_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n observability kube-prometheus-stack-grafana -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
 
-        kubectl config use-context "$WORKFLOW_CONTEXT"
+            if [ -n "$PROM_IP" ] && [ -n "$GRAFANA_IP" ]; then
+              break
+            fi
+            sleep 2
+          done
 
-        TARGET_CONTAINER="${EXP_NAME}-target-control-plane"
-        TARGET_IP=$(docker inspect "$TARGET_CONTAINER" | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
-        TARGET_URL="http://${TARGET_IP}:30080"
-        echo "  Target URL: $TARGET_URL"
-
-        USERS={{.USERS | default "10"}}
-        DURATION={{.DURATION | default "60s"}}
-
-        WORKFLOW_NAME=$(argo submit "$WORKFLOW_FILE" \
-          -p users="$USERS" \
-          -p duration="$DURATION" \
-          -p target-url="$TARGET_URL" \
-          -o name -n argo-workflows 2>/dev/null || \
-          kubectl create -f "$WORKFLOW_FILE" -o name)
-        echo "  Workflow: $WORKFLOW_NAME"
-
-        echo "  Waiting for workflow completion..."
-        argo wait "$WORKFLOW_NAME" -n argo-workflows 2>/dev/null || \
-          kubectl wait "$WORKFLOW_NAME" --for=condition=Completed --timeout=30m -n argo-workflows
-
-        echo ""
-        echo "=== Workflow Results ==="
-        argo get "$WORKFLOW_NAME" -n argo-workflows 2>/dev/null || \
-          kubectl get "$WORKFLOW_NAME" -n argo-workflows -o yaml
-
-        # Cleanup
-        echo ""
-        echo "=== Cleaning up experiment clusters ==="
-        for cluster_dir in "$EXP_PATH"/*/; do
-          if [ -f "$cluster_dir/cluster.yaml" ]; then
-            cluster=$(basename "$cluster_dir")
-            full_name="${EXP_NAME}-${cluster}"
-            echo "  Deleting cluster: $full_name"
-            kind delete cluster --name "$full_name"
+          if [ -z "$PROM_IP" ] || [ -z "$GRAFANA_IP" ]; then
+            echo "Warning: Could not get LoadBalancer IPs, falling back to cluster IP"
+            CLUSTER_IP=$(docker inspect "${EXP_NAME}-target-control-plane" | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
+            echo "  Use port-forward instead:"
+            echo "  kubectl --context $TARGET_CONTEXT port-forward -n observability svc/kube-prometheus-stack-prometheus 9090:9090"
+            echo "  kubectl --context $TARGET_CONTEXT port-forward -n observability svc/kube-prometheus-stack-grafana 3000:80"
           fi
-        done
 
-        kubectl config use-context kind-{{.HUB_CLUSTER}}
+          echo ""
+          echo "=============================================="
+          echo "  $(grep '^title:' "$TUTORIAL_FILE" | cut -d'"' -f2)"
+          echo "=============================================="
+          echo ""
+          echo "  Prometheus: http://${PROM_IP}:9090"
+          echo "  Grafana:    http://${GRAFANA_IP}:80  (admin/admin)"
+          echo ""
+          echo "----------------------------------------------"
 
-        echo ""
-        echo "=============================================="
-        echo "  EXPERIMENT COMPLETE"
-        echo "=============================================="
+          # Display instructions from tutorial.yaml
+          sed -n '/^instructions:/,/^[a-z]/p' "$TUTORIAL_FILE" | head -n -1 | sed 's/^instructions: |//' | sed 's/^  //'
+
+          echo ""
+          echo "----------------------------------------------"
+          echo ""
+          echo "Press Ctrl+C when you're done exploring..."
+          echo ""
+
+          # Cleanup function
+          cleanup() {
+            echo ""
+            echo ""
+            echo "=== Cleaning up experiment clusters ==="
+            for cluster_dir in "$EXP_PATH"/*/; do
+              if [ -f "$cluster_dir/cluster.yaml" ]; then
+                cluster=$(basename "$cluster_dir")
+                full_name="${EXP_NAME}-${cluster}"
+                echo "  Deleting cluster: $full_name"
+                kind delete cluster --name "$full_name"
+              fi
+            done
+            kubectl config use-context kind-{{.HUB_CLUSTER}} 2>/dev/null || true
+            echo ""
+            echo "=============================================="
+            echo "  TUTORIAL COMPLETE"
+            echo "=============================================="
+            exit 0
+          }
+
+          # Trap Ctrl+C
+          trap cleanup INT TERM
+
+          # Wait forever until user presses Ctrl+C
+          while true; do
+            sleep 1
+          done
+
+        else
+          # Automated workflow mode
+          echo ""
+          echo "=== Step 6/6: Running workflow ==="
+
+          # Determine orchestrator mode
+          HAS_ORCHESTRATOR=false
+          if [ -d "$EXP_PATH/orchestrator" ] && [ -f "$EXP_PATH/orchestrator/cluster.yaml" ]; then
+            HAS_ORCHESTRATOR=true
+          fi
+
+          # Determine which cluster runs the workflow
+          if [ "$HAS_ORCHESTRATOR" = "true" ]; then
+            WORKFLOW_CONTEXT="kind-${EXP_NAME}-orchestrator"
+            echo "  Running on: orchestrator"
+          else
+            WORKFLOW_CONTEXT="kind-{{.HUB_CLUSTER}}"
+            echo "  Running on: hub"
+          fi
+
+          kubectl config use-context "$WORKFLOW_CONTEXT"
+
+          TARGET_CONTAINER="${EXP_NAME}-target-control-plane"
+          TARGET_IP=$(docker inspect "$TARGET_CONTAINER" | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
+          TARGET_URL="http://${TARGET_IP}:30080"
+          echo "  Target URL: $TARGET_URL"
+
+          USERS={{.USERS | default "10"}}
+          DURATION={{.DURATION | default "60s"}}
+
+          WORKFLOW_NAME=$(argo submit "$WORKFLOW_FILE" \
+            -p users="$USERS" \
+            -p duration="$DURATION" \
+            -p target-url="$TARGET_URL" \
+            -o name -n argo-workflows 2>/dev/null || \
+            kubectl create -f "$WORKFLOW_FILE" -o name)
+          echo "  Workflow: $WORKFLOW_NAME"
+
+          echo "  Waiting for workflow completion..."
+          argo wait "$WORKFLOW_NAME" -n argo-workflows 2>/dev/null || \
+            kubectl wait "$WORKFLOW_NAME" --for=condition=Completed --timeout=30m -n argo-workflows
+
+          echo ""
+          echo "=== Workflow Results ==="
+          argo get "$WORKFLOW_NAME" -n argo-workflows 2>/dev/null || \
+            kubectl get "$WORKFLOW_NAME" -n argo-workflows -o yaml
+
+          # Cleanup
+          echo ""
+          echo "=== Cleaning up experiment clusters ==="
+          for cluster_dir in "$EXP_PATH"/*/; do
+            if [ -f "$cluster_dir/cluster.yaml" ]; then
+              cluster=$(basename "$cluster_dir")
+              full_name="${EXP_NAME}-${cluster}"
+              echo "  Deleting cluster: $full_name"
+              kind delete cluster --name "$full_name"
+            fi
+          done
+
+          kubectl config use-context kind-{{.HUB_CLUSTER}}
+
+          echo ""
+          echo "=============================================="
+          echo "  EXPERIMENT COMPLETE"
+          echo "=============================================="
+        fi
 
   teardown:
     desc: "Destroy experiment clusters: task kind:teardown -- <name>"

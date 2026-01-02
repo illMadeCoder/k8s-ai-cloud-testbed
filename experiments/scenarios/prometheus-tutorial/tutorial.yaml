@@ -1,0 +1,66 @@
+# Tutorial configuration
+# When this file exists, `task kind:conduct` runs in interactive mode
+
+title: "Prometheus & Grafana Tutorial"
+description: |
+  Learn Prometheus metrics collection, PromQL queries, and Grafana dashboards.
+
+instructions: |
+  ## Getting Started
+
+  1. Open Prometheus UI in your browser (URL shown above)
+  2. Open Grafana UI in your browser (URL shown above)
+     - Login with: admin / admin
+
+  ## Try These PromQL Queries
+
+  In Prometheus UI, go to Graph tab and try:
+
+  ### Request Rate
+  ```
+  rate(http_requests_total[1m])
+  ```
+
+  ### Error Rate
+  ```
+  sum(rate(http_requests_total{status=~"5.."}[1m])) / sum(rate(http_requests_total[1m]))
+  ```
+
+  ### 95th Percentile Latency
+  ```
+  histogram_quantile(0.95, rate(request_duration_seconds_bucket[1m]))
+  ```
+
+  ### Latency by Endpoint
+  ```
+  histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket[1m])) by (path, le))
+  ```
+
+  ## Generate Load
+
+  Open a new terminal and run:
+  ```bash
+  # Get the metrics-app URL
+  kubectl --context kind-prometheus-tutorial-target get svc -n demo
+
+  # Generate some traffic
+  for i in {1..100}; do
+    curl -s http://<METRICS-APP-IP>/
+    curl -s http://<METRICS-APP-IP>/slow
+    curl -s http://<METRICS-APP-IP>/error
+    curl -s http://<METRICS-APP-IP>/process
+    sleep 0.5
+  done
+  ```
+
+  ## Explore Grafana Dashboards
+
+  1. Go to Dashboards in the left menu
+  2. Browse pre-built dashboards:
+     - Kubernetes / Compute Resources / Cluster
+     - Kubernetes / Compute Resources / Namespace (Pods)
+     - Node Exporter / Nodes
+
+  ## When You're Done
+
+  Press Ctrl+C to tear down the experiment.
