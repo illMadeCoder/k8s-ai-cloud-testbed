@@ -481,10 +481,17 @@ tasks:
         EOF
           sleep 2
 
+          # Remove stale cluster registration if it exists (handles recreated clusters)
+          if argocd cluster get "$cluster" >/dev/null 2>&1; then
+            echo "    Removing stale registration..."
+            echo "y" | argocd cluster rm "$cluster" >/dev/null 2>&1 || true
+          fi
+
           # Add cluster to ArgoCD using CLI
           argocd cluster add "kind-${full_name}" --name "$cluster" \
-            --kubeconfig ~/.kube/config --insecure --yes 2>/dev/null || \
-            echo "    (cluster may already be registered)"
+            --kubeconfig ~/.kube/config --insecure --yes 2>/dev/null && \
+            echo "    Registered successfully" || \
+            echo "    (registration failed - check ArgoCD connectivity)"
         done
 
         # Step 4: Deploy ArgoCD apps
