@@ -840,8 +840,9 @@ tasks:
           for i in $(seq 1 90); do
             PROM_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n observability kube-prometheus-stack-prometheus -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
             GRAFANA_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n observability kube-prometheus-stack-grafana -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+            METRICS_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n demo metrics-app -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
 
-            if [ -n "$PROM_IP" ] && [ -n "$GRAFANA_IP" ]; then
+            if [ -n "$PROM_IP" ] && [ -n "$GRAFANA_IP" ] && [ -n "$METRICS_IP" ]; then
               break
             fi
             echo "  Waiting... ($i/90)"
@@ -849,8 +850,7 @@ tasks:
           done
 
           if [ -z "$PROM_IP" ] || [ -z "$GRAFANA_IP" ]; then
-            echo "Warning: Could not get LoadBalancer IPs, falling back to cluster IP"
-            CLUSTER_IP=$(docker inspect "${EXP_NAME}-target-control-plane" | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress')
+            echo "Warning: Could not get LoadBalancer IPs"
             echo "  Use port-forward instead:"
             echo "  kubectl --context $TARGET_CONTEXT port-forward -n observability svc/kube-prometheus-stack-prometheus 9090:9090"
             echo "  kubectl --context $TARGET_CONTEXT port-forward -n observability svc/kube-prometheus-stack-grafana 3000:80"
@@ -861,8 +861,9 @@ tasks:
           echo "  $(grep '^title:' "$TUTORIAL_FILE" | cut -d'"' -f2)"
           echo "=============================================="
           echo ""
-          echo "  Prometheus: http://${PROM_IP}:9090"
-          echo "  Grafana:    http://${GRAFANA_IP}:80  (admin/admin)"
+          echo "  Prometheus:  http://${PROM_IP}:9090"
+          echo "  Grafana:     http://${GRAFANA_IP}:80  (admin/admin)"
+          echo "  Metrics App: http://${METRICS_IP}:80"
           echo ""
           echo "----------------------------------------------"
 

@@ -38,18 +38,16 @@ instructions: |
 
   ## Generate Load
 
-  Open a new terminal and run:
+  The metrics-app IP is shown above. Generate traffic with:
   ```bash
-  # Get the metrics-app URL
-  kubectl --context kind-prometheus-tutorial-target get svc -n demo
-
-  # Generate some traffic
-  for i in {1..100}; do
-    curl -s http://<METRICS-APP-IP>/
-    curl -s http://<METRICS-APP-IP>/slow
-    curl -s http://<METRICS-APP-IP>/error
-    curl -s http://<METRICS-APP-IP>/process
-    sleep 0.5
+  # Replace METRICS_IP with the metrics-app IP shown above
+  METRICS_IP=<metrics-app-ip>
+  for i in {1..50}; do
+    curl -s http://$METRICS_IP/
+    curl -s http://$METRICS_IP/slow
+    curl -s http://$METRICS_IP/error
+    curl -s http://$METRICS_IP/process
+    sleep 0.3
   done
   ```
 
@@ -63,4 +61,4 @@ instructions: |
 
   ## When You're Done
 
-  Press Ctrl+C to tear down the experiment.
+  Press ENTER to tear down the experiment.
