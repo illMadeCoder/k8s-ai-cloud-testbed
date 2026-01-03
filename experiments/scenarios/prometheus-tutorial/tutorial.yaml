@@ -14,173 +14,322 @@ instructions: |
   ║  Station status: NOMINAL (probably)                                  ║
   ╚══════════════════════════════════════════════════════════════════════╝
 
-  ## Quick Start
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  RECOMMENDED SETUP: Split your screen                               │
+  │                                                                     │
+  │  ┌─────────────────────┐  ┌─────────────────────┐                   │
+  │  │                     │  │                     │                   │
+  │  │     TERMINAL        │  │     BROWSER         │                   │
+  │  │  (this window)      │  │  (Grafana)          │                   │
+  │  │                     │  │                     │                   │
+  │  └─────────────────────┘  └─────────────────────┘                   │
+  │                                                                     │
+  │  Run commands in terminal. Watch metrics change in Grafana.         │
+  └─────────────────────────────────────────────────────────────────────┘
 
-  Set your endpoint IPs (copy the IPs shown above):
+  ## Step 1: Set Your Environment Variables
+
+  Copy the IPs shown above into these exports:
   ```bash
-  export METRICS_IP=<metrics-app-ip>      # Training simulator
-  export STATION_IP=<station-monitor-ip>  # Live station feed
-  export PROM_IP=<prometheus-ip>          # Prometheus array
-  export GRAFANA_IP=<grafana-ip>          # Grafana terminal
+  export METRICS_IP=<metrics-app-ip>
+  export STATION_IP=<station-monitor-ip>
+  export PROM_IP=<prometheus-ip>
+  export GRAFANA_IP=<grafana-ip>
   ```
 
   ═══════════════════════════════════════════════════════════════════════
-  CHECKPOINT 1: VERIFY SYSTEMS ONLINE
+  CHECKPOINT 1: VERIFY SYSTEMS ONLINE (Terminal Only)
   ═══════════════════════════════════════════════════════════════════════
 
-  Run these commands. All should return data:
-
+  Quick smoke test - all should return data:
   ```bash
-  # Training simulator responds
   curl -s http://$METRICS_IP/ | head -1
-  # Expected: "Hello from metrics-app! Pod: metrics-app-xxxxx"
-
-  # Station monitor responds
-  curl -s http://$STATION_IP/ | head -3
-  # Expected: "CLOUDBREAK STATION STATUS" header
-
-  # Prometheus has targets
+  curl -s http://$STATION_IP/ | head -1
   curl -s "http://$PROM_IP:9090/api/v1/targets" | jq '.data.activeTargets | length'
-  # Expected: 11 (should be 11 active targets)
-
-  # Grafana is healthy
-  curl -s "http://$GRAFANA_IP/api/health" | jq '.database'
-  # Expected: "ok"
   ```
 
-  If all four checks pass, proceed to Checkpoint 2.
+  Expected: "Hello from metrics-app...", "CLOUDBREAK STATION...", and "11" or higher.
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║                                                                      ║
+  ║   >>> STOP: OPEN GRAFANA IN YOUR BROWSER NOW <<<                     ║
+  ║                                                                      ║
+  ╚══════════════════════════════════════════════════════════════════════╝
 
   ═══════════════════════════════════════════════════════════════════════
-  CHECKPOINT 2: VERIFY METRICS COLLECTION
+  CHECKPOINT 2: OPEN GRAFANA AND FIND THE DASHBOARDS
   ═══════════════════════════════════════════════════════════════════════
 
-  Generate some traffic:
+  1. Open your browser to: http://<grafana-ip>:80
+     (Use the GRAFANA_IP from above)
+
+  2. Login:
+     - Username: admin
+     - Password: admin
+     - Click "Skip" when asked to change password
+
+  3. Find the dashboards:
+     - Click the hamburger menu (three lines, top-left)
+     - Click "Dashboards"
+     - You should see TWO custom dashboards:
+
+       * "Cloudbreak Station Monitor"  <-- Open this one first
+       * "RED Metrics - metrics-app"
+
+  4. Click "Cloudbreak Station Monitor" to open it
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 3: UNDERSTAND THE DASHBOARD LAYOUT
+  ═══════════════════════════════════════════════════════════════════════
+
+  You should now see the Cloudbreak Station dashboard. Let's identify
+  the key panels:
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  TOP ROW - Station Vital Signs (4 stat panels)                      │
+  │  ┌────────────┬────────────┬────────────┬────────────┐              │
+  │  │   CREW     │CONTAINMENT │  BEACON    │ ANOMALIES  │              │
+  │  │   ~2847    │   ~100%    │  SILENT    │     0      │              │
+  │  │  (green)   │  (green)   │  (green)   │  (green)   │              │
+  │  └────────────┴────────────┴────────────┴────────────┘              │
+  │                                                                     │
+  │  MIDDLE ROW - Time Series (2 graphs)                                │
+  │  ┌─────────────────────────┬─────────────────────────┐              │
+  │  │  Crew Complement        │  Containment & Beacon   │              │
+  │  │  Over Time              │  Over Time              │              │
+  │  └─────────────────────────┴─────────────────────────┘              │
+  │                                                                     │
+  │  SECTOR STATUS ROW - Bar Gauges                                     │
+  │  ┌─────────────────────────┬─────────────────────────┐              │
+  │  │  Life Support           │  Sector Status          │              │
+  │  │  by Sector              │  by Sector              │              │
+  │  └─────────────────────────┴─────────────────────────┘              │
+  │                                                                     │
+  │  SECTOR 12 ROW - The Anomaly Zone                                   │
+  │  ┌────────────┬────────────┬─────────────────────────┐              │
+  │  │  Request   │   Error    │  Response Time          │              │
+  │  │   Rate     │   Rate     │  (p50/p95/p99)          │              │
+  │  └────────────┴────────────┴─────────────────────────┘              │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  VERIFY these panels are visible. If the dashboard looks empty,
+  set the time range to "Last 30 minutes" (top-right dropdown).
+
+  Current station status should show:
+  [ ] Crew Complement: ~2847 (green number)
+  [ ] Containment: ~100% (green)
+  [ ] Beacon: "SILENT" (green background)
+  [ ] Life Support bars: Mostly green (Sector 12 may already be yellow/red)
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║                                                                      ║
+  ║   >>> KEEP GRAFANA OPEN - YOU'LL WATCH IT CHANGE <<<                 ║
+  ║                                                                      ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 4: GENERATE ACTIVITY AND WATCH THE DASHBOARD
+  ═══════════════════════════════════════════════════════════════════════
+
+  Now comes the fun part. You'll run commands in your terminal while
+  watching the Grafana dashboard update in real-time.
+
+  ARRANGE YOUR WINDOWS: Terminal on left, Grafana browser on right.
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  WHAT TO WATCH IN GRAFANA:                                          │
+  │                                                                     │
+  │  1. TOP-LEFT STAT: "Crew Complement"                                │
+  │     - Number will slowly decrease                                   │
+  │     - Color changes: green -> yellow -> red                         │
+  │                                                                     │
+  │  2. TOP-MIDDLE STAT: "Containment Integrity"                        │
+  │     - Percentage drops as you hit Sector 12                         │
+  │     - Watch for color change at 95%, 80%                            │
+  │                                                                     │
+  │  3. TOP-RIGHT-ISH STAT: "Beacon Signal"                             │
+  │     - Starts as "SILENT" (green)                                    │
+  │     - Changes to "DETECTED" (yellow)                                │
+  │     - Then "STRONG" (orange) and "MAXIMUM" (red)                    │
+  │                                                                     │
+  │  4. SECTOR STATUS BARS: Watch Sector 12, 13, 14                     │
+  │     - Sector 12 bar shrinks and turns red                           │
+  │     - Sectors 13-14 start degrading (spreading effect)              │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  IN YOUR TERMINAL, run this command:
   ```bash
-  for i in {1..10}; do curl -s http://$METRICS_IP/ > /dev/null; done
-  for i in {1..5}; do curl -s http://$STATION_IP/sector12 > /dev/null; done
-  ```
-
-  Verify Prometheus collected the metrics:
-  ```bash
-  # Check request counter increased
-  curl -s "http://$PROM_IP:9090/api/v1/query?query=http_requests_total" | \
-    jq '.data.result | length'
-  # Expected: > 0 (should see multiple time series)
-
-  # Check station metrics exist
-  curl -s "http://$PROM_IP:9090/api/v1/query?query=station_crew_complement" | \
-    jq '.data.result[0].value[1]'
-  # Expected: ~2847 (crew count, may be slightly lower)
-  ```
-
-  ═══════════════════════════════════════════════════════════════════════
-  CHECKPOINT 3: EXPLORE GRAFANA DASHBOARDS
-  ═══════════════════════════════════════════════════════════════════════
-
-  Open Grafana in your browser:
-  - URL: http://<grafana-ip>:80
-  - Login: admin / admin (skip password change)
-
-  Find the pre-built dashboards:
-  1. Click the hamburger menu (☰) → Dashboards
-  2. You should see:
-     - "Cloudbreak Station Monitor" - Station telemetry
-     - "RED Metrics - metrics-app" - Request/Error/Duration
-
-  Open "Cloudbreak Station Monitor" and verify:
-  - [ ] Crew Complement shows ~2847
-  - [ ] Containment Integrity shows ~100%
-  - [ ] Beacon Signal shows "SILENT" (green)
-  - [ ] Life Support bars are mostly green
-
-  ═══════════════════════════════════════════════════════════════════════
-  CHECKPOINT 4: WATCH THE STATION DEGRADE
-  ═══════════════════════════════════════════════════════════════════════
-
-  Generate Sector 12 activity (this accelerates degradation):
-  ```bash
-  for i in {1..50}; do
-    curl -s http://$STATION_IP/sector12 > /dev/null
-    sleep 0.5
-  done
-  ```
-
-  While that runs, watch the Grafana dashboard. You should see:
-  - [ ] Crew Complement slowly decreasing
-  - [ ] Containment Integrity dropping below 100%
-  - [ ] Beacon Signal changing from SILENT to DETECTED
-  - [ ] Sector 12 showing high error rate (~70%)
-
-  Check Prometheus for alerts:
-  ```bash
-  curl -s "http://$PROM_IP:9090/api/v1/alerts" | jq '.data.alerts[] | .labels.alertname'
-  ```
-  # Expected: You may see alerts like "CrewComplementDeclining" or "BeaconSignalDetected"
-
-  ═══════════════════════════════════════════════════════════════════════
-  CHECKPOINT 5: INVESTIGATE THE ANOMALY
-  ═══════════════════════════════════════════════════════════════════════
-
-  Something is wrong in Sector 12. Use PromQL to investigate:
-
-  ```bash
-  # What is the current crew count?
-  curl -s "http://$PROM_IP:9090/api/v1/query?query=station_crew_complement" | \
-    jq '.data.result[0].value[1]'
-
-  # How fast is containment degrading?
-  curl -s "http://$PROM_IP:9090/api/v1/query?query=deriv(station_containment_integrity[5m])" | \
-    jq '.data.result[0].value[1]'
-
-  # What is the Sector 12 error rate?
-  curl -s "http://$PROM_IP:9090/api/v1/query?query=sum(rate(station_sector_requests_total{sector=\"12\",status=\"500\"}[5m]))/sum(rate(station_sector_requests_total{sector=\"12\"}[5m]))" | \
-    jq '.data.result[0].value[1]'
-
-  # What is the beacon transmitting?
-  curl http://$STATION_IP/beacon
-  ```
-
-  The answers tell a story. The crew is disappearing. The containment is failing.
-  Something in Sector 12 is transmitting. And it knows you're watching.
-
-  ═══════════════════════════════════════════════════════════════════════
-  EXPLORATION: RED METRICS DASHBOARD
-  ═══════════════════════════════════════════════════════════════════════
-
-  Open "RED Metrics - metrics-app" dashboard in Grafana.
-
-  Generate varied traffic:
-  ```bash
+  echo "Accessing Sector 12 systems..." && \
   for i in {1..30}; do
-    curl -s http://$METRICS_IP/ > /dev/null        # Fast requests
-    curl -s http://$METRICS_IP/slow > /dev/null    # Slow requests
-    curl -s http://$METRICS_IP/error > /dev/null   # Some will fail
-    sleep 0.3
+    curl -s http://$STATION_IP/sector12
+    echo ""
+    sleep 1
   done
   ```
 
-  Observe the RED metrics:
-  - **Rate**: Request throughput by endpoint
-  - **Errors**: Error rate (should be ~30% for /error endpoint)
-  - **Duration**: Latency percentiles (p50, p90, p95, p99)
+  *** WATCH GRAFANA WHILE THIS RUNS ***
 
-  Notice how /slow has higher latency than / in the percentile charts.
+  You should see:
+  - The Sector 12 request rate graph showing activity
+  - Error rate gauge climbing (Sector 12 has 70% failures)
+  - Containment percentage dropping
+  - Beacon signal changing from SILENT
+
+  Wait for the command to finish, then check the dashboard again.
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 5: OBSERVE THE DAMAGE
+  ═══════════════════════════════════════════════════════════════════════
+
+  After running the Sector 12 commands, examine the dashboard:
+
+  EXPECTED CHANGES:
+  [ ] Crew count dropped (watch the time series graph for the decline)
+  [ ] Containment is below 100% (maybe below 95% - yellow alert zone)
+  [ ] Beacon is no longer "SILENT"
+  [ ] Sector 12 life support bar is RED (< 40%)
+  [ ] Sectors 13-14 bars may be YELLOW (spreading effect)
+
+  Compare the LEFT side of the time series graphs (before) to the
+  RIGHT side (after). You're seeing the station degrade in real-time.
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 6: CHECK THE ALERTS
+  ═══════════════════════════════════════════════════════════════════════
+
+  The degradation should have triggered alerts. Check two ways:
+
+  IN GRAFANA:
+  1. Click the hamburger menu (three lines, top-left)
+  2. Click "Alerting" -> "Alert rules"
+  3. Look for alerts with names starting with:
+     - "CrewComplement..."
+     - "Containment..."
+     - "BeaconSignal..."
+
+  IN TERMINAL:
+  ```bash
+  curl -s "http://$PROM_IP:9090/api/v1/alerts" | \
+    jq -r '.data.alerts[] | "\(.state): \(.labels.alertname)"' | \
+    grep -E "Crew|Containment|Beacon|Sector" | sort
+  ```
+
+  You should see alerts like:
+  - FIRING: CrewComplementDeclining
+  - FIRING: ContainmentIntegrityDegraded
+  - FIRING: BeaconSignalDetected
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║                                                                      ║
+  ║   >>> NOW EXPLORE: RED METRICS DASHBOARD <<<                         ║
+  ║                                                                      ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 7: EXPLORE THE RED METRICS DASHBOARD
+  ═══════════════════════════════════════════════════════════════════════
+
+  Go back to the Grafana dashboard list and open:
+  "RED Metrics - metrics-app"
+
+  This dashboard shows the THREE GOLDEN SIGNALS of monitoring:
+  - Rate:     How many requests per second?
+  - Errors:   What percentage are failing?
+  - Duration: How long do requests take?
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  RED DASHBOARD LAYOUT:                                              │
+  │                                                                     │
+  │  TOP ROW - Current Values                                           │
+  │  ┌────────────┬────────────┬────────────┬────────────┐              │
+  │  │  REQUEST   │   ERROR    │    P95     │   ACTIVE   │              │
+  │  │   RATE     │   RATE     │  LATENCY   │   CONNS    │              │
+  │  └────────────┴────────────┴────────────┴────────────┘              │
+  │                                                                     │
+  │  RATE SECTION - Request throughput                                  │
+  │  ┌─────────────────────────┬─────────────────────────┐              │
+  │  │  Rate by Endpoint       │  Rate by Status Code    │              │
+  │  │  (/, /slow, /error)     │  (200, 500)             │              │
+  │  └─────────────────────────┴─────────────────────────┘              │
+  │                                                                     │
+  │  ERRORS SECTION - Failure analysis                                  │
+  │  ┌─────────────────────────┬─────────────────────────┐              │
+  │  │  Error Rate by Endpoint │  Total Errors           │              │
+  │  └─────────────────────────┴─────────────────────────┘              │
+  │                                                                     │
+  │  DURATION SECTION - Latency analysis                                │
+  │  ┌─────────────────────────┬─────────────────────────┐              │
+  │  │  Latency Percentiles    │  P95 by Endpoint        │              │
+  │  │  (p50, p90, p95, p99)   │                         │              │
+  │  └─────────────────────────┴─────────────────────────┘              │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Generate varied traffic to see the dashboard in action:
+  ```bash
+  echo "Generating mixed traffic..." && \
+  for i in {1..20}; do
+    curl -s http://$METRICS_IP/ > /dev/null
+    curl -s http://$METRICS_IP/slow > /dev/null &
+    curl -s http://$METRICS_IP/error > /dev/null
+    sleep 0.5
+  done && \
+  wait && echo "Done!"
+  ```
+
+  *** WATCH GRAFANA WHILE THIS RUNS ***
+
+  OBSERVE:
+  [ ] Request rate spikes in the "Rate by Endpoint" graph
+  [ ] /slow endpoint shows HIGHER latency than / in the percentile chart
+  [ ] /error endpoint shows ~30% error rate (red in the error graph)
+  [ ] Status code graph shows mix of 200s (green) and 500s (red)
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 8: THE INVESTIGATION (Optional Deep Dive)
+  ═══════════════════════════════════════════════════════════════════════
+
+  Return to the Cloudbreak Station dashboard. Use PromQL to investigate
+  what's happening. In Prometheus (http://<prom-ip>:9090), try these queries:
+
+  Crew loss over time:
+  ```
+  station_crew_complement
+  ```
+
+  Rate of containment degradation:
+  ```
+  deriv(station_containment_integrity[5m])
+  ```
+
+  Sector 12 error rate:
+  ```
+  sum(rate(station_sector_requests_total{sector="12",status="500"}[5m]))
+  /
+  sum(rate(station_sector_requests_total{sector="12"}[5m]))
+  ```
+
+  What is the beacon transmitting?
+  ```bash
+  for i in {1..5}; do curl http://$STATION_IP/beacon; sleep 1; done
+  ```
+
+  The answers tell a story. Something is wrong in Sector 12.
 
   ═══════════════════════════════════════════════════════════════════════
   FULL ORIENTATION MATERIALS
   ═══════════════════════════════════════════════════════════════════════
 
-  The complete training covers 16 modules across 6 sections:
-  - Part 1: Foundations (routine systems check)
-  - Part 2: PromQL Mastery (anomalies appearing)
-  - Part 3: SRE Methodology (incident reports filed)
-  - Part 4: Production Patterns (emergency protocols)
-  - Part 5: Grafana Dashboards (see everything)
+  This quick-start covered the basics. The full training includes:
+  - Part 1: Foundations (metric types, Prometheus architecture)
+  - Part 2: PromQL Mastery (rate, histogram_quantile, aggregations)
+  - Part 3: SRE Methodology (Four Golden Signals, SLOs)
+  - Part 4: Production Patterns (alerting best practices)
+  - Part 5: Grafana Dashboards (building your own)
   - Part 6: Sector 12 Investigation [CLASSIFIED]
 
   Access full orientation:
   ```bash
-  cat experiments/scenarios/prometheus-tutorial/README.md | less
+  less experiments/scenarios/prometheus-tutorial/README.md
   ```
 
   ═══════════════════════════════════════════════════════════════════════
