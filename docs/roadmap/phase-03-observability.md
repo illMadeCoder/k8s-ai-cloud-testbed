@@ -155,6 +155,72 @@
 
 ---
 
+### 4.4b ELK Stack (Alternative to Loki)
+
+**Goal:** Centralized logging with Elasticsearch, Logstash/Fluentd, and Kibana
+
+*Alternative to Loki for teams needing full-text search or existing ELK expertise.*
+
+**Learning objectives:**
+- Understand ELK architecture vs Loki trade-offs
+- Configure Elasticsearch for log storage
+- Build Kibana dashboards and visualizations
+- Implement log pipelines with Fluentd/Logstash
+
+**When to choose ELK over Loki:**
+- Need full-text search across log content
+- Existing ELK expertise on team
+- Complex log parsing requirements
+- Need for Kibana's visualization capabilities
+- Log analytics beyond simple filtering
+
+**When to choose Loki over ELK:**
+- Already using Grafana (single pane of glass)
+- Resource-constrained environments
+- Label-based queries are sufficient
+- Simpler operational overhead
+- Cost-sensitive deployments
+
+**Tasks:**
+- [ ] Create `experiments/scenarios/elk-tutorial/`
+- [ ] Deploy ELK stack via ECK (Elastic Cloud on Kubernetes):
+  - [ ] Elasticsearch cluster (single node dev, 3-node prod)
+  - [ ] Kibana for visualization
+  - [ ] Elastic Agent or Fluentd for collection
+- [ ] Configure Elasticsearch:
+  - [ ] Index templates and mappings
+  - [ ] Index lifecycle management (ILM)
+  - [ ] Retention policies (hot/warm/cold/delete)
+  - [ ] Shard sizing and replica configuration
+- [ ] Build log pipelines:
+  - [ ] Fluentd/Fluent Bit DaemonSet
+  - [ ] Parse Kubernetes metadata
+  - [ ] JSON log parsing
+  - [ ] Multi-line log handling
+  - [ ] Field extraction and enrichment
+- [ ] Kibana dashboards:
+  - [ ] Log explorer and search
+  - [ ] Log volume visualizations
+  - [ ] Error rate dashboards
+  - [ ] Index pattern configuration
+- [ ] Alerting:
+  - [ ] Kibana alerting rules
+  - [ ] Watcher for complex conditions
+  - [ ] Integration with notification channels
+- [ ] Performance tuning:
+  - [ ] JVM heap sizing
+  - [ ] Bulk indexing optimization
+  - [ ] Query performance analysis
+- [ ] Compare with Loki:
+  - [ ] Resource usage comparison
+  - [ ] Query performance comparison
+  - [ ] Operational complexity comparison
+  - [ ] Cost analysis (storage, compute)
+- [ ] Document ELK patterns and anti-patterns
+- [ ] **ADR:** Document logging stack selection criteria
+
+---
+
 ### 4.5 OpenTelemetry & Distributed Tracing
 
 **Goal:** End-to-end observability with traces, connecting metrics and logs
