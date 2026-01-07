@@ -78,9 +78,9 @@ prometheusOperator:
   admissionWebhooks:
     enabled: false
 
-# Node exporter - for cluster metrics
+# Node exporter - disabled to avoid port conflict with other tutorials
 nodeExporter:
-  enabled: true
+  enabled: false
 
 # kube-state-metrics - for Kubernetes object metrics
 kubeStateMetrics:
