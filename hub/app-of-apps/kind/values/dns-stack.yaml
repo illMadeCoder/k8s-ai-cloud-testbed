@@ -6,7 +6,7 @@
 # ENVIRONMENT CONFIG: If changing Kind network, also update:
 #   - manifests/metallb-config/kustomization.yaml (POOL_RANGE)
 #   - values/argocd.yaml (loadBalancerIP)
-#   - kind/Taskfile.yaml (DNS_IP)
+#   - platforms/kind/Taskfile.yaml (DNS_IP)
 
 # Domain served by this DNS server
 domain: k8s.local

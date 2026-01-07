@@ -19,7 +19,7 @@
 # DNS (k8s_gateway) LoadBalancer IP
 # Files:
 #   - values/dns-stack.yaml (loadBalancerIP)
-#   - kind/Taskfile.yaml (DNS_IP variable)
+#   - platforms/kind/Taskfile.yaml (DNS_IP variable)
 # Value: 172.19.255.200
 
 # ArgoCD LoadBalancer IP
@@ -47,7 +47,7 @@
 # k8s_gateway domain (for local cluster DNS)
 # Files:
 #   - values/dns-stack.yaml (domain)
-#   - kind/Taskfile.yaml (DNSMASQ_DOMAIN)
+#   - platforms/kind/Taskfile.yaml (DNSMASQ_DOMAIN)
 # Value: k8s.local
 
 # ============================================================================

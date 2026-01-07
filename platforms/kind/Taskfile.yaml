@@ -43,7 +43,7 @@ tasks:
         chmod 777 ~/.illmlab/openbao-data
       - |
         echo "=== Creating Kind cluster ==="
-        kind create cluster --name {{.HUB_CLUSTER}} --config kind/cluster-config.yaml --wait 60s || true
+        kind create cluster --name {{.HUB_CLUSTER}} --config platforms/kind/cluster-config.yaml --wait 60s || true
         kubectl config use-context kind-{{.HUB_CLUSTER}}
       - |
         echo "=== Installing ArgoCD ==="

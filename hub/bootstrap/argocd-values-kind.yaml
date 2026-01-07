@@ -7,7 +7,7 @@
 #   - hub/app-of-apps/kind/manifests/metallb-config/kustomization.yaml (POOL_RANGE)
 #   - hub/app-of-apps/kind/values/argocd.yaml (loadBalancerIP)
 #   - hub/app-of-apps/kind/values/dns-stack.yaml (loadBalancerIP)
-#   - kind/Taskfile.yaml (DNS_IP)
+#   - platforms/kind/Taskfile.yaml (DNS_IP)
 
 server:
   service:
