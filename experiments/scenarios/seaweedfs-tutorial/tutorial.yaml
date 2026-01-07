@@ -4,11 +4,10 @@
 
 title: "Needle in a Haystack"
 description: |
-  The starship's blackbox contains 10 years of sensor readings - billions of tiny files.
-  When the captain needs a specific reading from stardate 47634.44, traditional storage
-  would take minutes to search. SeaweedFS finds it instantly.
+  Ten years ago, something happened in Sector 12. The sensor logs were sealed.
+  Now the captain needs answers - but the blackbox contains 10,000 readings.
 
-  This tutorial demonstrates why O(1) lookup matters and how SeaweedFS achieves it.
+  Traditional storage would choke. SeaweedFS finds it in milliseconds.
 
 theme: "starship-blackbox"
 
@@ -23,14 +22,19 @@ prerequisites:
   - Basic understanding of object storage concepts
 
 instructions: |
-  Welcome, Engineer. The USS Kubernetes has accumulated 10 years of sensor data.
+  Welcome, Engineer.
 
-  Your mission:
-  1. Deploy SeaweedFS (master + volume + s3 gateway)
-  2. Load the ship's historical sensor archive (100,000 readings)
-  3. Find the critical reading from the Sector 12 incident
-  4. Compare retrieval time: SeaweedFS vs traditional filesystem
-  5. Understand why this matters for Loki, Tempo, and Thanos
+  Ten years ago, the USS Kubernetes lost contact with Outpost 12. The official
+  report says "sensor malfunction." The captain doesn't believe it.
+
+  The ship's blackbox has been loaded - 10,000 sensor readings from that decade.
+  Somewhere in there is the truth about stardate 476XX.XX (Sector 12 incident).
+
+  Your mission: Find the anomaly. The reading with radiation levels off the charts.
+
+  Hint: The incident occurred on a stardate starting with 47634...
+
+  Try:  curl http://<FILER_IP>:8888/blackbox/sensors/47634.44.json
 
 checkpoints:
   - id: 1

@@ -16,28 +16,30 @@ data:
     SENSOR_COUNT="${SENSOR_COUNT:-100000}"
 
     echo "=========================================="
-    echo "  STARSHIP BLACKBOX LOADER"
+    echo "  USS KUBERNETES - BLACKBOX RECOVERY"
     echo "=========================================="
     echo ""
-    echo "SeaweedFS Filer: $SEAWEED_FILER"
-    echo "Sensor readings to generate: $SENSOR_COUNT"
+    echo "Decrypting sealed sensor archives..."
+    echo "Classification: EYES ONLY"
+    echo ""
+    echo "Records to restore: $SENSOR_COUNT"
     echo ""
 
     # Wait for SeaweedFS to be ready
-    echo "Waiting for SeaweedFS..."
+    echo "Connecting to archive storage..."
     until curl -s "http://$SEAWEED_FILER/" > /dev/null 2>&1; do
       sleep 2
     done
-    echo "SeaweedFS is ready!"
+    echo "Connection established."
     echo ""
 
     # Create the blackbox directory
-    echo "Creating blackbox archive..."
+    echo "Initializing blackbox archive..."
     curl -s -X POST "http://$SEAWEED_FILER/blackbox/"
 
     # Generate sensor readings
-    echo "Generating $SENSOR_COUNT sensor readings..."
-    echo "This simulates 10 years of starship sensor data."
+    echo "Restoring $SENSOR_COUNT sensor readings..."
+    echo "Date range: Stardates 41000 - 51000 (10 year span)"
     echo ""
 
     START_TIME=$(date +%s%N)
@@ -81,31 +83,34 @@ data:
 
     echo ""
     echo "=========================================="
-    echo "  BLACKBOX ARCHIVE LOADED"
+    echo "  ARCHIVE RESTORATION COMPLETE"
     echo "=========================================="
-    echo "  Total readings: $SENSOR_COUNT"
-    echo "  Load time: ${DURATION}ms"
-    echo "  Avg per file: $(echo "scale=2; $DURATION / $SENSOR_COUNT" | bc)ms"
+    echo "  Records restored: $SENSOR_COUNT"
+    echo "  Time elapsed: ${DURATION}ms"
     echo ""
 
-    # Store a "needle" - the critical reading from Sector 12 incident
+    # Store the needle - the classified Sector 12 incident
     NEEDLE_STARDATE="47634.44"
-    echo "Storing the 'needle' - critical Sector 12 reading..."
-    printf '{"stardate":"%s","sensor_id":"SEN-CRITICAL","sector":12,"alert":"ANOMALY DETECTED","readings":{"temperature":9999,"radiation":50000,"hull_integrity":45,"warp_field":0.00,"beacon_signal":"STRONG"},"message":"You found the needle in the haystack!","timestamp":"2377-05-23T14:32:00Z"}' "$NEEDLE_STARDATE" > /tmp/needle.json
+    echo "[CLASSIFIED] Injecting Sector 12 incident record..."
+    printf '{"stardate":"%s","sensor_id":"OUTPOST-12-FINAL","sector":12,"classification":"CLASSIFIED","alert":"DISTRESS SIGNAL DETECTED","readings":{"temperature":9999,"radiation":50000,"hull_integrity":45,"warp_field":0.00,"life_signs":0,"beacon":"AUTOMATED DISTRESS - NO SURVIVORS"},"note":"Official report redacted. This reading was sealed by Starfleet Command.","timestamp":"2367-05-23T14:32:00Z"}' "$NEEDLE_STARDATE" > /tmp/needle.json
     curl -s -F "file=@/tmp/needle.json" "http://$SEAWEED_FILER/blackbox/sensors/${NEEDLE_STARDATE}.json"
 
     echo ""
-    echo "The needle is hidden at stardate $NEEDLE_STARDATE"
+    echo "=========================================="
+    echo "  READY FOR INVESTIGATION"
+    echo "=========================================="
     echo ""
-    echo "Try finding it:"
-    echo "  curl http://$SEAWEED_FILER/blackbox/sensors/47634.44.json"
+    echo "  The Sector 12 incident occurred somewhere around"
+    echo "  stardate 47634.XX - but which exact reading?"
     echo ""
-    echo "Notice the O(1) retrieval time - same speed whether"
-    echo "you have 100 files or 100 million files!"
+    echo "  In a traditional filesystem, searching 10,000 files"
+    echo "  would take seconds. With SeaweedFS: milliseconds."
+    echo ""
+    echo "  Find the truth, Engineer."
     echo ""
 
     # Keep container running for exploration
-    echo "Blackbox loader complete. Container staying alive for exploration."
+    echo "[Archive terminal ready]"
     tail -f /dev/null
 
 ---
