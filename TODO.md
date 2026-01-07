@@ -46,7 +46,7 @@ A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Plat
 |-------|-------|--------|---------|
 | 1 | [Platform Bootstrap & GitOps](docs/roadmap/phase-01-platform-bootstrap.md) | Complete | Hub, orchestrator, Argo Workflows, Talos, GitLab CI |
 | 2 | [CI/CD & Supply Chain](docs/roadmap/phase-02-cicd-supply-chain.md) | Complete | Image building, scanning, SBOM, signing, Image Updater |
-| 3 | [Observability](docs/roadmap/phase-03-observability.md) | Not Started | Metrics, logging, tracing, dashboards |
+| 3 | [Observability](docs/roadmap/phase-03-observability.md) | In Progress | Metrics, logging, tracing, dashboards |
 | 4 | [Traffic Management](docs/roadmap/phase-04-traffic-management.md) | Not Started | Ingress, load balancing, DNS |
 | 5 | [Deployment Strategies](docs/roadmap/phase-05-deployment-strategies.md) | Not Started | Blue-green, canary, progressive delivery |
 | 6 | [Data & Storage](docs/roadmap/phase-06-data-storage.md) | Not Started | Persistent volumes, operators, backup |
