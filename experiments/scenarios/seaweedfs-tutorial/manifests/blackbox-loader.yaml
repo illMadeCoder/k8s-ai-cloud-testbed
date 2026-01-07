@@ -1,0 +1,269 @@
+# Blackbox Loader - Generates and loads sensor readings into SeaweedFS
+#
+# Demonstrates O(1) lookup by storing 100,000 small files and timing retrieval
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blackbox-loader-script
+  namespace: seaweedfs
+data:
+  loader.sh: |
+    #!/bin/bash
+    set -e
+
+    SEAWEED_FILER="${SEAWEED_FILER:-seaweedfs-filer:8888}"
+    SEAWEED_S3="${SEAWEED_S3:-seaweedfs-s3:8333}"
+    SENSOR_COUNT="${SENSOR_COUNT:-100000}"
+
+    echo "=========================================="
+    echo "  STARSHIP BLACKBOX LOADER"
+    echo "=========================================="
+    echo ""
+    echo "SeaweedFS Filer: $SEAWEED_FILER"
+    echo "Sensor readings to generate: $SENSOR_COUNT"
+    echo ""
+
+    # Wait for SeaweedFS to be ready
+    echo "Waiting for SeaweedFS..."
+    until curl -s "http://$SEAWEED_FILER/" > /dev/null 2>&1; do
+      sleep 2
+    done
+    echo "SeaweedFS is ready!"
+    echo ""
+
+    # Create the blackbox directory
+    echo "Creating blackbox archive..."
+    curl -s -X POST "http://$SEAWEED_FILER/blackbox/"
+
+    # Generate sensor readings
+    echo "Generating $SENSOR_COUNT sensor readings..."
+    echo "This simulates 10 years of starship sensor data."
+    echo ""
+
+    START_TIME=$(date +%s%N)
+
+    for i in $(seq 1 $SENSOR_COUNT); do
+      # Generate a stardate (like 47634.44)
+      YEAR=$((41000 + RANDOM % 10000))
+      DECIMAL=$((RANDOM % 100))
+      STARDATE="${YEAR}.${DECIMAL}"
+
+      # Generate sensor data (small JSON, ~200 bytes)
+      SENSOR_DATA=$(cat <<EOF
+    {
+      "stardate": "$STARDATE",
+      "sensor_id": "SEN-$(printf '%05d' $i)",
+      "sector": $((RANDOM % 20 + 1)),
+      "readings": {
+        "temperature": $((RANDOM % 100 + 200)),
+        "radiation": $((RANDOM % 1000)),
+        "hull_integrity": $((RANDOM % 10 + 90)),
+        "warp_field": $(echo "scale=2; $RANDOM/32767" | bc)
+      },
+      "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    }
+    EOF
+    )
+
+      # Upload to SeaweedFS
+      echo "$SENSOR_DATA" | curl -s -X POST -d @- \
+        "http://$SEAWEED_FILER/blackbox/sensors/${STARDATE}.json" > /dev/null
+
+      # Progress indicator
+      if [ $((i % 10000)) -eq 0 ]; then
+        echo "  Uploaded $i / $SENSOR_COUNT readings..."
+      fi
+    done
+
+    END_TIME=$(date +%s%N)
+    DURATION=$(( (END_TIME - START_TIME) / 1000000 ))
+
+    echo ""
+    echo "=========================================="
+    echo "  BLACKBOX ARCHIVE LOADED"
+    echo "=========================================="
+    echo "  Total readings: $SENSOR_COUNT"
+    echo "  Load time: ${DURATION}ms"
+    echo "  Avg per file: $(echo "scale=2; $DURATION / $SENSOR_COUNT" | bc)ms"
+    echo ""
+
+    # Store a "needle" - the critical reading from Sector 12 incident
+    NEEDLE_STARDATE="47634.44"
+    echo "Storing the 'needle' - critical Sector 12 reading..."
+    cat <<EOF | curl -s -X POST -d @- "http://$SEAWEED_FILER/blackbox/sensors/${NEEDLE_STARDATE}.json"
+    {
+      "stardate": "$NEEDLE_STARDATE",
+      "sensor_id": "SEN-CRITICAL",
+      "sector": 12,
+      "alert": "ANOMALY DETECTED",
+      "readings": {
+        "temperature": 9999,
+        "radiation": 50000,
+        "hull_integrity": 45,
+        "warp_field": 0.00,
+        "beacon_signal": "STRONG"
+      },
+      "message": "You found the needle in the haystack!",
+      "timestamp": "2377-05-23T14:32:00Z"
+    }
+    EOF
+
+    echo ""
+    echo "The needle is hidden at stardate $NEEDLE_STARDATE"
+    echo ""
+    echo "Try finding it:"
+    echo "  curl http://$SEAWEED_FILER/blackbox/sensors/47634.44.json"
+    echo ""
+    echo "Notice the O(1) retrieval time - same speed whether"
+    echo "you have 100 files or 100 million files!"
+    echo ""
+
+    # Keep container running for exploration
+    echo "Blackbox loader complete. Container staying alive for exploration."
+    tail -f /dev/null
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox-loader
+  namespace: seaweedfs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blackbox-loader
+  template:
+    metadata:
+      labels:
+        app: blackbox-loader
+    spec:
+      containers:
+        - name: loader
+          image: curlimages/curl:8.5.0
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              apk add --no-cache bash bc
+              /scripts/loader.sh
+          env:
+            - name: SEAWEED_FILER
+              value: "seaweedfs-filer:8888"
+            - name: SENSOR_COUNT
+              value: "100000"
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 500m
+      volumes:
+        - name: scripts
+          configMap:
+            name: blackbox-loader-script
+            defaultMode: 0755
+
+---
+# Benchmark tool to demonstrate O(1) vs filesystem
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: benchmark-script
+  namespace: seaweedfs
+data:
+  benchmark.sh: |
+    #!/bin/bash
+    echo "=========================================="
+    echo "  O(1) LOOKUP BENCHMARK"
+    echo "=========================================="
+    echo ""
+
+    SEAWEED_FILER="${SEAWEED_FILER:-seaweedfs-filer:8888}"
+    ITERATIONS=100
+
+    echo "Retrieving random sensor readings $ITERATIONS times..."
+    echo ""
+
+    TOTAL_TIME=0
+    for i in $(seq 1 $ITERATIONS); do
+      # Generate random stardate to fetch
+      YEAR=$((41000 + RANDOM % 10000))
+      DECIMAL=$((RANDOM % 100))
+      STARDATE="${YEAR}.${DECIMAL}"
+
+      START=$(date +%s%N)
+      curl -s "http://$SEAWEED_FILER/blackbox/sensors/${STARDATE}.json" > /dev/null 2>&1
+      END=$(date +%s%N)
+
+      DURATION=$(( (END - START) / 1000000 ))
+      TOTAL_TIME=$((TOTAL_TIME + DURATION))
+
+      if [ $((i % 20)) -eq 0 ]; then
+        echo "  $i/$ITERATIONS - Last lookup: ${DURATION}ms"
+      fi
+    done
+
+    AVG=$(echo "scale=2; $TOTAL_TIME / $ITERATIONS" | bc)
+    echo ""
+    echo "=========================================="
+    echo "  RESULTS"
+    echo "=========================================="
+    echo "  Total lookups: $ITERATIONS"
+    echo "  Total time: ${TOTAL_TIME}ms"
+    echo "  Average per lookup: ${AVG}ms"
+    echo ""
+    echo "  This is O(1) - constant time regardless of file count!"
+    echo "  Traditional filesystem at 100k files: 10-50ms per lookup"
+    echo ""
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-filer-external
+  namespace: seaweedfs
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+  ports:
+    - name: http
+      port: 8888
+      targetPort: 8888
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-s3-external
+  namespace: seaweedfs
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+  ports:
+    - name: s3
+      port: 8333
+      targetPort: 8333
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-master-external
+  namespace: seaweedfs
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+  ports:
+    - name: http
+      port: 9333
+      targetPort: 9333

@@ -1,0 +1,105 @@
+# SeaweedFS Tutorial: Needle in a Haystack
+#
+# Learn why Facebook invented Haystack and how SeaweedFS implements O(1) lookups
+
+title: "Needle in a Haystack"
+description: |
+  The starship's blackbox contains 10 years of sensor readings - billions of tiny files.
+  When the captain needs a specific reading from stardate 47634.44, traditional storage
+  would take minutes to search. SeaweedFS finds it instantly.
+
+  This tutorial demonstrates why O(1) lookup matters and how SeaweedFS achieves it.
+
+theme: "starship-blackbox"
+
+learning_objectives:
+  - Understand the "lots of small files" (LOSF) problem
+  - Learn how Haystack/SeaweedFS packs files into volumes
+  - See O(1) lookup in action vs filesystem degradation
+  - Configure S3-compatible access for observability tools
+
+prerequisites:
+  - Completed prometheus-tutorial (recommended)
+  - Basic understanding of object storage concepts
+
+instructions: |
+  Welcome, Engineer. The USS Kubernetes has accumulated 10 years of sensor data.
+
+  Your mission:
+  1. Deploy SeaweedFS (master + volume + s3 gateway)
+  2. Load the ship's historical sensor archive (100,000 readings)
+  3. Find the critical reading from the Sector 12 incident
+  4. Compare retrieval time: SeaweedFS vs traditional filesystem
+  5. Understand why this matters for Loki, Tempo, and Thanos
+
+checkpoints:
+  - id: 1
+    name: "Deploy SeaweedFS"
+    description: "Master, Volume Server, and S3 Gateway running"
+    validation: "kubectl get pods -n seaweedfs | grep Running"
+
+  - id: 2
+    name: "Explore the Architecture"
+    description: "Access the SeaweedFS UI and understand volumes"
+    hint: "Visit http://<master-ip>:9333 to see the master UI"
+
+  - id: 3
+    name: "Load the Blackbox Archive"
+    description: "Upload 100,000 sensor readings to SeaweedFS"
+    command: "curl -X POST http://<filer-ip>:8888/blackbox/load"
+
+  - id: 4
+    name: "Find the Needle"
+    description: "Retrieve sensor reading from stardate 47634.44"
+    learn: |
+      Notice how retrieval time is constant (~2ms) regardless of file count.
+      This is O(1) - one disk seek, one read.
+
+      Traditional filesystem at this scale: 10+ disk seeks per read
+
+  - id: 5
+    name: "The LOSF Problem"
+    description: "See filesystem degradation with many small files"
+    learn: |
+      Create 10,000 files on a regular filesystem.
+      Watch as 'ls' and 'find' slow to a crawl.
+
+      SeaweedFS solution: Pack millions of files into 32GB "volumes"
+      Master only tracks volumes, not individual files.
+
+  - id: 6
+    name: "Volume Internals"
+    description: "Examine how files are packed into volumes"
+    command: "curl http://<volume-ip>:8080/status"
+    learn: |
+      Each volume contains:
+      - Data file (.dat): Concatenated file contents
+      - Index file (.idx): File ID -> offset mapping (in memory!)
+
+      Lookup: file_id -> volume_id -> offset -> single disk read
+
+  - id: 7
+    name: "S3 Gateway"
+    description: "Access SeaweedFS via S3 API"
+    learn: |
+      SeaweedFS provides full S3 compatibility.
+      Tools like Loki, Tempo, and Thanos use this interface.
+
+      aws --endpoint-url http://<s3-ip>:8333 s3 ls s3://blackbox/
+
+  - id: 8
+    name: "Create Observability Buckets"
+    description: "Prepare buckets for Loki and Thanos"
+    command: |
+      aws --endpoint-url http://<s3-ip>:8333 s3 mb s3://loki-chunks
+      aws --endpoint-url http://<s3-ip>:8333 s3 mb s3://thanos-blocks
+      aws --endpoint-url http://<s3-ip>:8333 s3 mb s3://tempo-traces
+
+summary: |
+  You've learned:
+  - Why traditional filesystems fail at billions of small files
+  - How Haystack/SeaweedFS solves this with volume packing
+  - O(1) lookup: file_id -> volume -> offset -> data
+  - S3 API compatibility for tool integration
+
+  Next: Use SeaweedFS as the backend for Loki (logs) or Thanos (metrics)

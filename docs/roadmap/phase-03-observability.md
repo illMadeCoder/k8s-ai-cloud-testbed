@@ -41,38 +41,45 @@
 
 ---
 
-### 3.2 MinIO Object Storage
+### 3.2 SeaweedFS Object Storage
 
-**Goal:** Deploy S3-compatible object storage as foundation for observability backends
+**Goal:** Deploy S3-compatible object storage using Facebook Haystack-inspired architecture
 
-*MinIO is taught early because Loki, Thanos, Tempo, Velero, and Argo Workflows all need object storage.*
+*SeaweedFS replaces MinIO (see ADR-008). Loki, Thanos, Tempo, Velero, and Argo Workflows all need S3-compatible storage.*
 
 **Learning objectives:**
-- Understand MinIO architecture
-- Configure for observability use cases
-- Establish storage foundation for later phases
+- Understand Haystack architecture (volumes, O(1) lookups)
+- Compare to traditional filesystem performance
+- Configure S3 gateway for observability backends
+
+**Why SeaweedFS over MinIO:**
+- MinIO entered maintenance mode (Dec 2025)
+- Apache 2.0 license (MinIO is AGPL)
+- O(1) disk seeks for small files
+- Lower resource usage
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/minio-tutorial/`
-- [ ] Deploy MinIO operator
-- [ ] Create MinIO tenant:
-  - [ ] Single node (development)
-  - [ ] Multi-node distributed (HA)
-- [ ] Configure:
-  - [ ] Buckets and policies
-  - [ ] Access keys and IAM
-  - [ ] Lifecycle rules
-  - [ ] Versioning
-- [ ] Create buckets for observability:
-  - [ ] `loki-chunks` - for log storage
-  - [ ] `thanos-blocks` - for metrics long-term storage
-  - [ ] `tempo-traces` - for trace storage
-  - [ ] `velero-backups` - for cluster backups (Phase 6)
-  - [ ] `argo-artifacts` - for workflow artifacts (Phase 13)
+- [ ] Create `experiments/scenarios/seaweedfs-tutorial/`
+- [ ] Deploy SeaweedFS (master + volume servers)
+- [ ] Understand the architecture:
+  - [ ] Master server (metadata, volume allocation)
+  - [ ] Volume servers (32GB volumes containing millions of files)
+  - [ ] Filer (optional filesystem layer)
+  - [ ] S3 Gateway (S3 API compatibility)
+- [ ] **Haystack demo: "Needle in a Haystack"**
+  - [ ] Store 100,000 small sensor readings
+  - [ ] Demonstrate O(1) lookup time (constant regardless of file count)
+  - [ ] Compare to filesystem degradation
+  - [ ] Visualize volume packing
+- [ ] Configure S3 gateway:
+  - [ ] Create buckets for observability
+  - [ ] `loki-chunks` - log storage
+  - [ ] `thanos-blocks` - metrics long-term storage
+  - [ ] `tempo-traces` - trace storage
 - [ ] Monitoring:
-  - [ ] MinIO metrics in Prometheus
-  - [ ] Storage capacity dashboards
-  - [ ] Alert on bucket growth
+  - [ ] SeaweedFS metrics in Prometheus
+  - [ ] Volume capacity dashboards
+  - [ ] Alert on disk usage
 - [ ] Document object storage patterns
 
 ---
@@ -81,7 +88,7 @@
 
 **Goal:** Centralized logging with Loki and LogQL
 
-*Requires: Section 3.2 (MinIO) for log chunk storage*
+*Requires: Section 3.2 (SeaweedFS) for log chunk storage*
 
 **Learning objectives:**
 - Understand Loki's label-based architecture (vs full-text indexing)
@@ -92,7 +99,7 @@
 - [ ] Create `experiments/scenarios/loki-tutorial/`
 - [ ] Deploy Loki stack (Loki + Promtail)
 - [ ] Configure Loki storage:
-  - [ ] Point to MinIO bucket from Section 3.2
+  - [ ] Point to SeaweedFS bucket from Section 3.2
   - [ ] Configure retention policies
 - [ ] Build app with structured JSON logging
 - [ ] Configure Promtail pipelines:
@@ -266,7 +273,7 @@
 
 **Goal:** Long-term metrics storage and global query view across clusters
 
-*Requires: Section 3.1 (Prometheus), Section 3.2 (MinIO)*
+*Requires: Section 3.1 (Prometheus), Section 3.2 (SeaweedFS)*
 
 **Learning objectives:**
 - Understand Thanos architecture (Sidecar, Store, Query, Compactor)
@@ -281,7 +288,7 @@
   - [ ] Query (global query layer)
   - [ ] Compactor (downsampling and retention)
 - [ ] Configure object storage:
-  - [ ] Use MinIO bucket from Section 3.2
+  - [ ] Use SeaweedFS bucket from Section 3.2
   - [ ] Retention policies (raw, 5m, 1h downsampling)
 - [ ] Multi-cluster setup:
   - [ ] Prometheus + Sidecar per cluster

@@ -1,0 +1,63 @@
+# SeaweedFS Tutorial - Target Cluster Apps
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: seaweedfs-tutorial
+  namespace: argocd
+  labels:
+    experiment: seaweedfs-tutorial
+    cluster: target
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # SeaweedFS via Helm
+    - repoURL: https://seaweedfs.github.io/seaweedfs/helm
+      chart: seaweedfs
+      targetRevision: 4.0.0
+      helm:
+        releaseName: seaweedfs
+        values: |
+          master:
+            replicas: 1
+            resources:
+              requests:
+                memory: 128Mi
+                cpu: 100m
+          volume:
+            replicas: 1
+            resources:
+              requests:
+                memory: 256Mi
+                cpu: 100m
+            data:
+              size: 10Gi
+          filer:
+            enabled: true
+            replicas: 1
+            resources:
+              requests:
+                memory: 128Mi
+                cpu: 100m
+            s3:
+              enabled: true
+              port: 8333
+          s3:
+            enabled: true
+
+    # Blackbox Loader app (sensor data generator)
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/scenarios/seaweedfs-tutorial/manifests
+
+  destination:
+    name: target
+    namespace: seaweedfs
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
