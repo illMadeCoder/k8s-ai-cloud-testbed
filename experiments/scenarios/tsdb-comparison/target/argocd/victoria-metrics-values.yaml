@@ -3,8 +3,8 @@
 # https://github.com/VictoriaMetrics/helm-charts/tree/master/charts/victoria-metrics-single
 
 server:
-  # Same retention as Prometheus for fair comparison
-  retentionPeriod: 2h
+  # Minimum retention period for Victoria Metrics is 1 day
+  retentionPeriod: 1d
 
   # Resource limits - intentionally similar to Prometheus
   resources:
