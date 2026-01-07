@@ -63,13 +63,16 @@ checkpoints:
 
   - id: 5
     name: "The LOSF Problem"
-    description: "See filesystem degradation with many small files"
+    description: "Compare filesystem vs SeaweedFS with 10,000 files"
+    command: "kubectl exec -n seaweedfs deploy/blackbox-loader -- bash /scripts/benchmark.sh"
     learn: |
-      Create 10,000 files on a regular filesystem.
-      Watch as 'ls' and 'find' slow to a crawl.
+      Run the benchmark to see:
+      - Phase 1: Create 10k files on local disk
+      - Phase 2: Time filesystem lookups (fast when cached)
+      - Phase 3: Time SeaweedFS lookups (O(1) always)
 
-      SeaweedFS solution: Pack millions of files into 32GB "volumes"
-      Master only tracks volumes, not individual files.
+      At 10k files, both are fast. At 1M+ files, filesystem degrades.
+      SeaweedFS stays constant because: file_id -> volume -> offset -> ONE read.
 
   - id: 6
     name: "Volume Internals"
