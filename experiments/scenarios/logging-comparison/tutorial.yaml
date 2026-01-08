@@ -1,0 +1,43 @@
+# Logging Stack Comparison Tutorial
+# Compares Loki vs Elasticsearch (ELK) for Kubernetes logging
+
+name: logging-comparison
+title: "Logging Stack Comparison: Loki vs Elasticsearch"
+description: |
+  Compare two popular logging solutions with measurable, reproducible results.
+  Learn when to use label-indexed storage (Loki) vs full-text indexing (Elasticsearch).
+
+difficulty: intermediate
+duration: 45-60 minutes
+
+prerequisites:
+  - kind-cluster-basics
+  - prometheus-tutorial
+
+learning_objectives:
+  - Understand the architectural differences between Loki and Elasticsearch
+  - Measure resource usage differences under identical log volumes
+  - Compare query performance for different query patterns
+  - Learn when to choose each logging solution
+
+components:
+  - loki
+  - promtail
+  - elasticsearch
+  - fluent-bit
+  - kibana
+  - grafana
+  - log-generator
+
+cluster_requirements:
+  target:
+    size: medium
+    reason: "Elasticsearch requires 1GB+ JVM heap"
+
+tags:
+  - logging
+  - observability
+  - loki
+  - elasticsearch
+  - elk
+  - comparison

@@ -1,0 +1,47 @@
+# Grafana Datasources for Logging Comparison
+# Adds Loki and Elasticsearch datasources for side-by-side comparison
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources-logging
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+    experiment: logging-comparison
+data:
+  logging-comparison-datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      # Loki datasource
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://loki.loki.svc:3100
+        isDefault: false
+        jsonData:
+          maxLines: 1000
+          derivedFields:
+            - name: TraceID
+              matcherRegex: '"trace_id":"([^"]+)"'
+              url: ""
+              datasourceUid: ""
+        editable: true
+
+      # Elasticsearch datasource
+      - name: Elasticsearch
+        type: elasticsearch
+        uid: elasticsearch
+        access: proxy
+        url: http://elasticsearch-master.elasticsearch.svc:9200
+        isDefault: false
+        jsonData:
+          index: "logs-*"
+          timeField: "@timestamp"
+          esVersion: "8.5.0"
+          logLevelField: "level"
+          logMessageField: "message"
+          maxConcurrentShardRequests: 5
+        editable: true

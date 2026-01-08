@@ -1,0 +1,341 @@
+# Benchmark Scripts for Logging Comparison Tutorial
+# ConfigMap containing shell scripts for running benchmarks
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: benchmark-scripts
+  namespace: logging-comparison
+  labels:
+    app: benchmark
+    experiment: logging-comparison
+data:
+  # Main benchmark script - runs all phases
+  benchmark.sh: |
+    #!/bin/bash
+    set -e
+
+    GENERATOR_URL="${GENERATOR_URL:-http://log-generator.logging-comparison.svc:8080}"
+    LOKI_URL="${LOKI_URL:-http://loki.loki.svc:3100}"
+    ES_URL="${ES_URL:-http://elasticsearch-master.elasticsearch.svc:9200}"
+
+    echo "=========================================="
+    echo "  Logging Stack Comparison Benchmark"
+    echo "=========================================="
+    echo ""
+
+    # Phase 1: Low volume baseline
+    echo "Phase 1: Low Volume Baseline (10 logs/sec)"
+    echo "-------------------------------------------"
+    curl -s -X POST "${GENERATOR_URL}/config?rate=low&cardinality=low"
+    echo "Waiting 60 seconds for metrics to stabilize..."
+    sleep 60
+
+    echo "Capturing resource usage..."
+    echo "Loki namespace memory: $(kubectl top pods -n loki --no-headers 2>/dev/null | awk '{sum+=$3} END {print sum}')Mi"
+    echo "ES namespace memory: $(kubectl top pods -n elasticsearch --no-headers 2>/dev/null | awk '{sum+=$3} END {print sum}')Mi"
+    echo ""
+
+    # Phase 2: Medium volume
+    echo "Phase 2: Medium Volume (100 logs/sec)"
+    echo "--------------------------------------"
+    curl -s -X POST "${GENERATOR_URL}/config?rate=medium&cardinality=medium"
+    echo "Waiting 60 seconds for metrics to stabilize..."
+    sleep 60
+
+    echo "Capturing resource usage..."
+    echo "Loki namespace memory: $(kubectl top pods -n loki --no-headers 2>/dev/null | awk '{sum+=$3} END {print sum}')Mi"
+    echo "ES namespace memory: $(kubectl top pods -n elasticsearch --no-headers 2>/dev/null | awk '{sum+=$3} END {print sum}')Mi"
+    echo ""
+
+    # Phase 3: High volume
+    echo "Phase 3: High Volume (1000 logs/sec)"
+    echo "-------------------------------------"
+    curl -s -X POST "${GENERATOR_URL}/config?rate=high&cardinality=high"
+    echo "Waiting 60 seconds for metrics to stabilize..."
+    sleep 60
+
+    echo "Capturing resource usage..."
+    echo "Loki namespace memory: $(kubectl top pods -n loki --no-headers 2>/dev/null | awk '{sum+=$3} END {print sum}')Mi"
+    echo "ES namespace memory: $(kubectl top pods -n elasticsearch --no-headers 2>/dev/null | awk '{sum+=$3} END {print sum}')Mi"
+    echo ""
+
+    # Reset to medium
+    echo "Resetting to medium volume..."
+    curl -s -X POST "${GENERATOR_URL}/config?rate=medium&cardinality=medium"
+
+    echo ""
+    echo "Benchmark complete! Check Grafana dashboard for detailed metrics."
+    echo "Dashboard: Logging Stack Comparison"
+
+  # Scale logs helper script
+  scale-logs.sh: |
+    #!/bin/bash
+
+    GENERATOR_URL="${GENERATOR_URL:-http://log-generator.logging-comparison.svc:8080}"
+
+    RATE="${1:-medium}"
+    CARDINALITY="${2:-medium}"
+
+    echo "Setting log generator: rate=${RATE}, cardinality=${CARDINALITY}"
+
+    RESPONSE=$(curl -s -X POST "${GENERATOR_URL}/config?rate=${RATE}&cardinality=${CARDINALITY}")
+    echo "Response: ${RESPONSE}"
+
+    echo ""
+    echo "Current configuration:"
+    curl -s "${GENERATOR_URL}/config" | jq .
+
+  # Query benchmark script
+  query-benchmark.sh: |
+    #!/bin/bash
+    set -e
+
+    LOKI_URL="${LOKI_URL:-http://loki.loki.svc:3100}"
+    ES_URL="${ES_URL:-http://elasticsearch-master.elasticsearch.svc:9200}"
+
+    echo "=========================================="
+    echo "  Query Performance Comparison"
+    echo "=========================================="
+    echo ""
+
+    # Test 1: Label-based query (Loki advantage)
+    echo "Test 1: Label-based query - Find errors from service-1"
+    echo "-------------------------------------------------------"
+
+    echo "Loki (LogQL): {app=\"log-generator\"} |= \"error\" | json | service=\"service-1\""
+    START=$(date +%s%N)
+    curl -s -G "${LOKI_URL}/loki/api/v1/query_range" \
+      --data-urlencode 'query={app="log-generator"} |= "error" | json | service="service-1"' \
+      --data-urlencode 'start='$(date -d '5 minutes ago' +%s%N) \
+      --data-urlencode 'end='$(date +%s%N) \
+      --data-urlencode 'limit=100' > /dev/null
+    END=$(date +%s%N)
+    LOKI_TIME=$(( ($END - $START) / 1000000 ))
+    echo "Loki query time: ${LOKI_TIME}ms"
+
+    echo ""
+    echo "Elasticsearch (KQL): level:error AND service:service-1"
+    START=$(date +%s%N)
+    curl -s -X POST "${ES_URL}/logs-*/_search" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "query": {
+          "bool": {
+            "must": [
+              {"match": {"level": "error"}},
+              {"match": {"service": "service-1"}}
+            ]
+          }
+        },
+        "size": 100
+      }' > /dev/null
+    END=$(date +%s%N)
+    ES_TIME=$(( ($END - $START) / 1000000 ))
+    echo "Elasticsearch query time: ${ES_TIME}ms"
+    echo ""
+
+    # Test 2: Full-text search (Elasticsearch advantage)
+    echo "Test 2: Full-text search - Find specific trace ID"
+    echo "---------------------------------------------------"
+
+    # Get a real trace_id from recent logs
+    TRACE_ID=$(curl -s -G "${LOKI_URL}/loki/api/v1/query" \
+      --data-urlencode 'query={app="log-generator"} | json' \
+      --data-urlencode 'limit=1' | jq -r '.data.result[0].values[0][1]' 2>/dev/null | jq -r '.trace_id' 2>/dev/null || echo "abc123")
+
+    echo "Searching for trace_id: ${TRACE_ID}"
+    echo ""
+
+    echo "Loki (grep through chunks):"
+    START=$(date +%s%N)
+    curl -s -G "${LOKI_URL}/loki/api/v1/query_range" \
+      --data-urlencode "query={app=\"log-generator\"} |= \"${TRACE_ID}\"" \
+      --data-urlencode 'start='$(date -d '5 minutes ago' +%s%N) \
+      --data-urlencode 'end='$(date +%s%N) \
+      --data-urlencode 'limit=100' > /dev/null
+    END=$(date +%s%N)
+    LOKI_TIME=$(( ($END - $START) / 1000000 ))
+    echo "Loki query time: ${LOKI_TIME}ms"
+
+    echo ""
+    echo "Elasticsearch (indexed field):"
+    START=$(date +%s%N)
+    curl -s -X POST "${ES_URL}/logs-*/_search" \
+      -H 'Content-Type: application/json' \
+      -d "{
+        \"query\": {
+          \"match\": {\"trace_id\": \"${TRACE_ID}\"}
+        },
+        \"size\": 100
+      }" > /dev/null
+    END=$(date +%s%N)
+    ES_TIME=$(( ($END - $START) / 1000000 ))
+    echo "Elasticsearch query time: ${ES_TIME}ms"
+    echo ""
+
+    # Test 3: Aggregation query
+    echo "Test 3: Aggregation - Count errors by service"
+    echo "----------------------------------------------"
+
+    echo "Loki metric query:"
+    START=$(date +%s%N)
+    curl -s -G "${LOKI_URL}/loki/api/v1/query" \
+      --data-urlencode 'query=sum by (service) (count_over_time({app="log-generator"} |= "error" | json [5m]))' > /dev/null
+    END=$(date +%s%N)
+    LOKI_TIME=$(( ($END - $START) / 1000000 ))
+    echo "Loki query time: ${LOKI_TIME}ms"
+
+    echo ""
+    echo "Elasticsearch aggregation:"
+    START=$(date +%s%N)
+    curl -s -X POST "${ES_URL}/logs-*/_search" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-5m"
+            }
+          }
+        },
+        "aggs": {
+          "errors_by_service": {
+            "filter": {"match": {"level": "error"}},
+            "aggs": {
+              "services": {
+                "terms": {"field": "service.keyword", "size": 100}
+              }
+            }
+          }
+        }
+      }' > /dev/null
+    END=$(date +%s%N)
+    ES_TIME=$(( ($END - $START) / 1000000 ))
+    echo "Elasticsearch query time: ${ES_TIME}ms"
+    echo ""
+
+    echo "=========================================="
+    echo "  Query benchmark complete!"
+    echo "=========================================="
+
+  # Resource snapshot script
+  resource-snapshot.sh: |
+    #!/bin/bash
+
+    echo "=========================================="
+    echo "  Current Resource Usage Snapshot"
+    echo "=========================================="
+    echo ""
+
+    echo "Loki Stack (namespace: loki):"
+    echo "------------------------------"
+    kubectl top pods -n loki 2>/dev/null || echo "metrics-server not available"
+    echo ""
+
+    echo "Elasticsearch Stack (namespace: elasticsearch):"
+    echo "------------------------------------------------"
+    kubectl top pods -n elasticsearch 2>/dev/null || echo "metrics-server not available"
+    echo ""
+
+    echo "Log Generator (namespace: logging-comparison):"
+    echo "-----------------------------------------------"
+    kubectl top pods -n logging-comparison 2>/dev/null || echo "metrics-server not available"
+    echo ""
+
+    # Check log counts if available
+    LOKI_URL="${LOKI_URL:-http://loki.loki.svc:3100}"
+    ES_URL="${ES_URL:-http://elasticsearch-master.elasticsearch.svc:9200}"
+
+    echo "Log Counts:"
+    echo "-----------"
+
+    # Loki log count (approximate)
+    LOKI_COUNT=$(curl -s -G "${LOKI_URL}/loki/api/v1/query" \
+      --data-urlencode 'query=count_over_time({app="log-generator"}[1h])' 2>/dev/null | \
+      jq -r '.data.result[0].value[1] // "N/A"')
+    echo "Loki (last hour): ${LOKI_COUNT}"
+
+    # Elasticsearch doc count
+    ES_COUNT=$(curl -s "${ES_URL}/logs-*/_count" 2>/dev/null | jq -r '.count // "N/A"')
+    echo "Elasticsearch total: ${ES_COUNT}"
+
+---
+# Benchmark runner pod for executing scripts
+apiVersion: v1
+kind: Pod
+metadata:
+  name: benchmark-runner
+  namespace: logging-comparison
+  labels:
+    app: benchmark-runner
+    experiment: logging-comparison
+spec:
+  serviceAccountName: benchmark-runner
+  containers:
+    - name: runner
+      image: bitnami/kubectl:latest
+      command: ["sleep", "infinity"]
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+  volumes:
+    - name: scripts
+      configMap:
+        name: benchmark-scripts
+        defaultMode: 0755
+  restartPolicy: Never
+
+---
+# ServiceAccount for benchmark runner
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: benchmark-runner
+  namespace: logging-comparison
+  labels:
+    app: benchmark-runner
+    experiment: logging-comparison
+
+---
+# ClusterRole for reading pod metrics
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: benchmark-runner
+  labels:
+    app: benchmark-runner
+    experiment: logging-comparison
+rules:
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: benchmark-runner
+  labels:
+    app: benchmark-runner
+    experiment: logging-comparison
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: benchmark-runner
+subjects:
+  - kind: ServiceAccount
+    name: benchmark-runner
+    namespace: logging-comparison

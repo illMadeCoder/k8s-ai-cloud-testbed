@@ -1,0 +1,40 @@
+# Promtail - Helm values for logging comparison tutorial
+# https://github.com/grafana/helm-charts/tree/main/charts/promtail
+
+# Loki endpoint
+config:
+  clients:
+    - url: http://loki.loki.svc:3100/loki/api/v1/push
+
+  snippets:
+    # Pipeline stages for JSON log parsing
+    pipelineStages:
+      - cri: {}
+      - json:
+          expressions:
+            level: level
+            service: service
+            trace_id: trace_id
+            message: message
+      - labels:
+          level:
+          service:
+      - output:
+          source: message
+
+# Resource limits
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+# Tolerations to run on all nodes
+tolerations:
+  - operator: Exists
+
+# Service monitor for Prometheus
+serviceMonitor:
+  enabled: true

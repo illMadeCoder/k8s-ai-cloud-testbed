@@ -1,0 +1,309 @@
+# Logging Comparison Tutorial - ArgoCD Applications
+# Deploys Loki + Promtail and Elasticsearch + Fluent Bit + Kibana
+
+---
+# Loki (Grafana's logging solution)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: logging-comparison-loki
+  namespace: argocd
+  labels:
+    experiment: logging-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: loki
+      targetRevision: 6.6.2
+      helm:
+        releaseName: loki
+        valueFiles:
+          - $values/experiments/scenarios/logging-comparison/target/argocd/loki-values.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    name: target
+    namespace: loki
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Promtail (Log collector for Loki)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: logging-comparison-promtail
+  namespace: argocd
+  labels:
+    experiment: logging-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: promtail
+      targetRevision: 6.16.4
+      helm:
+        releaseName: promtail
+        valueFiles:
+          - $values/experiments/scenarios/logging-comparison/target/argocd/promtail-values.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    name: target
+    namespace: loki
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Elasticsearch
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: logging-comparison-elasticsearch
+  namespace: argocd
+  labels:
+    experiment: logging-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.elastic.co
+      chart: elasticsearch
+      targetRevision: 8.5.1
+      helm:
+        releaseName: elasticsearch
+        valueFiles:
+          - $values/experiments/scenarios/logging-comparison/target/argocd/elasticsearch-values.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    name: target
+    namespace: elasticsearch
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Fluent Bit (Log collector for Elasticsearch)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: logging-comparison-fluent-bit
+  namespace: argocd
+  labels:
+    experiment: logging-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://fluent.github.io/helm-charts
+      chart: fluent-bit
+      targetRevision: 0.43.0
+      helm:
+        releaseName: fluent-bit
+        valueFiles:
+          - $values/experiments/scenarios/logging-comparison/target/argocd/fluent-bit-values.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    name: target
+    namespace: elasticsearch
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Kibana (Elasticsearch UI)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: logging-comparison-kibana
+  namespace: argocd
+  labels:
+    experiment: logging-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.elastic.co
+      chart: kibana
+      targetRevision: 8.5.1
+      helm:
+        releaseName: kibana
+        valueFiles:
+          - $values/experiments/scenarios/logging-comparison/target/argocd/kibana-values.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    name: target
+    namespace: elasticsearch
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Grafana (for comparison dashboards)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: logging-comparison-grafana
+  namespace: argocd
+  labels:
+    experiment: logging-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: grafana
+      targetRevision: 8.0.0
+      helm:
+        releaseName: grafana
+        values: |
+          adminPassword: admin
+          service:
+            type: LoadBalancer
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          sidecar:
+            dashboards:
+              enabled: true
+            datasources:
+              enabled: true
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/scenarios/logging-comparison/manifests
+      directory:
+        include: '{grafana-*.yaml,comparison-dashboard.yaml}'
+  destination:
+    name: target
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Workload (log-generator + benchmark runner)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: logging-comparison-workload
+  namespace: argocd
+  labels:
+    experiment: logging-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/scenarios/logging-comparison/manifests
+      directory:
+        include: '{log-generator.yaml,benchmark-scripts.yaml}'
+  destination:
+    name: target
+    namespace: logging-comparison
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

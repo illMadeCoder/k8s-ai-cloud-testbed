@@ -1,0 +1,3 @@
+# Logging Comparison Target Cluster
+# Requires medium size for Elasticsearch JVM heap
+size: medium

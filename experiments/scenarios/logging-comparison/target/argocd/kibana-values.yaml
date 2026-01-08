@@ -1,0 +1,32 @@
+# Kibana - Helm values for logging comparison tutorial
+# https://github.com/elastic/helm-charts/tree/main/kibana
+
+# Elasticsearch hosts
+elasticsearchHosts: "http://elasticsearch-master.elasticsearch.svc:9200"
+
+# Single replica
+replicas: 1
+
+# Resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Service
+service:
+  type: LoadBalancer
+  port: 5601
+
+# Health check
+healthCheckPath: "/app/kibana"
+
+# Extra environment
+extraEnvs:
+  - name: ELASTICSEARCH_HOSTS
+    value: "http://elasticsearch-master.elasticsearch.svc:9200"
+  - name: SERVER_PUBLICBASEURL
+    value: "http://localhost:5601"

@@ -1,0 +1,45 @@
+# Elasticsearch - Helm values for logging comparison tutorial
+# Uses elastic/elasticsearch chart
+# https://github.com/elastic/helm-charts/tree/main/elasticsearch
+
+# Single node mode
+replicas: 1
+minimumMasterNodes: 1
+
+# Cluster name
+clusterName: "logging-comparison"
+
+# Resources - minimum viable for Kind
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+# JVM heap - half of memory limit
+esJavaOpts: "-Xmx1g -Xms1g"
+
+# Single node discovery
+discovery.type: single-node
+
+# Disable security for tutorial simplicity
+xpack.security.enabled: "false"
+xpack.security.enrollment.enabled: "false"
+
+# Ephemeral storage
+persistence:
+  enabled: false
+
+# Extra environment variables
+extraEnvs:
+  - name: discovery.type
+    value: single-node
+  - name: xpack.security.enabled
+    value: "false"
+  - name: ES_JAVA_OPTS
+    value: "-Xmx1g -Xms1g"
+
+# Disable other features not needed
+antiAffinity: "soft"

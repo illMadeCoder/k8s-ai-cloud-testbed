@@ -1,0 +1,72 @@
+# Loki - Helm values for logging comparison tutorial
+# Uses grafana/loki chart in single binary mode
+# https://github.com/grafana/loki/tree/main/production/helm/loki
+
+loki:
+  # Single binary mode (monolithic)
+  auth_enabled: false
+
+  commonConfig:
+    replication_factor: 1
+
+  storage:
+    type: filesystem
+
+  # Schema config
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+
+  # Limits
+  limits_config:
+    retention_period: 72h
+    ingestion_rate_mb: 10
+    ingestion_burst_size_mb: 20
+
+# Single binary deployment
+deploymentMode: SingleBinary
+
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistence:
+    enabled: false
+
+# Disable other components for single binary mode
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+# Gateway
+gateway:
+  enabled: false
+
+# Disable minio (using filesystem)
+minio:
+  enabled: false
+
+# Disable monitoring (we have our own Prometheus)
+monitoring:
+  selfMonitoring:
+    enabled: false
+  lokiCanary:
+    enabled: false
+
+# Test disabled
+test:
+  enabled: false
