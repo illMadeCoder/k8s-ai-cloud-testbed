@@ -1,0 +1,72 @@
+# SeaweedFS PrometheusRules for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: seaweedfs-alerts
+  namespace: seaweedfs
+  labels:
+    app: seaweedfs
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: seaweedfs.rules
+      rules:
+        # Alert when disk space is low on any volume server
+        - alert: SeaweedFSDiskSpaceLow
+          expr: sum(SeaweedFS_volumeServer_read_only_volumes{type="isDiskSpaceLow"}) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "SeaweedFS volume server disk space is low"
+            description: "One or more SeaweedFS volume servers have low disk space and are read-only."
+
+        # Alert when no writable volumes are available
+        - alert: SeaweedFSNoWritableVolumes
+          expr: sum(SeaweedFS_master_volume_layout_writable) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "SeaweedFS has no writable volumes"
+            description: "No writable volumes are available in SeaweedFS. Write operations will fail."
+
+        # Alert when master is not leader (split-brain or election issues)
+        - alert: SeaweedFSMasterNotLeader
+          expr: SeaweedFS_master_is_leader == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "SeaweedFS master is not leader"
+            description: "SeaweedFS master {{ $labels.instance }} is not the leader."
+
+        # Alert on high request latency
+        - alert: SeaweedFSHighLatency
+          expr: histogram_quantile(0.95, rate(SeaweedFS_volumeServer_request_seconds_bucket{type="GET"}[5m])) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "SeaweedFS GET request latency is high"
+            description: "95th percentile GET latency is above 1 second for the last 10 minutes."
+
+        # Alert when volume servers have too many read-only volumes
+        - alert: SeaweedFSReadOnlyVolumes
+          expr: sum(SeaweedFS_volumeServer_read_only_volumes{type="IsReadOnly"}) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "SeaweedFS has read-only volumes"
+            description: "{{ $value }} volumes are in read-only mode."
+
+        # Alert on master heartbeat failures
+        - alert: SeaweedFSHeartbeatErrors
+          expr: rate(SeaweedFS_master_received_heartbeats{type="error"}[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "SeaweedFS master receiving heartbeat errors"
+            description: "SeaweedFS master is receiving heartbeat errors at {{ $value }} per second."

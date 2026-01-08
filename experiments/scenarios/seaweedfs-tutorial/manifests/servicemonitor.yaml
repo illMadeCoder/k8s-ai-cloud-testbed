@@ -1,0 +1,82 @@
+# ServiceMonitor for SeaweedFS metrics
+# Scrapes master, volume, filer, and s3 components on port 9327
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seaweedfs-master
+  namespace: seaweedfs
+  labels:
+    app: seaweedfs
+    component: master
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: master
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - seaweedfs
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seaweedfs-volume
+  namespace: seaweedfs
+  labels:
+    app: seaweedfs
+    component: volume
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: volume
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - seaweedfs
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seaweedfs-filer
+  namespace: seaweedfs
+  labels:
+    app: seaweedfs
+    component: filer
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: filer
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - seaweedfs
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seaweedfs-s3
+  namespace: seaweedfs
+  labels:
+    app: seaweedfs
+    component: s3
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: s3
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - seaweedfs

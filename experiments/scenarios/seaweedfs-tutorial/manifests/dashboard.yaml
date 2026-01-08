@@ -1,0 +1,246 @@
+# SeaweedFS Grafana Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seaweedfs-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  seaweedfs.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "gridPos": { "h": 2, "w": 24, "x": 0, "y": 0 },
+          "id": 1,
+          "options": {
+            "code": { "language": "plaintext", "showLineNumbers": false },
+            "content": "# SeaweedFS Object Storage\n\nMonitoring dashboard for SeaweedFS master, volume servers, and filer components.",
+            "mode": "markdown"
+          },
+          "title": "",
+          "type": "text"
+        },
+        {
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 2 },
+          "id": 2,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "SeaweedFS_master_is_leader",
+              "refId": "A"
+            }
+          ],
+          "title": "Master Leader",
+          "type": "stat"
+        },
+        {
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 2 },
+          "id": 3,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "SeaweedFS_volumeServer_max_volumes",
+              "refId": "A"
+            }
+          ],
+          "title": "Max Volumes",
+          "type": "stat"
+        },
+        {
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 2 },
+          "id": 4,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "sum(SeaweedFS_master_volume_layout_writable)",
+              "refId": "A"
+            }
+          ],
+          "title": "Writable Volumes",
+          "type": "stat"
+        },
+        {
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 2 },
+          "id": 5,
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "sum(SeaweedFS_volumeServer_read_only_volumes{type=\"isDiskSpaceLow\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Disk Space Low",
+          "type": "stat"
+        },
+        {
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "id": 6,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "single" }
+          },
+          "targets": [
+            {
+              "expr": "rate(SeaweedFS_master_received_heartbeats{type=\"total\"}[5m])",
+              "legendFormat": "Heartbeats/s",
+              "refId": "A"
+            }
+          ],
+          "title": "Master Heartbeats",
+          "type": "timeseries"
+        },
+        {
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "id": 7,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "single" }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(SeaweedFS_volumeServer_request_seconds_bucket{type=\"GET\"}[5m]))",
+              "legendFormat": "p50 GET",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.95, rate(SeaweedFS_volumeServer_request_seconds_bucket{type=\"GET\"}[5m]))",
+              "legendFormat": "p95 GET",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(SeaweedFS_volumeServer_request_seconds_bucket{type=\"GET\"}[5m]))",
+              "legendFormat": "p99 GET",
+              "refId": "C"
+            }
+          ],
+          "title": "Volume Server GET Latency",
+          "type": "timeseries"
+        },
+        {
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+          "id": 8,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "single" }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(SeaweedFS_filer_request_total[5m])) by (type)",
+              "legendFormat": "{{type}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Filer Request Rate",
+          "type": "timeseries"
+        },
+        {
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+          "id": 9,
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "single" }
+          },
+          "targets": [
+            {
+              "expr": "SeaweedFS_volumeServer_read_only_volumes",
+              "legendFormat": "{{type}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Read-Only Volumes by Type",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "tags": ["seaweedfs", "storage", "s3"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "SeaweedFS Overview",
+      "uid": "seaweedfs-overview"
+    }
