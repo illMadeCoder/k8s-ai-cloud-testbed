@@ -1,6 +1,9 @@
 # Elasticsearch - Helm values for logging comparison tutorial
-# Uses elastic/elasticsearch chart
+# Uses elastic/elasticsearch chart 8.5.1
 # https://github.com/elastic/helm-charts/tree/main/elasticsearch
+#
+# IMPORTANT: Security is disabled for tutorial simplicity.
+# Do NOT use this configuration in production.
 
 # Single node mode
 replicas: 1
@@ -21,16 +24,31 @@ resources:
 # JVM heap - half of memory limit
 esJavaOpts: "-Xmx1g -Xms1g"
 
-# Ephemeral storage
+# Disable TLS certificate generation (security disabled)
+createCert: false
+
+# Disable credential secret generation (security disabled)
+secret:
+  enabled: false
+
+# Configure Elasticsearch via elasticsearch.yml
+# This avoids duplicate env var issues
+esConfig:
+  elasticsearch.yml: |
+    cluster.name: logging-comparison
+    network.host: 0.0.0.0
+    discovery.type: single-node
+    xpack.security.enabled: false
+    xpack.security.enrollment.enabled: false
+    xpack.security.http.ssl.enabled: false
+    xpack.security.transport.ssl.enabled: false
+
+# Ephemeral storage (no persistence for tutorial)
 persistence:
   enabled: false
 
-# Environment variables for single-node setup
-extraEnvs:
-  - name: discovery.type
-    value: single-node
-  - name: xpack.security.enabled
-    value: "false"
-
-# Disable other features not needed
+# Soft anti-affinity (allows single-node Kind)
 antiAffinity: "soft"
+
+# Protocol for readiness probe
+protocol: http
