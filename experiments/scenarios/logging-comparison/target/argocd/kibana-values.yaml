@@ -8,10 +8,12 @@
 # Elasticsearch connection (HTTP, no TLS)
 elasticsearchHosts: "http://elasticsearch-master:9200"
 
-# Disable certificate/credential secrets (security disabled)
+# Disable certificate secrets (no TLS)
 elasticsearchCertificateSecret: ""
 elasticsearchCertificateAuthoritiesFile: ""
-elasticsearchCredentialSecret: ""
+
+# Use credential secret for auth (even though ES security is disabled)
+elasticsearchCredentialSecret: "logging-comparison-master-credentials"
 
 # Single replica
 replicas: 1

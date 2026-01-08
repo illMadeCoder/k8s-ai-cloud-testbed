@@ -27,8 +27,14 @@ esJavaOpts: "-Xmx1g -Xms1g"
 # Disable TLS certificate generation (security disabled)
 createCert: false
 
-# Disable credential secret generation (security disabled)
+# Keep credential secret for readiness probe compatibility
+# The probe script requires ELASTIC_PASSWORD env var even when security is disabled
 secret:
+  enabled: true
+  password: "admin"
+
+# Disable helm tests (they expect TLS)
+tests:
   enabled: false
 
 # Configure Elasticsearch via elasticsearch.yml
