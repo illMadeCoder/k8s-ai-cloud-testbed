@@ -176,7 +176,7 @@ spec:
     spec:
       containers:
         - name: runner
-          image: curlimages/curl:8.5.0
+          image: dwdraju/alpine-curl-jq:latest
           command: ["sleep", "infinity"]
           volumeMounts:
             - name: scripts
