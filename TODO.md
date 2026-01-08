@@ -150,7 +150,7 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 - [x] Configure External Secrets Operator for TLS sync
 - [x] Temporarily disable Let's Encrypt (rate limit exhaustion)
 - [x] Add `ignoreDifferences` for ESO-managed secrets
-- [ ] Re-enable Let's Encrypt after rate limit reset (~Jan 1)
+- [x] Re-enable Let's Encrypt after rate limit reset (issuers ready)
 
 ### ArgoCD Fixes
 
@@ -229,9 +229,18 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 - [ ] Test experiment end-to-end with `task kind:conduct -- prometheus-tutorial`
 - [ ] Build Grafana RED dashboard for metrics-app
 
+### TSDB Comparison (Phase 3.1 addition)
+
+- [x] Create TSDB comparison tutorial (Prometheus vs Victoria Metrics)
+- [x] Create cardinality-generator app
+- [x] Deploy and test comparison end-to-end
+- [x] Document in ADR-009
+
 ### Next Steps
 
-- [ ] Re-enable Let's Encrypt after rate limit reset
+- [x] Re-enable Let's Encrypt after rate limit reset (issuers ready)
 - [ ] Set up Talos home lab cluster
-- [ ] Phase 3.2: SLOs & Error Budgets (Sloth/Pyrra)
-- [ ] Phase 3.3: MinIO Object Storage
+- [ ] Phase 3.2: SeaweedFS Object Storage
+- [ ] Phase 3.3: Loki & Log Aggregation
+- [ ] Phase 3.4: OpenTelemetry & Distributed Tracing
+- [ ] Phase 3.5: SLOs & Error Budgets (Sloth/Pyrra)
