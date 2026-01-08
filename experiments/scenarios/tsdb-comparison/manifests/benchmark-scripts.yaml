@@ -176,7 +176,7 @@ spec:
     spec:
       containers:
         - name: runner
-          image: dwdraju/alpine-curl-jq:latest
+          image: nicolaka/netshoot:latest
           command: ["sleep", "infinity"]
           volumeMounts:
             - name: scripts
