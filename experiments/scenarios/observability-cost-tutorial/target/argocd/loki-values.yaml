@@ -12,6 +12,17 @@ loki:
   storage:
     type: filesystem
 
+  # Schema config required for Loki
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+
   # Short retention for cost analysis demo
   limits_config:
     retention_period: 72h
