@@ -483,17 +483,67 @@ tasks:
           sleep 2
 
           # Remove stale cluster registration if it exists (handles recreated clusters)
+          # First try kubectl (always works), then argocd CLI (if available)
+          kubectl --context kind-{{.HUB_CLUSTER}} delete secret -n argocd -l argocd.argoproj.io/secret-type=cluster,name=$cluster 2>/dev/null || true
+          kubectl --context kind-{{.HUB_CLUSTER}} delete secret argocd-cluster-$cluster -n argocd 2>/dev/null || true
           if argocd cluster get "$cluster" >/dev/null 2>&1; then
-            echo "    Removing stale registration..."
+            echo "    Removing stale CLI registration..."
             echo "y" | argocd cluster rm "$cluster" >/dev/null 2>&1 || true
           fi
 
-          # Add cluster to ArgoCD using CLI
-          argocd cluster add "kind-${full_name}" --name "$cluster" \
-            --kubeconfig ~/.kube/config --insecure --yes 2>/dev/null && \
-            echo "    Registered successfully" || \
-            echo "    (registration failed - check ArgoCD connectivity)"
+          # Add cluster to ArgoCD - try CLI first, fall back to kubectl secret
+          if argocd cluster add "kind-${full_name}" --name "$cluster" \
+            --kubeconfig ~/.kube/config --insecure --yes 2>/dev/null; then
+            echo "    Registered via CLI"
+          else
+            # Fallback: create cluster secret directly
+            echo "    CLI unavailable, creating secret directly..."
+            TARGET_CA=$(kubectl --context "kind-${full_name}" get secret argocd-manager-token -n kube-system -o jsonpath='{.data.ca\.crt}')
+            TARGET_TOKEN=$(kubectl --context "kind-${full_name}" get secret argocd-manager-token -n kube-system -o jsonpath='{.data.token}' | base64 -d)
+            cat <<CLUSTERSECRET | kubectl --context kind-{{.HUB_CLUSTER}} apply -f -
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: argocd-cluster-${cluster}
+          namespace: argocd
+          labels:
+            argocd.argoproj.io/secret-type: cluster
+        type: Opaque
+        stringData:
+          name: "${cluster}"
+          server: "https://${CLUSTER_IP}:6443"
+          config: |
+            {
+              "bearerToken": "${TARGET_TOKEN}",
+              "tlsClientConfig": {
+                "insecure": false,
+                "caData": "${TARGET_CA}"
+              }
+            }
+        CLUSTERSECRET
+            echo "    Registered via secret"
+          fi
         done
+
+        # Step 3b: Load local images (if local-images.txt exists)
+        LOCAL_IMAGES_FILE="$EXP_PATH/local-images.txt"
+        if [ -f "$LOCAL_IMAGES_FILE" ]; then
+          echo ""
+          echo "=== Loading local Docker images ==="
+          while read -r image; do
+            [ -z "$image" ] && continue
+            [[ "$image" =~ ^# ]] && continue
+            if docker image inspect "$image" >/dev/null 2>&1; then
+              for cluster in $CLUSTERS; do
+                full_name="${EXP_NAME}-${cluster}"
+                echo "  Loading $image into $full_name..."
+                kind load docker-image "$image" --name "$full_name" 2>/dev/null || echo "    (failed)"
+              done
+            else
+              echo "  WARNING: Image '$image' not found locally - build it first"
+            fi
+          done < "$LOCAL_IMAGES_FILE"
+        fi
 
         # Step 4: Deploy ArgoCD apps
         echo ""
