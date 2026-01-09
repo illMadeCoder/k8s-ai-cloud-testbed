@@ -54,9 +54,12 @@ grafana:
       type: loki
       url: http://loki-gateway.loki.svc.cluster.local
       access: proxy
-      isDefault: true
+      isDefault: false
       jsonData:
         maxLines: 1000
+
+  # Disable default datasource to avoid conflict
+  defaultDashboardsEnabled: false
 
   # Sidecar for dashboards
   sidecar:
