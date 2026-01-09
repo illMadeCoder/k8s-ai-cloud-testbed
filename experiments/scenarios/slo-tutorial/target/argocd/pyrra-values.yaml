@@ -1,14 +1,12 @@
 # Pyrra values for SLO tutorial
 # SLO management with built-in UI
 
-# API server configuration
-pyrra:
-  # Prometheus URL (within same namespace)
-  prometheusUrl: http://kube-prometheus-stack-prometheus.slo-tutorial.svc:9090
+# Prometheus URL for API server
+prometheusUrl: http://prometheus-operated.slo-tutorial.svc:9090
 
-  # Enable generic recording rules
-  genericRules:
-    enabled: true
+# Enable generic recording rules
+genericRules:
+  enabled: true
 
 # Web UI service
 service:
