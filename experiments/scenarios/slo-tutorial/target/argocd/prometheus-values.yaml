@@ -8,6 +8,10 @@ prometheus:
     ruleSelector: {}
     ruleNamespaceSelector: {}
     ruleSelectorNilUsesHelmValues: false
+    # Enable ServiceMonitor selectors for metrics-app
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    serviceMonitorSelectorNilUsesHelmValues: false
     resources:
       requests:
         cpu: 100m
