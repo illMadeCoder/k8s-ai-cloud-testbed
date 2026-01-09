@@ -28,8 +28,6 @@ vars:
   OPENBAO_NAMESPACE: openbao
   # Infrastructure containers
   CPK_CONTAINER: cloud-provider-kind
-  DNSMASQ_CONTAINER: kind-dnsmasq
-  DNSMASQ_DOMAIN: k8s.local
 
 tasks:
   # =============================================================================
@@ -390,7 +388,6 @@ tasks:
     desc: "Deploy experiment: task kind:up -- <name>"
     cmds:
       - task: _ensure-cloud-provider-kind
-      - task: _ensure-dnsmasq
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
           echo "Usage: task kind:up -- <experiment-name>"
@@ -561,7 +558,6 @@ tasks:
         echo ""
         echo "  Waiting for apps to sync..."
         sleep 30
-      - task: _update-dns
       - |
         EXP_NAME="{{.CLI_ARGS}}"
         EXP_PATH="experiments/scenarios/$EXP_NAME"
@@ -623,7 +619,6 @@ tasks:
     desc: "Run experiment: task kind:conduct -- <name> [USERS=10] [DURATION=60s]"
     cmds:
       - task: _ensure-cloud-provider-kind
-      - task: _ensure-dnsmasq
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
           echo "Usage: task kind:conduct -- <experiment-name> [USERS=10] [DURATION=60s]"
@@ -867,7 +862,6 @@ tasks:
             fi
           fi
         done
-      - task: _update-dns
       - |
         EXP_NAME="{{.CLI_ARGS}}"
         EXP_PATH="experiments/scenarios/$EXP_NAME"
@@ -1073,56 +1067,3 @@ tasks:
           registry.k8s.io/cloud-provider-kind/cloud-controller-manager:v0.6.0
         sleep 2
         docker ps --format '{{"{{"}}.Names{{"}}"}}' | grep -q "^{{.CPK_CONTAINER}}$" && echo "  [cloud-provider-kind] Running" || exit 1
-
-  _ensure-dnsmasq:
-    internal: true
-    cmds:
-      - |
-        if docker ps --format '{{"{{"}}.Names{{"}}"}}' | grep -q "^{{.DNSMASQ_CONTAINER}}$"; then
-          echo "  [dnsmasq] Already running"
-          exit 0
-        fi
-        docker rm -f {{.DNSMASQ_CONTAINER}} 2>/dev/null || true
-        mkdir -p /tmp/kind-dnsmasq
-        cat > /tmp/kind-dnsmasq/dnsmasq.conf << 'EOF'
-        no-resolv
-        no-hosts
-        server=8.8.8.8
-        server=8.8.4.4
-        address=/k8s.local/127.0.0.1
-        EOF
-        echo "  [dnsmasq] Starting..."
-        docker run -d \
-          --name {{.DNSMASQ_CONTAINER}} \
-          --network kind \
-          --restart unless-stopped \
-          --cap-add NET_ADMIN \
-          -p 127.0.0.1:5353:53/udp \
-          -v /tmp/kind-dnsmasq:/etc/dnsmasq.d:ro \
-          andyshinn/dnsmasq:latest \
-          --conf-dir=/etc/dnsmasq.d,*.conf --no-daemon --log-facility=-
-        sleep 2
-        docker ps --format '{{"{{"}}.Names{{"}}"}}' | grep -q "^{{.DNSMASQ_CONTAINER}}$" && echo "  [dnsmasq] Running" || exit 1
-
-  _update-dns:
-    internal: true
-    cmds:
-      - |
-        if ! docker ps --format '{{"{{"}}.Names{{"}}"}}' | grep -q "^{{.DNSMASQ_CONTAINER}}$"; then
-          exit 0
-        fi
-        echo "  [dnsmasq] Updating DNS entries..."
-        mkdir -p /tmp/kind-dnsmasq
-        cat > /tmp/kind-dnsmasq/dnsmasq.conf << 'EOF'
-        no-resolv
-        no-hosts
-        server=8.8.8.8
-        server=8.8.4.4
-        EOF
-        for cluster in $(kind get clusters 2>/dev/null); do
-          kubectl --context "kind-${cluster}" get svc -A -o json 2>/dev/null | \
-            jq -r '.items[] | select(.spec.type=="LoadBalancer") | select(.status.loadBalancer.ingress != null) | "address=/\(.metadata.name).\(.metadata.namespace).{{.DNSMASQ_DOMAIN}}/\(.status.loadBalancer.ingress[0].ip)"' \
-            >> /tmp/kind-dnsmasq/dnsmasq.conf
-        done
-        docker restart {{.DNSMASQ_CONTAINER}} > /dev/null
-        echo "  [dnsmasq] Updated"
