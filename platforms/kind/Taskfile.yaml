@@ -447,6 +447,8 @@ tasks:
             wait $pid || { echo "ERROR: Cluster creation failed"; exit 1; }
           done
           echo "  All clusters created!"
+          # Restart cloud-provider-kind to pick up new cluster credentials
+          docker restart cloud-provider-kind >/dev/null 2>&1 || true
         fi
 
         # Step 3: Register clusters with hub ArgoCD
@@ -699,6 +701,8 @@ tasks:
             wait $pid || { echo "ERROR: Cluster creation failed (pid $pid)"; exit 1; }
           done
           echo "  All clusters created!"
+          # Restart cloud-provider-kind to pick up new cluster credentials
+          docker restart cloud-provider-kind >/dev/null 2>&1 || true
         fi
 
         # Step 3: Bootstrap orchestrator if present
