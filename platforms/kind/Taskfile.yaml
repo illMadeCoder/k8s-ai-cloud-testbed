@@ -934,6 +934,18 @@ tasks:
 
           # Cleanup
           echo ""
+          echo "=== Cleaning up ArgoCD resources ==="
+          for cluster_dir in "$EXP_PATH"/*/; do
+            if [ -f "$cluster_dir/cluster.yaml" ]; then
+              cluster=$(basename "$cluster_dir")
+              full_name="${EXP_NAME}-${cluster}"
+              # Delete ArgoCD app first
+              kubectl --context kind-{{.HUB_CLUSTER}} delete app "$full_name" -n argocd --wait=false 2>/dev/null || true
+              # Delete cluster secret
+              kubectl --context kind-{{.HUB_CLUSTER}} delete secret "cluster-${cluster}" -n argocd 2>/dev/null || true
+            fi
+          done
+
           echo "=== Cleaning up experiment clusters ==="
           for cluster_dir in "$EXP_PATH"/*/; do
             if [ -f "$cluster_dir/cluster.yaml" ]; then
@@ -998,6 +1010,18 @@ tasks:
 
           # Cleanup
           echo ""
+          echo "=== Cleaning up ArgoCD resources ==="
+          for cluster_dir in "$EXP_PATH"/*/; do
+            if [ -f "$cluster_dir/cluster.yaml" ]; then
+              cluster=$(basename "$cluster_dir")
+              full_name="${EXP_NAME}-${cluster}"
+              # Delete ArgoCD app first
+              kubectl --context kind-{{.HUB_CLUSTER}} delete app "$full_name" -n argocd --wait=false 2>/dev/null || true
+              # Delete cluster secret
+              kubectl --context kind-{{.HUB_CLUSTER}} delete secret "cluster-${cluster}" -n argocd 2>/dev/null || true
+            fi
+          done
+
           echo "=== Cleaning up experiment clusters ==="
           for cluster_dir in "$EXP_PATH"/*/; do
             if [ -f "$cluster_dir/cluster.yaml" ]; then
@@ -1033,7 +1057,32 @@ tasks:
           exit 1
         fi
 
-        echo "Destroying experiment clusters for: $EXP_NAME"
+        echo "Destroying experiment: $EXP_NAME"
+
+        # Step 1: Clean up ArgoCD resources on hub (prevents stale apps blocking future deployments)
+        echo "=== Cleaning up ArgoCD resources ==="
+        for cluster_dir in "$EXP_PATH"/*/; do
+          if [ -f "$cluster_dir/cluster.yaml" ]; then
+            cluster_name=$(basename "$cluster_dir")
+            full_name="${EXP_NAME}-${cluster_name}"
+            argocd_app="${full_name}"
+
+            # Delete ArgoCD application (if exists)
+            if kubectl --context kind-{{.HUB_CLUSTER}} get app "$argocd_app" -n argocd >/dev/null 2>&1; then
+              echo "  Deleting ArgoCD app: $argocd_app"
+              kubectl --context kind-{{.HUB_CLUSTER}} delete app "$argocd_app" -n argocd --wait=false 2>/dev/null || true
+            fi
+
+            # Delete cluster secret from ArgoCD
+            if kubectl --context kind-{{.HUB_CLUSTER}} get secret "cluster-${cluster_name}" -n argocd >/dev/null 2>&1; then
+              echo "  Deleting cluster secret: cluster-${cluster_name}"
+              kubectl --context kind-{{.HUB_CLUSTER}} delete secret "cluster-${cluster_name}" -n argocd 2>/dev/null || true
+            fi
+          fi
+        done
+
+        # Step 2: Delete Kind clusters
+        echo "=== Deleting Kind clusters ==="
         for cluster_dir in "$EXP_PATH"/*/; do
           if [ -f "$cluster_dir/cluster.yaml" ]; then
             cluster_name=$(basename "$cluster_dir")
