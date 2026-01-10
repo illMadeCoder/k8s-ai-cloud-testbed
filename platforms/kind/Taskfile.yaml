@@ -939,10 +939,13 @@ tasks:
             if [ -f "$cluster_dir/cluster.yaml" ]; then
               cluster=$(basename "$cluster_dir")
               full_name="${EXP_NAME}-${cluster}"
-              # Delete ArgoCD app first
+              # Remove finalizer first (cluster is being deleted, no need for resource cleanup)
+              kubectl --context kind-{{.HUB_CLUSTER}} patch app "$full_name" -n argocd -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+              # Delete ArgoCD app
               kubectl --context kind-{{.HUB_CLUSTER}} delete app "$full_name" -n argocd --wait=false 2>/dev/null || true
-              # Delete cluster secret
+              # Delete cluster secrets (both naming patterns)
               kubectl --context kind-{{.HUB_CLUSTER}} delete secret "cluster-${cluster}" -n argocd 2>/dev/null || true
+              kubectl --context kind-{{.HUB_CLUSTER}} delete secret "argocd-cluster-${cluster}" -n argocd 2>/dev/null || true
             fi
           done
 
@@ -1015,10 +1018,13 @@ tasks:
             if [ -f "$cluster_dir/cluster.yaml" ]; then
               cluster=$(basename "$cluster_dir")
               full_name="${EXP_NAME}-${cluster}"
-              # Delete ArgoCD app first
+              # Remove finalizer first (cluster is being deleted, no need for resource cleanup)
+              kubectl --context kind-{{.HUB_CLUSTER}} patch app "$full_name" -n argocd -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+              # Delete ArgoCD app
               kubectl --context kind-{{.HUB_CLUSTER}} delete app "$full_name" -n argocd --wait=false 2>/dev/null || true
-              # Delete cluster secret
+              # Delete cluster secrets (both naming patterns)
               kubectl --context kind-{{.HUB_CLUSTER}} delete secret "cluster-${cluster}" -n argocd 2>/dev/null || true
+              kubectl --context kind-{{.HUB_CLUSTER}} delete secret "argocd-cluster-${cluster}" -n argocd 2>/dev/null || true
             fi
           done
 
@@ -1070,14 +1076,14 @@ tasks:
             # Delete ArgoCD application (if exists)
             if kubectl --context kind-{{.HUB_CLUSTER}} get app "$argocd_app" -n argocd >/dev/null 2>&1; then
               echo "  Deleting ArgoCD app: $argocd_app"
+              # Remove finalizer first (cluster is being deleted, no need for resource cleanup)
+              kubectl --context kind-{{.HUB_CLUSTER}} patch app "$argocd_app" -n argocd -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
               kubectl --context kind-{{.HUB_CLUSTER}} delete app "$argocd_app" -n argocd --wait=false 2>/dev/null || true
             fi
 
-            # Delete cluster secret from ArgoCD
-            if kubectl --context kind-{{.HUB_CLUSTER}} get secret "cluster-${cluster_name}" -n argocd >/dev/null 2>&1; then
-              echo "  Deleting cluster secret: cluster-${cluster_name}"
-              kubectl --context kind-{{.HUB_CLUSTER}} delete secret "cluster-${cluster_name}" -n argocd 2>/dev/null || true
-            fi
+            # Delete cluster secrets from ArgoCD (both naming patterns)
+            kubectl --context kind-{{.HUB_CLUSTER}} delete secret "cluster-${cluster_name}" -n argocd 2>/dev/null || true
+            kubectl --context kind-{{.HUB_CLUSTER}} delete secret "argocd-cluster-${cluster_name}" -n argocd 2>/dev/null || true
           fi
         done
 
