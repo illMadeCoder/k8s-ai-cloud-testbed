@@ -138,10 +138,12 @@ tasks:
         echo "Step 1: Creating ArgoCD app for Talos target..."
         APP_NAME="${EXP_NAME}-talos"
 
-        # Read app.yaml and modify destination server to Talos
+        # Read app.yaml and modify destination to Talos
+        # - Change app name from *-target to *-talos
+        # - Replace destination.name with destination.server (Talos URL)
         cat "$ARGOCD_APP" | \
           sed "s|name: ${EXP_NAME}-target|name: ${APP_NAME}|" | \
-          sed "s|server:.*|server: https://{{.TALOS_IP}}:6443|" | \
+          sed 's|name: target$|server: https://{{.TALOS_IP}}:6443|' | \
           kubectl --context {{.HUB_CONTEXT}} apply -f -
 
         # Step 2: Force sync
@@ -150,19 +152,21 @@ tasks:
         kubectl --context {{.HUB_CONTEXT}} patch app "$APP_NAME" -n argocd \
           --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' 2>/dev/null || true
 
-        # Step 3: Wait for healthy
+        # Step 3: Wait for sync (not health - LoadBalancer services stay Progressing without MetalLB)
         echo ""
         echo "Step 3: Waiting for app to sync..."
         for i in $(seq 1 60); do
-          HEALTH=$(kubectl --context {{.HUB_CONTEXT}} get application "$APP_NAME" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
           SYNC=$(kubectl --context {{.HUB_CONTEXT}} get application "$APP_NAME" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+          HEALTH=$(kubectl --context {{.HUB_CONTEXT}} get application "$APP_NAME" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
 
-          if [ "$HEALTH" = "Healthy" ] && [ "$SYNC" = "Synced" ]; then
-            echo "  App is Healthy and Synced!"
+          if [ "$SYNC" = "Synced" ]; then
+            echo "  App Synced! (Health: $HEALTH)"
+            # Wait a bit more for pods to start
+            sleep 10
             break
           fi
           echo "  Status: $SYNC / $HEALTH ($i/60)"
-          sleep 5
+          sleep 3
         done
 
         echo ""
