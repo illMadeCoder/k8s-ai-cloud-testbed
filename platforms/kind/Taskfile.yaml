@@ -838,17 +838,15 @@ tasks:
 
             APP_NAME=$(grep 'name:' "$argocd_dir/app.yaml" | head -1 | awk '{print $2}')
             if [ -n "$APP_NAME" ]; then
-              # Try argocd CLI for refresh/sync (optional - works if port-forward is active)
-              # Falls back to auto-sync if CLI unavailable
-              if argocd app get "$APP_NAME" --hard-refresh >/dev/null 2>&1; then
-                echo "  Refreshing: $APP_NAME (via CLI)"
-                sleep 3
-                echo "  Syncing: $APP_NAME (via CLI)"
-                argocd app sync "$APP_NAME" --force --prune --timeout 300 2>&1 | tail -3 || true
+              # Force immediate refresh via annotation (faster than waiting for reconciliation)
+              kubectl --context "$ARGOCD_CONTEXT" patch app "$APP_NAME" -n argocd \
+                --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' 2>/dev/null || true
+
+              # Try argocd CLI for sync (optional - works if authenticated)
+              if argocd app sync "$APP_NAME" --force --prune --timeout 300 >/dev/null 2>&1; then
+                echo "  Synced: $APP_NAME (via CLI)"
               else
-                echo "  ArgoCD CLI unavailable - using auto-sync (this is fine)"
-                echo "  Waiting for ArgoCD to detect and sync the app..."
-                sleep 10
+                echo "  Auto-sync enabled, waiting for sync..."
               fi
 
               # Wait for app to be healthy using kubectl (doesn't require argocd CLI)
