@@ -21,7 +21,7 @@ spec:
       targetRevision: 7.7.5
       helm:
         valueFiles:
-          - $values/hub/app-of-apps/kind/values/argocd.yaml
+          - $values/platforms/hub/app-of-apps/kind/values/argocd.yaml
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       ref: values

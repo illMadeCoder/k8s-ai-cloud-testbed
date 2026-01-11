@@ -21,7 +21,7 @@ spec:
       targetRevision: 1.18.1
       helm:
         valueFiles:
-          - $values/hub/app-of-apps/kind/values/crossplane.yaml
+          - $values/platforms/hub/app-of-apps/kind/values/crossplane.yaml
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       ref: values

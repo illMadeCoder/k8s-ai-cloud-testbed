@@ -23,7 +23,7 @@ spec:
       targetRevision: v1.19.1
       helm:
         valueFiles:
-          - $values/hub/app-of-apps/kind/values/cert-manager.yaml
+          - $values/platforms/hub/app-of-apps/kind/values/cert-manager.yaml
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       ref: values

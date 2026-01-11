@@ -23,7 +23,7 @@ spec:
       targetRevision: 0.14.9
       helm:
         valueFiles:
-          - $values/hub/app-of-apps/kind/values/metallb.yaml
+          - $values/platforms/hub/app-of-apps/kind/values/metallb.yaml
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       ref: values

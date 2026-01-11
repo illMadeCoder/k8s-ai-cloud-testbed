@@ -1,0 +1,199 @@
+version: '3'
+
+# Talos Platform - Persistent target cluster on GMKtec mini PC
+#
+# Usage:
+#   task talos:status                # Show cluster status
+#   task talos:reset                 # Reset cluster for new experiment
+#   task talos:up -- <name>          # Deploy experiment to Talos target
+
+silent: true
+
+vars:
+  TALOS_CONTEXT: talos-hub
+  TALOS_TARGET_NAME: talos-target
+  TALOS_IP: 192.168.1.178
+  HUB_CONTEXT: kind-hub
+  ARGOCD_NAMESPACE: argocd
+  # Namespaces to preserve during reset
+  PRESERVED_NS: "kube-system kube-public kube-node-lease default"
+
+tasks:
+  status:
+    desc: Show Talos cluster status
+    cmds:
+      - |
+        echo "=== Talos Cluster Status ==="
+        echo ""
+        echo "Endpoint: {{.TALOS_IP}}"
+        echo "Context: {{.TALOS_CONTEXT}}"
+        echo ""
+
+        echo "=== Nodes ==="
+        kubectl --context {{.TALOS_CONTEXT}} get nodes -o wide
+
+        echo ""
+        echo "=== Namespaces ==="
+        kubectl --context {{.TALOS_CONTEXT}} get namespaces
+
+        echo ""
+        echo "=== Running Pods (non-system) ==="
+        kubectl --context {{.TALOS_CONTEXT}} get pods -A --field-selector=metadata.namespace!=kube-system
+
+  reset:
+    desc: Reset Talos cluster for new experiment (delete all non-system resources)
+    cmds:
+      - |
+        echo "=== Resetting Talos cluster ==="
+        echo ""
+
+        # Step 1: Clean up any ArgoCD apps pointing to Talos
+        echo "Step 1: Cleaning ArgoCD apps targeting Talos..."
+        for app in $(kubectl --context {{.HUB_CONTEXT}} get apps -n argocd -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+          dest=$(kubectl --context {{.HUB_CONTEXT}} get app "$app" -n argocd -o jsonpath='{.spec.destination.server}' 2>/dev/null)
+          if echo "$dest" | grep -q "{{.TALOS_IP}}"; then
+            echo "  Removing finalizer and deleting: $app"
+            kubectl --context {{.HUB_CONTEXT}} patch app "$app" -n argocd -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+            kubectl --context {{.HUB_CONTEXT}} delete app "$app" -n argocd --wait=false 2>/dev/null || true
+          fi
+        done
+
+        # Step 2: Delete all non-system namespaces on Talos
+        echo ""
+        echo "Step 2: Deleting experiment namespaces..."
+        PRESERVED="{{.PRESERVED_NS}}"
+        for ns in $(kubectl --context {{.TALOS_CONTEXT}} get namespaces -o jsonpath='{.items[*].metadata.name}'); do
+          if ! echo " $PRESERVED " | grep -q " $ns "; then
+            echo "  Deleting namespace: $ns"
+            kubectl --context {{.TALOS_CONTEXT}} delete namespace "$ns" --wait=false 2>/dev/null || true
+          fi
+        done
+
+        # Step 2b: Clean up resources in default namespace (preserve namespace but not resources)
+        echo ""
+        echo "Step 2b: Cleaning default namespace resources..."
+        kubectl --context {{.TALOS_CONTEXT}} delete deployments,services,configmaps,secrets,pods --all -n default 2>/dev/null || true
+
+        # Step 3: Wait for namespace deletion
+        echo ""
+        echo "Step 3: Waiting for cleanup..."
+        sleep 5
+        for i in $(seq 1 30); do
+          REMAINING=$(kubectl --context {{.TALOS_CONTEXT}} get namespaces -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | while read ns; do
+            if ! echo " $PRESERVED " | grep -q " $ns "; then
+              echo "$ns"
+            fi
+          done | wc -w)
+
+          if [ "$REMAINING" -eq 0 ]; then
+            echo "  All experiment resources cleaned up!"
+            break
+          fi
+          echo "  Waiting for $REMAINING namespaces to terminate... ($i/30)"
+          sleep 2
+        done
+
+        echo ""
+        echo "=== Reset Complete ==="
+        kubectl --context {{.TALOS_CONTEXT}} get namespaces
+
+  up:
+    desc: "Deploy experiment to Talos target: task talos:up -- <name>"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task talos:up -- <experiment-name>"
+          echo ""
+          echo "Deploys experiment to Talos target cluster via ArgoCD."
+          exit 1
+        fi
+
+        EXP_NAME="{{.CLI_ARGS}}"
+        EXP_PATH="experiments/scenarios/$EXP_NAME"
+
+        if [ ! -d "$EXP_PATH" ]; then
+          echo "ERROR: Experiment not found at $EXP_PATH"
+          exit 1
+        fi
+
+        echo "=============================================="
+        echo "  DEPLOYING TO TALOS: $EXP_NAME"
+        echo "=============================================="
+        echo ""
+
+        # Check for target folder (experiments deploy to target)
+        TARGET_DIR="$EXP_PATH/target"
+        if [ ! -d "$TARGET_DIR" ]; then
+          echo "ERROR: No target/ folder found in experiment"
+          exit 1
+        fi
+
+        ARGOCD_APP="$TARGET_DIR/argocd/app.yaml"
+        if [ ! -f "$ARGOCD_APP" ]; then
+          echo "ERROR: No argocd/app.yaml found in target/"
+          exit 1
+        fi
+
+        # Step 1: Create a modified app pointing to Talos
+        echo "Step 1: Creating ArgoCD app for Talos target..."
+        APP_NAME="${EXP_NAME}-talos"
+
+        # Read app.yaml and modify destination server to Talos
+        cat "$ARGOCD_APP" | \
+          sed "s|name: ${EXP_NAME}-target|name: ${APP_NAME}|" | \
+          sed "s|server:.*|server: https://{{.TALOS_IP}}:6443|" | \
+          kubectl --context {{.HUB_CONTEXT}} apply -f -
+
+        # Step 2: Force sync
+        echo ""
+        echo "Step 2: Triggering sync..."
+        kubectl --context {{.HUB_CONTEXT}} patch app "$APP_NAME" -n argocd \
+          --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' 2>/dev/null || true
+
+        # Step 3: Wait for healthy
+        echo ""
+        echo "Step 3: Waiting for app to sync..."
+        for i in $(seq 1 60); do
+          HEALTH=$(kubectl --context {{.HUB_CONTEXT}} get application "$APP_NAME" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+          SYNC=$(kubectl --context {{.HUB_CONTEXT}} get application "$APP_NAME" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+
+          if [ "$HEALTH" = "Healthy" ] && [ "$SYNC" = "Synced" ]; then
+            echo "  App is Healthy and Synced!"
+            break
+          fi
+          echo "  Status: $SYNC / $HEALTH ($i/60)"
+          sleep 5
+        done
+
+        echo ""
+        echo "=============================================="
+        echo "  DEPLOYED TO TALOS: $EXP_NAME"
+        echo "=============================================="
+        echo ""
+        echo "  kubectl context: {{.TALOS_CONTEXT}}"
+        echo "  ArgoCD app: $APP_NAME"
+        echo ""
+        echo "To reset: task talos:reset"
+
+  down:
+    desc: "Remove experiment from Talos: task talos:down -- <name>"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task talos:down -- <experiment-name>"
+          exit 1
+        fi
+
+        EXP_NAME="{{.CLI_ARGS}}"
+        APP_NAME="${EXP_NAME}-talos"
+
+        echo "Removing experiment: $EXP_NAME"
+
+        # Remove ArgoCD app
+        if kubectl --context {{.HUB_CONTEXT}} get app "$APP_NAME" -n argocd >/dev/null 2>&1; then
+          echo "  Removing finalizer and deleting app..."
+          kubectl --context {{.HUB_CONTEXT}} patch app "$APP_NAME" -n argocd -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+          kubectl --context {{.HUB_CONTEXT}} delete app "$APP_NAME" -n argocd --wait=false 2>/dev/null || true
+        fi
+
+        echo "Done. Run 'task talos:reset' for full cleanup."

@@ -25,7 +25,7 @@ spec:
       targetRevision: 2.4.0
       helm:
         valueFiles:
-          - $values/hub/app-of-apps/kind/values/dns-stack.yaml
+          - $values/platforms/hub/app-of-apps/kind/values/dns-stack.yaml
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       ref: values

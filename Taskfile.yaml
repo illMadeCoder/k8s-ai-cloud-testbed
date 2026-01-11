@@ -4,7 +4,7 @@ silent: true
 
 includes:
   kind: ./platforms/kind/Taskfile.yaml
-  # talos: ./platforms/talos/Taskfile.yaml  # future
+  talos: ./platforms/talos/Taskfile.yaml
   # cloud: ./platforms/cloud/Taskfile.yaml  # future
 
 tasks:
