@@ -298,19 +298,13 @@ tasks:
         OPENBAO_POD=$(kubectl --context kind-{{.HUB_CLUSTER}} get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}')
 
         # Parse arguments: first is path, rest are key=value pairs
-        ARGS=({{.CLI_ARGS}})
-        SECRET_PATH="${ARGS[0]}"
-        unset ARGS[0]
-
-        # Build key=value arguments
-        KV_ARGS=""
-        for arg in "${ARGS[@]}"; do
-          KV_ARGS="$KV_ARGS $arg"
-        done
+        set -- {{.CLI_ARGS}}
+        SECRET_PATH="$1"
+        shift
 
         echo "Storing secret at: secret/$SECRET_PATH"
         kubectl --context kind-{{.HUB_CLUSTER}} exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
-          env BAO_TOKEN="$ROOT_TOKEN" bao kv put "secret/$SECRET_PATH" $KV_ARGS
+          env BAO_TOKEN="$ROOT_TOKEN" bao kv put "secret/$SECRET_PATH" "$@"
 
         echo "Secret stored successfully!"
 
