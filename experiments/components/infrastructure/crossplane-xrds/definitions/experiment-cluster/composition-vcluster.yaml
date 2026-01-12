@@ -120,6 +120,7 @@ spec:
           fromFieldPath: spec.scenario
           toFieldPath: spec.forProvider.releaseName
         # Set kubeconfig server URL to vcluster service
+        # Service name is vcluster-{scenario} (same as helm release name)
         - type: CombineFromComposite
           combine:
             variables:
@@ -127,7 +128,7 @@ spec:
               - fromFieldPath: spec.scenario
             strategy: string
             string:
-              fmt: "https://%s.exp-%s.svc:443"
+              fmt: "https://vcluster-%s.exp-%s.svc:443"
           toFieldPath: spec.forProvider.values.exportKubeConfig.server
         # Size mapping: CPU requests
         - type: FromCompositeFieldPath
@@ -217,7 +218,7 @@ spec:
         - type: FromCompositeFieldPath
           fromFieldPath: spec.scenario
           toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
-        # Server URL
+        # Server URL (service name is vcluster-{scenario})
         - type: CombineFromComposite
           combine:
             variables:
@@ -225,7 +226,7 @@ spec:
               - fromFieldPath: spec.scenario
             strategy: string
             string:
-              fmt: "https://%s.exp-%s.svc:443"
+              fmt: "https://vcluster-%s.exp-%s.svc:443"
           toFieldPath: spec.forProvider.manifest.stringData.server
         # Write server to status
         - type: CombineFromComposite
@@ -235,7 +236,7 @@ spec:
               - fromFieldPath: spec.scenario
             strategy: string
             string:
-              fmt: "https://%s.exp-%s.svc:443"
+              fmt: "https://vcluster-%s.exp-%s.svc:443"
           toFieldPath: status.server
         # Write cluster name to status
         - type: FromCompositeFieldPath
