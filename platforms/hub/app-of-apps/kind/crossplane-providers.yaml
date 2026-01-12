@@ -1,0 +1,55 @@
+# Crossplane Providers for Hub
+#
+# Installs provider-helm, provider-kubernetes, provider-aws, provider-azure
+# and composition functions needed for ExperimentCluster XRD.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crossplane-providers
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+    environment: kind
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    targetRevision: HEAD
+    path: experiments/components/infrastructure/crossplane-providers
+    directory:
+      recurse: true
+      exclude: 'providers.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: crossplane-system
+  ignoreDifferences:
+    - group: pkg.crossplane.io
+      kind: Provider
+      jqPathExpressions:
+        - .status
+    - group: pkg.crossplane.io
+      kind: ProviderRevision
+      jqPathExpressions:
+        - .status
+    - group: pkg.crossplane.io
+      kind: Function
+      jqPathExpressions:
+        - .status
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

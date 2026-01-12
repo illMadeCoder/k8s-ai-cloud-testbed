@@ -1,0 +1,255 @@
+---
+# vcluster Composition for ExperimentCluster XRD
+# Creates an ephemeral Kubernetes cluster using vcluster inside the hub
+#
+# Resources created:
+# 1. Namespace for vcluster (exp-{name})
+# 2. vcluster Helm Release
+# 3. ArgoCD cluster secret for registration
+#
+# Note: vcluster creates its kubeconfig in a secret named "vc-{name}"
+# This composition creates a separate ArgoCD secret referencing the vcluster service
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xexperimentclusters.vcluster.illm.io
+  labels:
+    provider: vcluster
+    crossplane.io/xrd: xexperimentclusters.illm.io
+spec:
+  compositeTypeRef:
+    apiVersion: illm.io/v1alpha1
+    kind: XExperimentCluster
+
+  patchSets:
+    - name: metadata
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels
+          toFieldPath: metadata.labels
+          policy:
+            mergeOptions:
+              keepMapValues: true
+
+  resources:
+    # 1. Namespace for vcluster
+    - name: namespace
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: placeholder
+                labels:
+                  illm.io/experiment: "true"
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+
+    # 2. vcluster Helm Release
+    - name: vcluster
+      base:
+        apiVersion: helm.crossplane.io/v1beta1
+        kind: Release
+        spec:
+          providerConfigRef:
+            name: helm-incluster
+          forProvider:
+            chart:
+              name: vcluster
+              repository: https://charts.loft.sh
+              version: "0.20.0"
+            namespace: placeholder
+            wait: true
+            waitTimeout: 10m0s
+            values:
+              # Expose vcluster API via ClusterIP service
+              service:
+                type: ClusterIP
+              # Syncer configuration
+              syncer:
+                extraArgs: []
+              # Sync resources from host
+              sync:
+                fromHost:
+                  storageClasses:
+                    enabled: true
+                  ingressClasses:
+                    enabled: true
+                  nodes:
+                    enabled: false
+              # Export kubeconfig for external access
+              exportKubeConfig:
+                context: vcluster
+                server: ""
+              # Resource limits (will be patched by size)
+              controlPlane:
+                statefulSet:
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 128Mi
+                    limits:
+                      cpu: 1000m
+                      memory: 1Gi
+      patches:
+        # Release name matches scenario
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "vcluster-%s"
+        # Namespace
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.namespace
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s"
+        # Helm release name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.releaseName
+        # Set kubeconfig server URL to vcluster service
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.scenario
+              - fromFieldPath: spec.scenario
+            strategy: string
+            string:
+              fmt: "https://%s.exp-%s.svc:443"
+          toFieldPath: spec.forProvider.values.exportKubeConfig.server
+        # Size mapping: CPU requests
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.values.controlPlane.statefulSet.resources.requests.cpu
+          transforms:
+            - type: map
+              map:
+                small: "100m"
+                medium: "250m"
+                large: "500m"
+        # Size mapping: Memory requests
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.values.controlPlane.statefulSet.resources.requests.memory
+          transforms:
+            - type: map
+              map:
+                small: "128Mi"
+                medium: "256Mi"
+                large: "512Mi"
+        # Size mapping: CPU limits
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.values.controlPlane.statefulSet.resources.limits.cpu
+          transforms:
+            - type: map
+              map:
+                small: "1000m"
+                medium: "2000m"
+                large: "4000m"
+        # Size mapping: Memory limits
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.values.controlPlane.statefulSet.resources.limits.memory
+          transforms:
+            - type: map
+              map:
+                small: "1Gi"
+                medium: "2Gi"
+                large: "4Gi"
+
+    # 3. ArgoCD Cluster Secret
+    # Creates a cluster secret that ArgoCD uses to connect to the vcluster
+    # Note: Uses insecure TLS because vcluster uses self-signed certs
+    - name: argocd-cluster-secret
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: placeholder
+                namespace: argocd
+                labels:
+                  argocd.argoproj.io/secret-type: cluster
+                  illm.io/experiment: "true"
+              type: Opaque
+              stringData:
+                name: placeholder
+                server: placeholder
+                config: |
+                  {
+                    "tlsClientConfig": {
+                      "insecure": true
+                    }
+                  }
+      patches:
+        # Secret name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "cluster-%s"
+        # Cluster name (what ArgoCD shows)
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.stringData.name
+        # Scenario label
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+        # Server URL
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.scenario
+              - fromFieldPath: spec.scenario
+            strategy: string
+            string:
+              fmt: "https://%s.exp-%s.svc:443"
+          toFieldPath: spec.forProvider.manifest.stringData.server
+        # Write server to status
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.scenario
+              - fromFieldPath: spec.scenario
+            strategy: string
+            string:
+              fmt: "https://%s.exp-%s.svc:443"
+          toFieldPath: status.server
+        # Write cluster name to status
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: status.clusterName
+        # Write provider to status
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.provider
+          toFieldPath: status.provider

@@ -1,0 +1,37 @@
+---
+# Crossplane Composition Functions
+# These functions enable advanced composition logic for ExperimentCluster XRD
+
+# Patch and Transform Function
+# Standard function for patching and transforming composite resources
+apiVersion: pkg.crossplane.io/v1beta1
+kind: Function
+metadata:
+  name: function-patch-and-transform
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-patch-and-transform:v0.7.0
+---
+# Go Templating Function
+# Enables Go template syntax for complex transformations
+# Used for: Converting vcluster kubeconfig YAML to ArgoCD JSON format
+apiVersion: pkg.crossplane.io/v1beta1
+kind: Function
+metadata:
+  name: function-go-templating
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.7.0
+---
+# Auto Ready Function
+# Automatically marks composite resources as ready when all composed resources are ready
+apiVersion: pkg.crossplane.io/v1beta1
+kind: Function
+metadata:
+  name: function-auto-ready
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/function-auto-ready:v0.3.0

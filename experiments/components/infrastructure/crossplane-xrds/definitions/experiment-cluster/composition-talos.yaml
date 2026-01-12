@@ -1,0 +1,130 @@
+---
+# Talos Composition for ExperimentCluster XRD
+# References the existing persistent Talos hardware cluster
+#
+# Unlike vcluster, Talos is a pre-existing persistent cluster.
+# This composition:
+# 1. Creates an ExternalSecret to sync cluster credentials from OpenBao
+# 2. Labels the cluster for the specific experiment
+#
+# Prerequisites:
+# - Talos cluster credentials stored in OpenBao at secret/data/clusters/talos-target
+# - ExternalSecrets Operator configured with ClusterSecretStore "openbao"
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xexperimentclusters.talos.illm.io
+  labels:
+    provider: talos
+    crossplane.io/xrd: xexperimentclusters.illm.io
+spec:
+  compositeTypeRef:
+    apiVersion: illm.io/v1alpha1
+    kind: XExperimentCluster
+
+  resources:
+    # ExternalSecret for Talos cluster credentials
+    # Creates an ArgoCD cluster secret from OpenBao-stored credentials
+    - name: talos-cluster-secret
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: external-secrets.io/v1beta1
+              kind: ExternalSecret
+              metadata:
+                name: placeholder
+                namespace: argocd
+              spec:
+                refreshInterval: 1h
+                secretStoreRef:
+                  kind: ClusterSecretStore
+                  name: openbao
+                target:
+                  name: placeholder
+                  creationPolicy: Owner
+                  template:
+                    type: Opaque
+                    metadata:
+                      labels:
+                        argocd.argoproj.io/secret-type: cluster
+                        illm.io/experiment: "true"
+                        illm.io/provider: talos
+                    data:
+                      name: "{{ .name }}"
+                      server: "{{ .server }}"
+                      config: |
+                        {
+                          "tlsClientConfig": {
+                            "caData": "{{ .caData }}",
+                            "certData": "{{ .certData }}",
+                            "keyData": "{{ .keyData }}"
+                          }
+                        }
+                data:
+                  - secretKey: name
+                    remoteRef:
+                      key: secret/data/clusters/talos-target
+                      property: name
+                  - secretKey: server
+                    remoteRef:
+                      key: secret/data/clusters/talos-target
+                      property: server
+                  - secretKey: caData
+                    remoteRef:
+                      key: secret/data/clusters/talos-target
+                      property: caData
+                  - secretKey: certData
+                    remoteRef:
+                      key: secret/data/clusters/talos-target
+                      property: certData
+                  - secretKey: keyData
+                    remoteRef:
+                      key: secret/data/clusters/talos-target
+                      property: keyData
+      patches:
+        # ExternalSecret name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "cluster-talos-%s"
+        # Target secret name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.spec.target.name
+          transforms:
+            - type: string
+              string:
+                fmt: "cluster-talos-%s"
+        # Scenario label on secret
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.spec.target.template.metadata.labels["illm.io/scenario"]
+        # Write cluster name to status (uses talos-target as name)
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: status.clusterName
+          transforms:
+            - type: string
+              string:
+                fmt: "talos-%s"
+        # Write provider to status
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.provider
+          toFieldPath: status.provider
+        # Server URL (hardcoded for Talos since it's a fixed cluster)
+        # Note: This will be overridden by the actual value from OpenBao
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.provider
+          toFieldPath: status.server
+          transforms:
+            - type: string
+              string:
+                fmt: "https://talos-cluster:6443"
