@@ -37,6 +37,15 @@ spec:
   destination:
     name: target
     namespace: observability
+  ignoreDifferences:
+    - group: apps
+      kind: ReplicaSet
+      jsonPointers:
+        - /status
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status
   syncPolicy:
     automated:
       prune: true
