@@ -11,7 +11,7 @@ allInOne:
   replicas: 1
   image:
     repository: jaegertracing/all-in-one
-    tag: "1.62"
+    tag: "1.57"
   # OTLP is enabled by default in recent Jaeger versions
   resources:
     requests:
