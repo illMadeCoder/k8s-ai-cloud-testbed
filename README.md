@@ -23,17 +23,17 @@ A Kubernetes learning lab with GitOps, supply chain security, and observability.
 │  │   (GitOps)  │  │  (Secrets)  │  │   (Infra)   │  │ (Policy/Admission)  │  │
 │  └──────┬──────┘  └─────────────┘  └──────┬──────┘  └─────────────────────┘  │
 │         │                                 │                                  │
-│         │  Deploys workloads              │  Provisions clusters             │
-│         │                                 │                                  │
-│  ┌─────────────┐  ┌─────────────┐         │                                  │
-│  │   MetalLB   │  │ k8s_gateway │         │                                  │
-│  │ (LoadBal)   │  │    (DNS)    │         │                                  │
-│  └─────────────┘  └─────────────┘         │                                  │
+│         │  ┌─────────────┐  ┌─────────────┐                                  │
+│         │  │   MetalLB   │  │ k8s_gateway │                                  │
+│         │  │ (LoadBal)   │  │    (DNS)    │                                  │
+│         │  └─────────────┘  └─────────────┘                                  │
 └─────────┼─────────────────────────────────┼──────────────────────────────────┘
           │                                 │
-          │         ┌───────────────────────┼───────────────────────┐
-          │         │                       │                       │
-          ▼         ▼                       ▼                       ▼
+          │    Deploys workloads            │    Provisions clusters
+          │                                 │
+          └────────────┬────────────────────┼────────────────────┐
+                       │                    │                    │
+                       ▼                    ▼                    ▼
 ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐
 │   On-Prem (Talos/N100)  │  │      Azure (AKS)        │  │       AWS (EKS)         │
 │                         │  │                         │  │                         │
@@ -48,12 +48,6 @@ A Kubernetes learning lab with GitOps, supply chain security, and observability.
 │  │ k6 load tests     │  │  │  │ k6 load tests     │  │  │  │ k6 load tests     │  │
 │  └───────────────────┘  │  │  └───────────────────┘  │  │  └───────────────────┘  │
 └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘
-
-         ArgoCD (GitOps)                 Crossplane (Infrastructure)
-              │                                    │
-              └── Deploys observability,           └── Provisions clusters via
-                  experiments, apps to                 ExperimentCluster CRD
-                  all target clusters
 ```
 
 ## Quick Start
