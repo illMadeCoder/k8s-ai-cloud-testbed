@@ -15,17 +15,39 @@ A Kubernetes learning lab with GitOps, supply chain security, and observability.
 ## Architecture
 
 ```
-Hub Cluster (Self-Managing GitOps)
-├── ArgoCD ──────────► App-of-Apps pattern, sync waves
-├── OpenBao ─────────► Secrets, dynamic credentials, PKI
-├── Crossplane ──────► Infrastructure abstraction (Kind/Talos/Cloud)
-├── Kyverno ─────────► Image signature verification
-├── Argo Workflows ──► Experiment orchestration with auto-cleanup
-└── Observability
-    ├── Prometheus + Grafana (metrics)
-    ├── Loki + Promtail (logs)
-    ├── Tempo + OTel Collector (traces)
-    └── Pyrra (SLOs + error budgets)
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              Hub Cluster                                     │
+│                                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │   ArgoCD    │  │   OpenBao   │  │  Crossplane │  │      Kyverno        │  │
+│  │   (GitOps)  │  │  (Secrets)  │  │   (Infra)   │  │ (Policy/Admission)  │  │
+│  └──────┬──────┘  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                         Observability Stack                            │  │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────────────────┐  │  │
+│  │  │ Prometheus │  │    Loki    │  │   Tempo    │  │      Pyrra       │  │  │
+│  │  │ + Grafana  │  │ + Promtail │  │   + OTel   │  │ (SLOs + Budgets) │  │  │
+│  │  │  (metrics) │  │   (logs)   │  │  (traces)  │  │                  │  │  │
+│  │  └────────────┘  └────────────┘  └────────────┘  └──────────────────┘  │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                       Experiment Namespace                             │  │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────────────────┐  │  │
+│  │  │  Demo App  │  │ Argo       │  │     k6     │  │   SeaweedFS /    │  │  │
+│  │  │ (metrics,  │  │ Workflows  │  │   (load)   │  │   MinIO (S3)     │  │  │
+│  │  │  traces)   │  │            │  │            │  │                  │  │  │
+│  │  └────────────┘  └────────────┘  └────────────┘  └──────────────────┘  │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌─────────────┐  ┌─────────────┐                                            │
+│  │   MetalLB   │  │ k8s_gateway │   Platform: Kind / Talos / AKS / EKS       │
+│  │ (LoadBal)   │  │    (DNS)    │                                            │
+│  └─────────────┘  └─────────────┘                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
