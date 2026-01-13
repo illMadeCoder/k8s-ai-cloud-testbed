@@ -18,14 +18,14 @@ elasticsearchCredentialSecret: "logging-comparison-master-credentials"
 # Single replica
 replicas: 1
 
-# Resources
+# Resources - Kibana requires ~800MB during startup
 resources:
   requests:
     cpu: 100m
-    memory: 256Mi
-  limits:
-    cpu: 500m
     memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
 
 # Service - LoadBalancer for Kind access
 service:

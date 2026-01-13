@@ -209,18 +209,21 @@ tasks:
           sleep 3
         done
 
-        # Step 4: Label namespace for privileged pods (Talos enforces PSS)
-        # DaemonSets like promtail, node-exporter need hostPath/hostNetwork
+        # Step 4: Label ALL experiment namespaces for privileged pods (Talos enforces PSS)
+        # Multi-namespace experiments (logging-comparison) create loki, elasticsearch, monitoring, etc.
+        # DaemonSets like promtail, node-exporter, fluent-bit need hostPath/hostNetwork
         echo ""
-        echo "Step 4: Labeling namespace for privileged workloads..."
-        DEST_NS=$(kubectl --context {{.HUB_CONTEXT}} get application "$APP_NAME" -n argocd -o jsonpath='{.spec.destination.namespace}' 2>/dev/null)
-        if [ -n "$DEST_NS" ]; then
-          kubectl --context {{.TALOS_CONTEXT}} label namespace "$DEST_NS" \
-            pod-security.kubernetes.io/enforce=privileged \
-            pod-security.kubernetes.io/warn=restricted \
-            --overwrite 2>/dev/null || true
-          echo "  Labeled namespace: $DEST_NS"
-        fi
+        echo "Step 4: Labeling namespaces for privileged workloads..."
+        PRESERVED="{{.PRESERVED_NS}}"
+        for ns in $(kubectl --context {{.TALOS_CONTEXT}} get namespaces -o jsonpath='{.items[*].metadata.name}'); do
+          if ! echo " $PRESERVED " | grep -q " $ns "; then
+            kubectl --context {{.TALOS_CONTEXT}} label namespace "$ns" \
+              pod-security.kubernetes.io/enforce=privileged \
+              pod-security.kubernetes.io/warn=restricted \
+              --overwrite 2>/dev/null || true
+            echo "  Labeled namespace: $ns"
+          fi
+        done
 
         echo ""
         echo "=============================================="
