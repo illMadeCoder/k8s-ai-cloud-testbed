@@ -225,6 +225,23 @@ tasks:
           fi
         done
 
+        # Step 5: Restart DaemonSets to pick up PSS label changes
+        # DaemonSet pods may have been rejected before namespace labeling
+        echo ""
+        echo "Step 5: Restarting DaemonSets..."
+        for ns in $(kubectl --context {{.TALOS_CONTEXT}} get namespaces -o jsonpath='{.items[*].metadata.name}'); do
+          if ! echo " $PRESERVED " | grep -q " $ns "; then
+            for ds in $(kubectl --context {{.TALOS_CONTEXT}} get daemonsets -n "$ns" -o name 2>/dev/null); do
+              echo "  Restarting $ds in $ns"
+              kubectl --context {{.TALOS_CONTEXT}} rollout restart "$ds" -n "$ns" 2>/dev/null || true
+            done
+          fi
+        done
+
+        # Wait for DaemonSets to become ready
+        echo "  Waiting for DaemonSets to stabilize..."
+        sleep 10
+
         echo ""
         echo "=============================================="
         echo "  DEPLOYED TO TALOS: $EXP_NAME"
