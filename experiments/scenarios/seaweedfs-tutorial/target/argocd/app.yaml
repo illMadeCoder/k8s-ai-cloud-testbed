@@ -67,9 +67,12 @@ spec:
               type: emptyDir
 
     # Blackbox Loader app (sensor data generator)
+    # Exclude dashboard.yaml which targets monitoring namespace
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
       path: experiments/scenarios/seaweedfs-tutorial/manifests
+      directory:
+        exclude: 'dashboard.yaml'
 
   destination:
     name: target
