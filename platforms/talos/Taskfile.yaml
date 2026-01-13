@@ -183,7 +183,7 @@ tasks:
         # - Replace destination.name with destination.server (Talos URL)
         cat "$ARGOCD_APP" | \
           sed "s|name: ${EXP_NAME}-target|name: ${APP_NAME}|" | \
-          sed 's|name: target$|server: https://{{.TALOS_IP}}:6443|' | \
+          sed -E 's|name: target( +#.*)?$|server: https://{{.TALOS_IP}}:6443|' | \
           kubectl --context {{.HUB_CONTEXT}} apply -f -
 
         # Step 2: Force sync
