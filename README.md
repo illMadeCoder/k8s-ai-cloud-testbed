@@ -31,23 +31,24 @@ A Kubernetes learning lab with GitOps, supply chain security, and observability.
           │                                 │
           │    Deploys workloads            │    Provisions clusters
           │                                 │
-          └────────────┬────────────────────┼────────────────────┐
-                       │                    │                    │
-                       ▼                    ▼                    ▼
-┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐
-│   On-Prem (Talos/N100)  │  │      Azure (AKS)        │  │       AWS (EKS)         │
-│                         │  │                         │  │                         │
-│  ┌───────────────────┐  │  │  ┌───────────────────┐  │  │  ┌───────────────────┐  │
-│  │   Observability   │  │  │  │   Observability   │  │  │  │   Observability   │  │
-│  │ Prometheus, Loki  │  │  │  │ Prometheus, Loki  │  │  │  │ Prometheus, Loki  │  │
-│  │ Tempo, Grafana    │  │  │  │ Tempo, Grafana    │  │  │  │ Tempo, Grafana    │  │
-│  └───────────────────┘  │  │  └───────────────────┘  │  │  └───────────────────┘  │
-│  ┌───────────────────┐  │  │  ┌───────────────────┐  │  │  ┌───────────────────┐  │
-│  │    Experiments    │  │  │  │    Experiments    │  │  │  │    Experiments    │  │
-│  │ Apps, Workflows   │  │  │  │ Apps, Workflows   │  │  │  │ Apps, Workflows   │  │
-│  │ k6 load tests     │  │  │  │ k6 load tests     │  │  │  │ k6 load tests     │  │
-│  └───────────────────┘  │  │  └───────────────────┘  │  │  └───────────────────┘  │
-└─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘
+          └────────────┬────────────────────┴────────────────────┐
+                       │                                         │
+                       ▼                                         ▼
+┌───────────────────────────────────────────────┐  ┌───────────────────────────┐
+│            Target Cluster(s)                  │  │    Load Gen Cluster(s)    │
+│         Talos (on-prem) / AKS / EKS           │  │      Talos / AKS / EKS    │
+│                                               │  │                           │
+│  ┌─────────────────────────────────────────┐  │  │  ┌─────────────────────┐  │
+│  │            Observability                │  │  │  │    k6 / Locust      │  │
+│  │  Prometheus, Loki, Tempo, Grafana       │  │  │  │    Load Tests       │  │
+│  │  Pyrra (SLOs + error budgets)           │  │  │  │                     │  │
+│  └─────────────────────────────────────────┘  │  │  └──────────┬──────────┘  │
+│  ┌─────────────────────────────────────────┐  │  │             │             │
+│  │            Applications                 │  │  │             │             │
+│  │  Demo apps, Argo Workflows              │◄─┼──┼─────────────┘             │
+│  │  metrics, logs, traces                  │  │  │        HTTP traffic       │
+│  └─────────────────────────────────────────┘  │  │                           │
+└───────────────────────────────────────────────┘  └───────────────────────────┘
 ```
 
 ## Quick Start
