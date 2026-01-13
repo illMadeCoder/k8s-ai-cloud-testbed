@@ -7,8 +7,12 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o order-service .
 
 FROM alpine:3.19
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates && \
+    addgroup -g 1000 appgroup && \
+    adduser -u 1000 -G appgroup -D appuser
 WORKDIR /app
 COPY --from=builder /app/order-service .
+RUN chown -R appuser:appgroup /app
+USER appuser
 EXPOSE 8080
 CMD ["./order-service"]
