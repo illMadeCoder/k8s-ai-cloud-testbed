@@ -49,6 +49,20 @@ spec:
   destination:
     name: target
     namespace: otel-tutorial
+  # Ignore Kubernetes 1.32+ terminatingReplicas field
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: ReplicaSet
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /status/terminatingReplicas
   syncPolicy:
     automated:
       prune: true
