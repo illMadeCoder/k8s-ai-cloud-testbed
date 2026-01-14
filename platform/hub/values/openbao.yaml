@@ -25,8 +25,10 @@ server:
       memory: 256Mi
 
   # Expose via LoadBalancer for Kind
+  # IP assignments: DNS=.200, ArgoCD=.201, OpenBao=.202
   service:
     type: LoadBalancer
+    loadBalancerIP: 172.19.255.202
 
   # File storage configuration
   dataStorage:
