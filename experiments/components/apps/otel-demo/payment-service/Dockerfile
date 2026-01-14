@@ -13,6 +13,6 @@ RUN apk --no-cache add ca-certificates && \
 WORKDIR /app
 COPY --from=builder /app/payment-service .
 RUN chown -R appuser:appgroup /app
-USER appuser
+USER 1000
 EXPOSE 8080
 CMD ["./payment-service"]
