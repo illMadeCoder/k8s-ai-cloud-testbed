@@ -873,51 +873,58 @@ tasks:
           # Get target cluster context
           TARGET_CONTEXT="kind-${EXP_NAME}-target"
 
-          # Wait for LoadBalancer IPs to be assigned
-          echo "Waiting for services to get LoadBalancer IPs..."
-          for i in $(seq 1 90); do
-            PROM_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n observability kube-prometheus-stack-prometheus -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
-            GRAFANA_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n observability kube-prometheus-stack-grafana -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
-            METRICS_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n demo metrics-app -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
-            STATION_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -n station station-monitor -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
-
-            if [ -n "$PROM_IP" ] && [ -n "$GRAFANA_IP" ] && [ -n "$METRICS_IP" ]; then
+          # Wait for LoadBalancer services to get IPs (generic discovery)
+          echo "Waiting for LoadBalancer services..."
+          for i in $(seq 1 60); do
+            LB_COUNT=$(kubectl --context "$TARGET_CONTEXT" get svc -A -o json 2>/dev/null | \
+              jq '[.items[] | select(.spec.type=="LoadBalancer") | select(.status.loadBalancer.ingress[0].ip != null)] | length')
+            if [ "$LB_COUNT" -gt 0 ]; then
               break
             fi
-            echo "  Waiting... ($i/90)"
-            sleep 3
+            echo "  Waiting for LoadBalancer IPs... ($i/60)"
+            sleep 2
           done
 
-          if [ -z "$PROM_IP" ] || [ -z "$GRAFANA_IP" ]; then
-            echo "Warning: Could not get LoadBalancer IPs"
-            echo "  Use port-forward instead:"
-            echo "  kubectl --context $TARGET_CONTEXT port-forward -n observability svc/kube-prometheus-stack-prometheus 9090:9090"
-            echo "  kubectl --context $TARGET_CONTEXT port-forward -n observability svc/kube-prometheus-stack-grafana 3000:80"
-          fi
+          echo ""
+          echo "=============================================="
+          echo "  $(grep '^title:' "$TUTORIAL_FILE" | cut -d'"' -f2 || echo "$EXP_NAME")"
+          echo "=============================================="
+          echo ""
 
-          echo ""
-          echo "=============================================="
-          echo "  $(grep '^title:' "$TUTORIAL_FILE" | cut -d'"' -f2)"
-          echo "=============================================="
-          echo ""
-          echo "  Prometheus:      http://${PROM_IP}:9090"
-          echo "  Grafana:         http://${GRAFANA_IP}:80  (admin/admin)"
-          echo "  Metrics App:     http://${METRICS_IP}:80"
-          if [ -n "$STATION_IP" ]; then
-          echo "  Station Monitor: http://${STATION_IP}:80  [SECTOR 12]"
-          fi
+          # Dynamically discover and display LoadBalancer services
+          echo "  Services:"
+          kubectl --context "$TARGET_CONTEXT" get svc -A -o json 2>/dev/null | \
+            jq -r '.items[] | select(.spec.type=="LoadBalancer") | select(.status.loadBalancer.ingress[0].ip != null) |
+              "  \(.metadata.name): http://\(.status.loadBalancer.ingress[0].ip):\(.spec.ports[0].port)"' | \
+            while read line; do
+              # Add helpful hints for known services
+              case "$line" in
+                *grafana*) echo "$line  (admin/admin)" ;;
+                *prometheus*) echo "$line" ;;
+                *) echo "$line" ;;
+              esac
+            done
           echo ""
           echo "----------------------------------------------"
 
-          # Display instructions from tutorial.yaml
-          sed -n '/^instructions:/,/^[a-z]/p' "$TUTORIAL_FILE" | head -n -1 | sed 's/^instructions: |//' | sed 's/^  //'
+          # Display instructions from tutorial.yaml if present
+          if grep -q '^instructions:' "$TUTORIAL_FILE" 2>/dev/null; then
+            sed -n '/^instructions:/,/^[a-z]/p' "$TUTORIAL_FILE" | head -n -1 | sed 's/^instructions: |//' | sed 's/^  //'
+            echo ""
+            echo "----------------------------------------------"
+          fi
 
-          echo ""
-          echo "----------------------------------------------"
-          echo ""
-          echo "Quick load generation (copy & paste):"
-          echo ""
-          echo "  for i in {1..50}; do curl -s http://${METRICS_IP}/; curl -s http://${METRICS_IP}/slow; curl -s http://${METRICS_IP}/error; sleep 0.3; done"
+          # Show quick commands based on discovered services
+          APP_IP=$(kubectl --context "$TARGET_CONTEXT" get svc -A -o json 2>/dev/null | \
+            jq -r '.items[] | select(.spec.type=="LoadBalancer") | select(.status.loadBalancer.ingress[0].ip != null) |
+              select(.metadata.name | test("user-service|metrics-app|demo")) |
+              "\(.status.loadBalancer.ingress[0].ip):\(.spec.ports[0].port)"' | head -1)
+          if [ -n "$APP_IP" ]; then
+            echo ""
+            echo "Quick test (copy & paste):"
+            echo ""
+            echo "  curl http://$APP_IP/"
+          fi
           echo ""
           echo "----------------------------------------------"
           echo ""
