@@ -1,0 +1,35 @@
+# Envoy Gateway ArgoCD Application
+# Separate from main app due to ArgoCD multi-source OCI helm issues
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-tutorial-envoy-gateway
+  namespace: argocd
+  labels:
+    experiment: gateway-tutorial
+    cluster: target
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # OCI helm chart works in single-source apps
+    repoURL: oci://docker.io/envoyproxy/gateway-helm
+    targetRevision: v1.2.4
+    chart: ""
+  destination:
+    name: target
+    namespace: envoy-gateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

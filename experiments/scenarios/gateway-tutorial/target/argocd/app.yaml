@@ -21,14 +21,8 @@ spec:
         releaseName: ingress-nginx
         valueFiles:
           - $values/experiments/scenarios/gateway-tutorial/target/argocd/nginx-ingress-values.yaml
-    # Envoy Gateway (Part 3-5)
-    - repoURL: https://gateway.envoyproxy.io/charts
-      chart: gateway-helm
-      targetRevision: v1.2.4
-      helm:
-        releaseName: envoy-gateway
-        valueFiles:
-          - $values/experiments/scenarios/gateway-tutorial/target/argocd/envoy-gateway-values.yaml
+    # Envoy Gateway will be installed separately - see envoy-gateway-app.yaml
+    # ArgoCD multi-source has issues with OCI helm charts
     # Values reference
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
