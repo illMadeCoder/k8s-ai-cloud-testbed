@@ -248,9 +248,10 @@ spec:
   retry:
     numRetries: 3
     retryOn:
-      - "5xx"
-      - "reset"
-      - "connect-failure"
+      triggers:
+        - "5xx"
+        - "reset"
+        - "connect-failure"
     perRetry:
       timeout: 5s
       backOff:
@@ -319,10 +320,8 @@ spec:
     name: cors-enabled-route
   cors:
     allowOrigins:
-      - type: Exact
-        value: "https://example.com"
-      - type: RegularExpression
-        value: "https://.*\\.example\\.com"
+      - "https://example.com"
+      - "https://*.example.com"
     allowMethods:
       - GET
       - POST

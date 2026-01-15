@@ -205,10 +205,11 @@ spec:
   retry:
     numRetries: 3
     retryOn:
-      # gRPC-specific retry conditions
-      - "unavailable"          # gRPC UNAVAILABLE
-      - "resource-exhausted"   # gRPC RESOURCE_EXHAUSTED
-      - "cancelled"            # gRPC CANCELLED (for hedging)
+      triggers:
+        # gRPC-specific retry conditions
+        - "unavailable"          # gRPC UNAVAILABLE
+        - "resource-exhausted"   # gRPC RESOURCE_EXHAUSTED
+        - "cancelled"            # gRPC CANCELLED (for hedging)
     perRetry:
       timeout: 10s
       backOff:
