@@ -197,7 +197,9 @@ spec:
       targetPort: 9001
 ---
 # Part 5f: gRPC Health Check Demo Service
-# Service with proper gRPC health checking protocol
+# Note: moul/grpcbin does NOT implement grpc.health.v1.Health protocol.
+# Using TCP probes as fallback. For production, use an image that implements
+# the gRPC health checking protocol (github.com/grpc-ecosystem/grpc-health-probe).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -223,18 +225,17 @@ spec:
               name: grpc
             - containerPort: 9001
               name: grpc-tls
-          # Kubernetes 1.24+ native gRPC health probes
-          # Note: K8s gRPC probes don't support TLS, must use insecure port
+          # TCP probes - grpcbin doesn't implement grpc.health.v1.Health
+          # For K8s 1.24+ native gRPC probes, the service must implement
+          # the standard gRPC health checking protocol
           livenessProbe:
-            grpc:
+            tcpSocket:
               port: 9000
-              service: grpc.health.v1.Health
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
-            grpc:
+            tcpSocket:
               port: 9000
-              service: grpc.health.v1.Health
             initialDelaySeconds: 3
             periodSeconds: 5
           resources:
