@@ -1,12 +1,29 @@
 # Envoy Gateway Helm values for Gateway Tutorial
 # CNCF reference implementation of Gateway API
+# Using defaults from v1.2.4 chart to avoid nil pointer errors
 
-# Gateway API CRDs are installed automatically
-gateway:
-  # Create a default GatewayClass
-  gatewayClass:
-    create: true
-    name: envoy-gateway
+# Pod disruption budget
+podDisruptionBudget:
+  minAvailable: 0
+
+# Deployment configuration
+deployment:
+  envoyGateway:
+    resources:
+      limits:
+        memory: 1024Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+  replicas: 1
+  pod:
+    annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port: '19001'
+
+# Service configuration
+service:
+  annotations: {}
 
 # Envoy Gateway config
 config:
@@ -15,24 +32,20 @@ config:
       controllerName: gateway.envoyproxy.io/gatewayclass-controller
     provider:
       type: Kubernetes
-      kubernetes:
-        deploy:
-          replicas: 1
     logging:
       level:
         default: info
 
-# Service configuration
-service:
-  annotations: {}
+# Certgen for certificates
+certgen:
+  job:
+    annotations: {}
+    ttlSecondsAfterFinished: 30
+  rbac:
+    annotations: {}
+    labels: {}
 
-# Deployment configuration
-deployment:
-  envoyGateway:
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
+# Namespace already created by ArgoCD
+createNamespace: false
 
-# Create default Gateway resource
-createGateway: false  # We'll create this manually in the tutorial
+kubernetesClusterDomain: cluster.local
