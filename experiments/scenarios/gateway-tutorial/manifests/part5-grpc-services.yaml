@@ -98,7 +98,7 @@ spec:
   ports:
     - name: grpc
       port: 50051
-      targetPort: 9001
+      targetPort: 9000
 ---
 # gRPC Echo V2 (for traffic splitting demos)
 apiVersion: apps/v1
@@ -153,7 +153,7 @@ spec:
   ports:
     - name: grpc
       port: 50051
-      targetPort: 9001
+      targetPort: 9000
 ---
 # Part 5a: HTTP/2 Load Balancing Problem Demo
 # Deploy multiple replicas and observe L4 LB failure
@@ -174,7 +174,7 @@ spec:
   ports:
     - name: grpc
       port: 50051
-      targetPort: 9001
+      targetPort: 9000
 ---
 # Part 5a: Headless service for client-side LB demo
 apiVersion: v1
@@ -194,7 +194,7 @@ spec:
   ports:
     - name: grpc
       port: 50051
-      targetPort: 9001
+      targetPort: 9000
 ---
 # Part 5f: gRPC Health Check Demo Service
 # Note: moul/grpcbin does NOT implement grpc.health.v1.Health protocol.
@@ -257,7 +257,7 @@ spec:
   ports:
     - name: grpc
       port: 50051
-      targetPort: 9001
+      targetPort: 9000
 ---
 # Part 5e: Streaming Demo Service
 # For server/client/bidirectional streaming patterns
@@ -308,7 +308,7 @@ spec:
   ports:
     - name: grpc
       port: 50051
-      targetPort: 9001
+      targetPort: 9000
 ---
 # LoadBalancer services for external access during tutorial
 apiVersion: v1
@@ -326,7 +326,7 @@ spec:
   ports:
     - name: grpc
       port: 50051
-      targetPort: 9001
+      targetPort: 9000
 ---
 # grpcurl Testing Pod
 # Provides grpcurl for testing gRPC services within the cluster
