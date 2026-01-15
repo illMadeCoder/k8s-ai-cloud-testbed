@@ -1,0 +1,296 @@
+# Tutorial configuration
+# When this file exists, `task hub:conduct` runs in interactive mode
+
+title: "GATEWAY CONTROL CENTER - Traffic Management Division"
+description: |
+  Kubernetes Gateway Tutorial: From Ingress to Gateway API
+  Master L7 traffic management patterns for HTTP and gRPC.
+
+instructions: |
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  GATEWAY CONTROL CENTER       ║  TRAFFIC MANAGEMENT TERMINAL         ║
+  ╠══════════════════════════════════════════════════════════════════════╣
+  ║  Welcome, Traffic Engineer. Your training begins now.                ║
+  ║  Mission: Master the evolution from Ingress to Gateway API           ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  MISSION BRIEFING                                                    │
+  │                                                                      │
+  │  You will learn:                                                     │
+  │  Part 1: Ingress Basics (path, host, TLS routing)                   │
+  │  Part 2: Ingress Limitations (the annotation problem)               │
+  │  Part 3: Gateway API Migration (clean, portable configs)            │
+  │  Part 4: Advanced Patterns (traffic manipulation, policies)         │
+  │  Part 5: gRPC Traffic Management (the HTTP/2 challenge)             │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  ## Step 1: Set Your Environment Variables
+
+  Copy the IPs shown above into these exports:
+  ```bash
+  export INGRESS_IP=<ingress-nginx-controller-ip>
+  export GATEWAY_IP=<envoy-gateway-ip>
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 1: VERIFY SERVICES ONLINE
+  ═══════════════════════════════════════════════════════════════════════
+
+  Quick smoke test - all should return data:
+  ```bash
+  # Test echo service directly
+  curl -s http://<echo-v1-ip>/ | head -1
+
+  # Test API service (httpbin)
+  curl -s http://<api-service-ip>/get | jq -r '.url'
+
+  # Test web service
+  curl -s http://<web-service-ip>/ | head -5
+  ```
+
+  Expected: "Hello from echo-v1", httpbin response, and HTML page.
+
+  ═══════════════════════════════════════════════════════════════════════
+  PART 1: INGRESS BASICS
+  ═══════════════════════════════════════════════════════════════════════
+
+  ## 1a: Path-Based Routing
+
+  Test the Ingress routing by path:
+  ```bash
+  # Root path -> web-service
+  curl -s http://$INGRESS_IP/
+
+  # /echo -> echo-v1
+  curl -s http://$INGRESS_IP/echo
+
+  # /api/* -> api-service (httpbin)
+  curl -s http://$INGRESS_IP/api/get | jq '.headers'
+  ```
+
+  ## 1b: Host-Based Routing (Virtual Hosts)
+
+  Test routing by Host header:
+  ```bash
+  # Different hosts route to different services
+  curl -s -H "Host: echo.gateway.local" http://$INGRESS_IP/
+  curl -s -H "Host: api.gateway.local" http://$INGRESS_IP/get | jq '.url'
+  curl -s -H "Host: web.gateway.local" http://$INGRESS_IP/ | head -3
+  ```
+
+  Review the Ingress resource:
+  ```bash
+  kubectl get ingress -n gateway-tutorial -o yaml | less
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  PART 2: HITTING INGRESS LIMITATIONS
+  ═══════════════════════════════════════════════════════════════════════
+
+  ## 2a: Rate Limiting (Annotation Hell)
+
+  Look at how rate limiting requires nginx-specific annotations:
+  ```bash
+  kubectl get ingress rate-limited-api -n gateway-tutorial -o yaml
+  ```
+
+  Test the rate limiting:
+  ```bash
+  # Rapid requests should trigger 429 responses
+  for i in {1..20}; do
+    curl -s -o /dev/null -w "%{http_code}\n" \
+      -H "Host: ratelimited.gateway.local" http://$INGRESS_IP/
+  done
+  ```
+
+  ## 2b: Traffic Splitting (Canary)
+
+  Notice the awkward two-Ingress pattern:
+  ```bash
+  kubectl get ingress canary-primary canary-new-version -n gateway-tutorial -o yaml
+  ```
+
+  Test canary routing (20% should go to v2):
+  ```bash
+  for i in {1..20}; do
+    curl -s -H "Host: canary.gateway.local" http://$INGRESS_IP/
+  done | sort | uniq -c
+  ```
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║                                                                      ║
+  ║  >>> PAIN POINT: Notice how each feature requires custom annotations?║
+  ║  >>> These aren't portable across Ingress controllers!               ║
+  ║                                                                      ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ═══════════════════════════════════════════════════════════════════════
+  PART 3: MIGRATE TO GATEWAY API
+  ═══════════════════════════════════════════════════════════════════════
+
+  ## 3a: Examine Gateway API Resources
+
+  ```bash
+  # GatewayClass - defines the controller
+  kubectl get gatewayclass
+
+  # Gateway - defines listeners
+  kubectl get gateway -n gateway-tutorial -o yaml
+
+  # HTTPRoutes - define routing rules
+  kubectl get httproutes -n gateway-tutorial
+  ```
+
+  ## 3b: Compare Configurations
+
+  Traffic splitting - Ingress way:
+  ```bash
+  kubectl get ingress canary-primary canary-new-version -n gateway-tutorial -o yaml | grep -A20 metadata
+  ```
+
+  Traffic splitting - Gateway API way:
+  ```bash
+  kubectl get httproute traffic-splitting -n gateway-tutorial -o yaml
+  ```
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  Notice the difference:                                              ║
+  ║  - Ingress: 2 resources, many annotations, nginx-specific            ║
+  ║  - HTTPRoute: 1 resource, clean YAML, portable                       ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ## 3c: Test Gateway API Routing
+
+  ```bash
+  # Get Envoy Gateway IP
+  GATEWAY_IP=$(kubectl get svc -n envoy-gateway-system -l gateway.envoyproxy.io/owning-gateway-name=tutorial-gateway -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
+
+  # Test path-based routing via Gateway
+  curl -s http://$GATEWAY_IP/
+  curl -s http://$GATEWAY_IP/echo
+  curl -s http://$GATEWAY_IP/api/get | jq '.url'
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  PART 4: GATEWAY API DEEP DIVE
+  ═══════════════════════════════════════════════════════════════════════
+
+  ## 4a: Header-Based Routing (Native Support!)
+
+  ```bash
+  # Default -> v1
+  curl -s -H "Host: versioned.gateway.local" http://$GATEWAY_IP/
+
+  # With X-Version: v2 header -> v2
+  curl -s -H "Host: versioned.gateway.local" -H "X-Version: v2" http://$GATEWAY_IP/
+  ```
+
+  ## 4b: Traffic Splitting
+
+  ```bash
+  # Run 100 requests, count distribution
+  for i in {1..100}; do
+    curl -s -H "Host: canary.gateway.local" http://$GATEWAY_IP/
+  done | sort | uniq -c
+  # Expected: ~80 v1, ~20 v2
+  ```
+
+  ## 4c: Request Mirroring
+
+  ```bash
+  # Traffic is mirrored to v2 (check v2 logs)
+  kubectl logs -n gateway-tutorial -l version=v2 -f &
+
+  # Send requests to mirror endpoint
+  curl -s -H "Host: mirror.gateway.local" http://$GATEWAY_IP/
+
+  # Kill log tail
+  kill %1
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  PART 5: gRPC TRAFFIC MANAGEMENT
+  ═══════════════════════════════════════════════════════════════════════
+
+  ## 5-zero: Why gRPC?
+
+  gRPC advantages over REST:
+  - Binary serialization (protobuf) - smaller, faster
+  - HTTP/2 - multiplexing, streaming, header compression
+  - Strong typing - compile-time safety
+  - Code generation - consistent clients across languages
+
+  ## 5a: The HTTP/2 Load Balancing Problem
+
+  gRPC uses HTTP/2, which multiplexes all requests over a single connection.
+  This breaks traditional L4 load balancing!
+
+  ```bash
+  # Watch logs from all grpc-echo pods
+  kubectl logs -n grpc-tutorial -l app=grpc-echo --all-containers -f &
+
+  # Send 10 gRPC requests via L4 service (ClusterIP)
+  GRPC_IP=$(kubectl get svc grpc-echo -n grpc-tutorial -o jsonpath='{.spec.clusterIP}')
+  for i in {1..10}; do
+    grpcurl -plaintext $GRPC_IP:50051 grpcbin.GRPCBin/Index
+  done
+
+  # Notice: ALL requests go to ONE pod (HTTP/2 connection reuse)
+  kill %1
+  ```
+
+  ## 5b: gRPC with Ingress (The Pain)
+
+  Check the nginx annotations required:
+  ```bash
+  kubectl get ingress grpc-nginx-ingress -n grpc-tutorial -o yaml
+  ```
+
+  Notice:
+  - `nginx.ingress.kubernetes.io/backend-protocol: "GRPC"`
+  - TLS required (or complex h2c config)
+  - No native service/method routing
+
+  ## 5c: GRPCRoute (The Solution)
+
+  ```bash
+  kubectl get grpcroutes -n grpc-tutorial -o yaml
+  ```
+
+  Notice the clean routing by service/method:
+  ```yaml
+  matches:
+    - method:
+        service: grpc.Echo
+        method: Echo
+  ```
+
+  ## 5d: Test gRPC via Gateway
+
+  ```bash
+  GRPC_GW_IP=$(kubectl get svc -n envoy-gateway-system -l gateway.envoyproxy.io/owning-gateway-name=grpc-gateway -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
+
+  # gRPC via Gateway (proper L7 load balancing)
+  grpcurl -plaintext $GRPC_GW_IP:50051 grpcbin.GRPCBin/Index
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  MISSION COMPLETE
+  ═══════════════════════════════════════════════════════════════════════
+
+  You have learned:
+  [x] Kubernetes Ingress basics (path, host routing)
+  [x] Ingress limitations (annotation hell, portability)
+  [x] Gateway API migration (clean, portable)
+  [x] Advanced routing patterns (headers, weights, mirroring)
+  [x] gRPC traffic management (HTTP/2 challenges, GRPCRoute)
+
+  Full documentation:
+  ```bash
+  less experiments/scenarios/gateway-tutorial/README.md
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  Press ENTER to complete the tutorial.
+  ═══════════════════════════════════════════════════════════════════════

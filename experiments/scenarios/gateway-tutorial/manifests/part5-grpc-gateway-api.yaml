@@ -1,0 +1,304 @@
+# Part 5c: GRPCRoute with Gateway API
+# Clean, portable gRPC traffic management
+---
+# Gateway with gRPC listener
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: grpc-gateway
+  namespace: grpc-tutorial
+spec:
+  gatewayClassName: eg
+  listeners:
+    # HTTP/2 listener for gRPC
+    - name: grpc
+      protocol: HTTP
+      port: 50051
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: GRPCRoute
+    # HTTPS listener for secure gRPC
+    - name: grpcs
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: tutorial-tls-cert
+            namespace: gateway-tutorial
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: GRPCRoute
+---
+# Part 5c: Basic GRPCRoute - Service Matching
+# Route by gRPC service name (package.Service)
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpc-service-routing
+  namespace: grpc-tutorial
+spec:
+  parentRefs:
+    - name: grpc-gateway
+      sectionName: grpc
+  hostnames:
+    - "grpc.gateway.local"
+  rules:
+    # Route grpc.Echo service
+    - matches:
+        - method:
+            service: grpc.Echo
+      backendRefs:
+        - name: grpc-echo
+          port: 50051
+    # Route grpc.Streaming service
+    - matches:
+        - method:
+            service: grpc.Streaming
+      backendRefs:
+        - name: grpc-streaming
+          port: 50051
+    # Default catch-all
+    - backendRefs:
+        - name: grpc-echo
+          port: 50051
+---
+# Part 5c: Method-Level Routing
+# Route by specific method (package.Service/Method)
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpc-method-routing
+  namespace: grpc-tutorial
+spec:
+  parentRefs:
+    - name: grpc-gateway
+      sectionName: grpc
+  hostnames:
+    - "grpc-methods.gateway.local"
+  rules:
+    # Route specific method to v2
+    - matches:
+        - method:
+            service: grpc.Echo
+            method: EchoV2
+      backendRefs:
+        - name: grpc-echo-v2
+          port: 50051
+    # All other Echo methods to v1
+    - matches:
+        - method:
+            service: grpc.Echo
+      backendRefs:
+        - name: grpc-echo
+          port: 50051
+---
+# Part 5c: Header/Metadata Matching
+# Route based on gRPC metadata (sent as HTTP/2 headers)
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpc-header-routing
+  namespace: grpc-tutorial
+spec:
+  parentRefs:
+    - name: grpc-gateway
+      sectionName: grpc
+  hostnames:
+    - "grpc-headers.gateway.local"
+  rules:
+    # Route based on x-version metadata
+    - matches:
+        - headers:
+            - name: x-version
+              value: v2
+      backendRefs:
+        - name: grpc-echo-v2
+          port: 50051
+    # Route based on x-tenant metadata
+    - matches:
+        - headers:
+            - name: x-tenant
+              value: premium
+      backendRefs:
+        - name: grpc-echo
+          port: 50051
+          weight: 100
+    # Default
+    - backendRefs:
+        - name: grpc-echo
+          port: 50051
+---
+# Part 5c: gRPC Traffic Splitting (Canary)
+# Weight-based traffic distribution for gRPC
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpc-traffic-splitting
+  namespace: grpc-tutorial
+spec:
+  parentRefs:
+    - name: grpc-gateway
+      sectionName: grpc
+  hostnames:
+    - "grpc-canary.gateway.local"
+  rules:
+    - backendRefs:
+        # 90% to stable v1
+        - name: grpc-echo
+          port: 50051
+          weight: 90
+        # 10% to canary v2
+        - name: grpc-echo-v2
+          port: 50051
+          weight: 10
+---
+# Part 5c: gRPC Request Mirroring
+# Shadow traffic to v2 for testing
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpc-mirroring
+  namespace: grpc-tutorial
+spec:
+  parentRefs:
+    - name: grpc-gateway
+      sectionName: grpc
+  hostnames:
+    - "grpc-mirror.gateway.local"
+  rules:
+    - backendRefs:
+        - name: grpc-echo
+          port: 50051
+      filters:
+        - type: RequestMirror
+          requestMirror:
+            backendRef:
+              name: grpc-echo-v2
+              port: 50051
+---
+# Part 5d: gRPC Timeouts and Retries (via BackendTrafficPolicy)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: grpc-timeout-retry-policy
+  namespace: grpc-tutorial
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: GRPCRoute
+    name: grpc-with-retry
+  timeout:
+    http:
+      connectionIdleTimeout: 3600s  # Long-lived for streaming
+      maxConnectionDuration: 7200s
+  retry:
+    numRetries: 3
+    retryOn:
+      # gRPC-specific retry conditions
+      - "unavailable"          # gRPC UNAVAILABLE
+      - "resource-exhausted"   # gRPC RESOURCE_EXHAUSTED
+      - "cancelled"            # gRPC CANCELLED (for hedging)
+    perRetry:
+      timeout: 10s
+      backOff:
+        baseInterval: 100ms
+        maxInterval: 1s
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpc-with-retry
+  namespace: grpc-tutorial
+spec:
+  parentRefs:
+    - name: grpc-gateway
+      sectionName: grpc
+  hostnames:
+    - "grpc-retry.gateway.local"
+  rules:
+    - backendRefs:
+        - name: grpc-echo
+          port: 50051
+---
+# Comparison: Ingress vs GRPCRoute
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grpc-comparison
+  namespace: grpc-tutorial
+data:
+  comparison.md: |
+    # Ingress vs GRPCRoute Comparison
+
+    ## Service Routing
+
+    ### Ingress (nginx)
+    ```yaml
+    # Awkward path-based routing
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    rules:
+      - paths:
+          - path: /grpc.Echo  # Not natural for gRPC
+    ```
+
+    ### GRPCRoute
+    ```yaml
+    # Native service/method routing
+    rules:
+      - matches:
+          - method:
+              service: grpc.Echo
+              method: Echo
+    ```
+
+    ## Traffic Splitting
+
+    ### Ingress (nginx canary)
+    ```yaml
+    # Requires TWO Ingress resources
+    # Ingress 1: Primary
+    # Ingress 2: Canary with annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "10"
+    ```
+
+    ### GRPCRoute
+    ```yaml
+    # Single resource, clear weights
+    backendRefs:
+      - name: grpc-v1
+        weight: 90
+      - name: grpc-v2
+        weight: 10
+    ```
+
+    ## Metadata/Header Routing
+
+    ### Ingress (nginx)
+    ```yaml
+    # Requires snippets (security risk)
+    annotations:
+      nginx.ingress.kubernetes.io/server-snippet: |
+        if ($http_x_version = "v2") { ... }
+    ```
+
+    ### GRPCRoute
+    ```yaml
+    # Native header matching
+    matches:
+      - headers:
+          - name: x-version
+            value: v2
+    ```
+
+    ## Winner: GRPCRoute
+    - Native gRPC service/method routing
+    - Clean YAML, no annotations
+    - Portable across Gateway API implementations
+    - Proper L7 load balancing for HTTP/2

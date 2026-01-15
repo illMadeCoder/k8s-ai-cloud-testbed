@@ -1,0 +1,181 @@
+# Part 3: Migrate to Gateway API
+# Clean, portable, role-based traffic management
+#
+# Gateway API provides:
+# - Portable configuration across implementations
+# - Clear resource hierarchy (GatewayClass -> Gateway -> Routes)
+# - Role-based access (infra admin vs app developer)
+# - Native support for advanced traffic patterns
+---
+# GatewayClass - Managed by infrastructure admin
+# Defines which controller handles Gateway resources
+# (Usually created by Envoy Gateway helm chart, shown here for reference)
+# apiVersion: gateway.networking.k8s.io/v1
+# kind: GatewayClass
+# metadata:
+#   name: envoy-gateway
+# spec:
+#   controllerName: gateway.envoyproxy.io/gatewayclass-controller
+---
+# Gateway - Created by cluster operator
+# Defines the load balancer and listener configuration
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tutorial-gateway
+  namespace: gateway-tutorial
+spec:
+  gatewayClassName: eg  # Envoy Gateway's default class
+  listeners:
+    # HTTP listener on port 80
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    # HTTPS listener on port 443 (for Part 4 TLS demos)
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: tutorial-tls-cert
+            kind: Secret
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+# Part 3a: Path-Based Routing with HTTPRoute
+# Compare this clarity to the Ingress version!
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: path-based-routing
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  rules:
+    # Root path to web-service
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: web-service
+          port: 80
+          weight: 1
+    # /api/* to api-service
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: api-service
+          port: 80
+    # /echo to echo-v1
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /echo
+      backendRefs:
+        - name: echo-v1
+          port: 80
+---
+# Part 3b: Host-Based Routing with HTTPRoute
+# Multiple hosts in a single, clear resource
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: host-based-routing
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "web.gateway.local"
+  rules:
+    - backendRefs:
+        - name: web-service
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-host-route
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "api.gateway.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: echo-host-route
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "echo.gateway.local"
+  rules:
+    - backendRefs:
+        - name: echo-v1
+          port: 80
+---
+# Part 3c: Header-Based Routing (Native Support!)
+# No annotations, no snippets - just clean YAML
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: header-based-routing
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "versioned.gateway.local"
+  rules:
+    # Route to v2 when X-Version: v2 header is present
+    - matches:
+        - headers:
+            - name: X-Version
+              value: v2
+      backendRefs:
+        - name: echo-v2
+          port: 80
+    # Default to v1
+    - backendRefs:
+        - name: echo-v1
+          port: 80
+---
+# Part 3d: Traffic Splitting (Clean and Clear!)
+# No duplicate Ingress resources, no canary annotations
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: traffic-splitting
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "canary.gateway.local"
+  rules:
+    - backendRefs:
+        # 80% to v1
+        - name: echo-v1
+          port: 80
+          weight: 80
+        # 20% to v2
+        - name: echo-v2
+          port: 80
+          weight: 20

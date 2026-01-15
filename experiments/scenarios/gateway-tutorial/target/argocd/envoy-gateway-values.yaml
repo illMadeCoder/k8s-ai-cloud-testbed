@@ -1,0 +1,23 @@
+# Envoy Gateway Helm values for Gateway Tutorial
+# CNCF reference implementation of Gateway API
+
+# Gateway API CRDs are installed automatically
+gateway:
+  # Create a default GatewayClass
+  gatewayClass:
+    create: true
+    name: envoy-gateway
+
+# Envoy Gateway config
+config:
+  envoyGateway:
+    gateway:
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+    provider:
+      type: Kubernetes
+    logging:
+      level:
+        default: info
+
+# Create default Gateway resource
+createGateway: false  # We'll create this manually in the tutorial

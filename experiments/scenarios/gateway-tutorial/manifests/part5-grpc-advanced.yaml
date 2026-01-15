@@ -1,0 +1,374 @@
+# Part 5: Advanced gRPC Features
+# gRPC-Web, Transcoding, Security, Observability
+---
+# Part 5g: gRPC-Web Configuration
+# Enables browser clients to call gRPC services
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: grpc-web-config
+  namespace: grpc-tutorial
+spec:
+  # Enable gRPC-Web transcoding filter
+  # This allows browsers to call gRPC services via gRPC-Web protocol
+  provider:
+    type: Kubernetes
+---
+# gRPC-Web route (requires special handling)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grpc-web-route
+  namespace: grpc-tutorial
+  annotations:
+    description: |
+      gRPC-Web transcoding for browser clients.
+      Browser sends: application/grpc-web
+      Gateway converts to: application/grpc
+spec:
+  parentRefs:
+    - name: grpc-gateway
+      sectionName: grpcs
+  hostnames:
+    - "grpc-web.gateway.local"
+  rules:
+    - matches:
+        - headers:
+            - name: content-type
+              value: application/grpc-web
+        - headers:
+            - name: content-type
+              value: application/grpc-web+proto
+      backendRefs:
+        - name: grpc-echo
+          port: 50051
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            add:
+              # CORS headers for browser
+              - name: Access-Control-Allow-Origin
+                value: "*"
+              - name: Access-Control-Allow-Methods
+                value: "POST, OPTIONS"
+              - name: Access-Control-Allow-Headers
+                value: "content-type, x-grpc-web, x-user-agent"
+              - name: Access-Control-Expose-Headers
+                value: "grpc-status, grpc-message"
+---
+# Part 5h: gRPC-JSON Transcoding
+# REST clients can call gRPC services
+# Requires google.api.http annotations in proto files
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grpc-transcoding-example
+  namespace: grpc-tutorial
+data:
+  example.proto: |
+    syntax = "proto3";
+    package example;
+
+    import "google/api/annotations.proto";
+
+    service UserService {
+      // gRPC method with HTTP transcoding
+      rpc GetUser(GetUserRequest) returns (User) {
+        option (google.api.http) = {
+          get: "/v1/users/{user_id}"
+        };
+      }
+
+      rpc CreateUser(CreateUserRequest) returns (User) {
+        option (google.api.http) = {
+          post: "/v1/users"
+          body: "*"
+        };
+      }
+
+      rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+        option (google.api.http) = {
+          get: "/v1/users"
+        };
+      }
+    }
+
+    message GetUserRequest {
+      string user_id = 1;
+    }
+
+    message CreateUserRequest {
+      string name = 1;
+      string email = 2;
+    }
+
+    message User {
+      string id = 1;
+      string name = 2;
+      string email = 3;
+    }
+
+    message ListUsersRequest {
+      int32 page_size = 1;
+      string page_token = 2;
+    }
+
+    message ListUsersResponse {
+      repeated User users = 1;
+      string next_page_token = 2;
+    }
+  usage.md: |
+    # gRPC-JSON Transcoding Usage
+
+    With transcoding enabled, REST clients can call gRPC services:
+
+    ```bash
+    # REST call (transcoded to gRPC)
+    curl https://api.gateway.local/v1/users/123
+
+    # Equivalent gRPC call
+    grpcurl -d '{"user_id": "123"}' api.gateway.local:443 example.UserService/GetUser
+    ```
+
+    Both return the same response!
+---
+# Part 5i: gRPC Security Configuration
+# TLS modes and authentication
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: grpc-secure-gateway
+  namespace: grpc-tutorial
+spec:
+  gatewayClassName: eg
+  listeners:
+    # mTLS listener for mutual TLS
+    - name: grpc-mtls
+      protocol: HTTPS
+      port: 8443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: server-cert
+        options:
+          gateway.envoyproxy.io/client-validation: "required"
+      allowedRoutes:
+        kinds:
+          - kind: GRPCRoute
+---
+# Client certificate secret (for mTLS demo)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: client-ca-cert
+  namespace: grpc-tutorial
+type: Opaque
+stringData:
+  ca.crt: |
+    # CA certificate for validating client certs
+    # In production, use cert-manager or external CA
+    -----BEGIN CERTIFICATE-----
+    (Client CA certificate here)
+    -----END CERTIFICATE-----
+---
+# JWT Authentication for gRPC
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: grpc-jwt-auth
+  namespace: grpc-tutorial
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: GRPCRoute
+    name: grpc-authenticated
+  jwt:
+    providers:
+      - name: auth0
+        issuer: "https://your-tenant.auth0.com/"
+        audiences:
+          - "grpc-api"
+        remoteJWKS:
+          uri: "https://your-tenant.auth0.com/.well-known/jwks.json"
+        claimToHeaders:
+          - claim: sub
+            header: x-user-id
+          - claim: scope
+            header: x-user-scope
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpc-authenticated
+  namespace: grpc-tutorial
+spec:
+  parentRefs:
+    - name: grpc-secure-gateway
+  rules:
+    - backendRefs:
+        - name: grpc-echo
+          port: 50051
+---
+# Part 5j: gRPC Observability
+# Metrics and tracing configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grpc-observability-config
+  namespace: grpc-tutorial
+data:
+  metrics.md: |
+    # gRPC Observability Metrics
+
+    ## Key Metrics to Monitor
+
+    ### Request Rate
+    - `grpc_server_started_total` - Total RPCs started
+    - `grpc_server_handled_total` - Total RPCs completed
+
+    ### Error Rate
+    - `grpc_server_handled_total{grpc_code!="OK"}` - Failed RPCs
+    - Group by: grpc_code, grpc_service, grpc_method
+
+    ### Latency
+    - `grpc_server_handling_seconds` - RPC latency histogram
+    - `grpc_server_handling_seconds_bucket{le="0.1"}` - % under 100ms
+
+    ## PromQL Examples
+
+    ```promql
+    # Request rate by service
+    sum(rate(grpc_server_started_total[5m])) by (grpc_service)
+
+    # Error rate
+    sum(rate(grpc_server_handled_total{grpc_code!="OK"}[5m]))
+    /
+    sum(rate(grpc_server_handled_total[5m]))
+
+    # p95 latency
+    histogram_quantile(0.95,
+      sum(rate(grpc_server_handling_seconds_bucket[5m])) by (le, grpc_method)
+    )
+    ```
+
+  tracing.md: |
+    # gRPC Distributed Tracing
+
+    ## Trace Context Propagation
+
+    gRPC uses metadata (HTTP/2 headers) for trace context:
+    - `traceparent` - W3C Trace Context
+    - `grpc-trace-bin` - Legacy gRPC format
+
+    ## OpenTelemetry Integration
+
+    ```go
+    // Go example
+    import "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+
+    conn, err := grpc.Dial(target,
+      grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
+      grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
+    )
+    ```
+
+    ## Envoy Gateway Tracing
+
+    Gateway automatically:
+    - Generates trace IDs if not present
+    - Propagates context to backends
+    - Reports spans to configured backend (Zipkin, Jaeger, OTLP)
+---
+# Part 5k: gRPC Reflection and Debugging
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grpc-debugging
+  namespace: grpc-tutorial
+data:
+  tools.md: |
+    # gRPC Debugging Tools
+
+    ## grpcurl - curl for gRPC
+    ```bash
+    # List services (requires reflection)
+    grpcurl -plaintext localhost:50051 list
+
+    # Describe service
+    grpcurl -plaintext localhost:50051 describe grpc.Echo
+
+    # Call method
+    grpcurl -plaintext -d '{"message":"hello"}' \
+      localhost:50051 grpc.Echo/Echo
+
+    # With TLS
+    grpcurl -cacert ca.crt \
+      grpc.gateway.local:443 grpc.Echo/Echo
+
+    # With headers (metadata)
+    grpcurl -H 'x-version: v2' \
+      localhost:50051 grpc.Echo/Echo
+    ```
+
+    ## grpc_cli (official tool)
+    ```bash
+    grpc_cli call localhost:50051 grpc.Echo.Echo "message: 'hello'"
+    ```
+
+    ## Evans - interactive gRPC client
+    ```bash
+    evans --host localhost --port 50051 -r repl
+    > package grpc
+    > service Echo
+    > call Echo
+    ```
+
+    ## Postman
+    - File > New > gRPC Request
+    - Enter server URL
+    - Import .proto or use reflection
+    - Build request and send
+
+    ## BloomRPC (GUI)
+    - Import .proto files
+    - Visual request builder
+    - Response formatting
+
+  reflection-security.md: |
+    # gRPC Reflection Security
+
+    ## What is Reflection?
+    - Service discovery at runtime
+    - Allows tools to query available methods
+    - Like Swagger/OpenAPI for gRPC
+
+    ## Security Considerations
+
+    ### Development
+    - Enable reflection for debugging
+    - Useful for grpcurl, Evans, etc.
+
+    ### Production
+    - Consider disabling in prod
+    - Exposes API surface to attackers
+    - Alternative: Require authentication for reflection
+
+    ### Conditional Enabling
+    ```go
+    if os.Getenv("ENABLE_REFLECTION") == "true" {
+      reflection.Register(server)
+    }
+    ```
+
+    ### Gateway-Level Control
+    Block reflection methods at gateway:
+    ```yaml
+    # Block reflection service
+    - matches:
+        - method:
+            service: grpc.reflection.v1alpha.ServerReflection
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            statusCode: 404
+    ```

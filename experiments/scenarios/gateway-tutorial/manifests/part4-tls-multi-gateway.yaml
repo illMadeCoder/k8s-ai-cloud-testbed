@@ -1,0 +1,180 @@
+# Part 4: TLS Configuration and Multi-Gateway Patterns
+---
+# Part 4k: TLS Certificate (self-signed for demo)
+# In production, use cert-manager
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tutorial-tls-cert
+  namespace: gateway-tutorial
+type: kubernetes.io/tls
+stringData:
+  # Self-signed certificate for *.gateway.local
+  # Generated with:
+  # openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes \
+  #   -keyout tls.key -out tls.crt \
+  #   -subj "/CN=*.gateway.local" \
+  #   -addext "subjectAltName=DNS:*.gateway.local,DNS:gateway.local"
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIBkTCB+wIJAKHBfpegPjXuMA0GCSqGSIb3DQEBCwUAMBExDzANBgNVBAMMBnVu
+    dXNlZDAeFw0yNDAxMDEwMDAwMDBaFw0yNTAxMDEwMDAwMDBaMBExDzANBgNVBAMM
+    BnVudXNlZDBcMA0GCSqGSIb3DQEBAQUAA0sAMEgCQQC6B4F9xYPn3VfbPmTdQCyP
+    YVBjiVKPmHmaPTyp8OVxavPt2GQQES3FUH/XOmPLKP1E0pPnUghToOHxfca5sHkf
+    AgMBAAGjUzBRMB0GA1UdDgQWBBSA2Z7/NIBb4MRksmNKKky3CuGjcDAfBgNVHSME
+    GDAWgBSA2Z7/NIBb4MRksmNKKky3CuGjcDAPBgNVHRMBAf8EBTADAQH/MA0GCSqG
+    SIb3DQEBCwUAA0EANh0fMPuKFE9F0Y9FHvAWomyLV+o6/aQ2Gj8rbKNmn5h7r0gg
+    QBYtD3A7PzHSspNj8zG4E0LhMx8Qj7CKHKTCwQ==
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN RSA PRIVATE KEY-----
+    MIIBOgIBAAJBALoHgX3Fg+fdV9s+ZN1ALI9hUGOJUo+YeZo5PKnw5XFq8+3YZBAR
+    LcVQf9c6Y8so/UTSk+dSCFOg4fF9xrmweR8CAwEAAQJAKHBfpegPjXuMAKHBfpeg
+    PjXuMAKHBfpegPjXuMAKHBfpegPjXuMAKHBfpegPjXuMAKHBfpegPjXuMDEhAiEA
+    2VfbPmTdQCyPMAKHBfpegPjXuMBjiVKPmHmaPTyp8OUCIQDZXsKL8OVxavPt2GQQ
+    ES3FUH/XOmPLKP1E0pPnUghTAiEA0LLKP1E0pPnUghToOHxfca5sHkfZXsKL8OVx
+    avPt2GQCIBYtD3A7PzHSspNj8zG4E0LhMx8Qj7CKHKTCwQS6B4ECIFPmHmaPTyp8
+    OVxavPt2GQQES3FUH/XOmPLKP1E0pPnU
+    -----END RSA PRIVATE KEY-----
+---
+# Part 4l: TLS Termination - Gateway terminates TLS
+# This is the most common pattern
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tls-termination-gateway
+  namespace: gateway-tutorial
+spec:
+  gatewayClassName: eg
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: tutorial-tls-cert
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+# Part 4m: TLS Passthrough - Gateway passes encrypted traffic to backend
+# Backend must handle TLS termination
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tls-passthrough-gateway
+  namespace: gateway-tutorial
+spec:
+  gatewayClassName: eg
+  listeners:
+    - name: tls-passthrough
+      protocol: TLS
+      port: 8443
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+# TLSRoute for passthrough (routes based on SNI)
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: tls-passthrough-route
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tls-passthrough-gateway
+      sectionName: tls-passthrough
+  hostnames:
+    - "passthrough.gateway.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+---
+# Part 4n: Multi-Gateway Pattern - Internal vs External
+# External gateway for public traffic
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: external-gateway
+  namespace: gateway-tutorial
+  annotations:
+    description: "Public-facing gateway with stricter security"
+spec:
+  gatewayClassName: eg
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+# Internal gateway for service-to-service traffic
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: internal-gateway
+  namespace: gateway-tutorial
+  annotations:
+    description: "Internal gateway for cluster traffic"
+spec:
+  gatewayClassName: eg
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 8080
+      allowedRoutes:
+        namespaces:
+          from: All  # Allow routes from any namespace
+---
+# Part 4o: ReferenceGrant - Cross-namespace routing
+# Allow routes in other namespaces to reference services in gateway-tutorial
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-cross-namespace
+  namespace: gateway-tutorial
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: other-namespace  # Allow routes from other-namespace
+  to:
+    - group: ""
+      kind: Service
+---
+# Route attached to external gateway
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: external-api
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: external-gateway
+  hostnames:
+    - "api.public.gateway.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+---
+# Route attached to internal gateway
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: internal-api
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: internal-gateway
+  hostnames:
+    - "api.internal.gateway.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80

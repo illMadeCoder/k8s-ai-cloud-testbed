@@ -1,0 +1,94 @@
+# Part 1: Ingress Basics
+# Demonstrates path-based routing, host-based routing (virtual hosts)
+#
+# This file contains Ingress resources that will be commented out initially.
+# The tutorial will guide you through uncommenting each section.
+---
+# Part 1a: Path-Based Routing
+# Routes traffic based on URL path
+# /       -> web-service
+# /api    -> api-service
+# /echo   -> echo-v1
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: path-based-routing
+  namespace: gateway-tutorial
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Root path goes to web-service
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-service
+                port:
+                  number: 80
+          # /api/* routes to api-service
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+          # /echo routes to echo-v1
+          - path: /echo
+            pathType: Prefix
+            backend:
+              service:
+                name: echo-v1
+                port:
+                  number: 80
+---
+# Part 1b: Host-Based Routing (Virtual Hosts)
+# Routes traffic based on Host header
+# web.gateway.local  -> web-service
+# api.gateway.local  -> api-service
+# echo.gateway.local -> echo-v1
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: host-based-routing
+  namespace: gateway-tutorial
+  annotations:
+    # This ingress demonstrates virtual host routing
+    description: "Virtual host routing example"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: web.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-service
+                port:
+                  number: 80
+    - host: api.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+    - host: echo.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo-v1
+                port:
+                  number: 80

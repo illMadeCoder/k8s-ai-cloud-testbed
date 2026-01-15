@@ -1,0 +1,325 @@
+# Part 5: gRPC Traffic Management
+# Demo services for understanding gRPC patterns
+#
+# Services:
+# - grpc-echo: Simple gRPC echo service
+# - grpc-greeter: Classic Hello World gRPC service
+# - grpc-route: Service chain demonstrating tracing
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grpc-tutorial
+  labels:
+    experiment: gateway-tutorial
+---
+# Part 5-zero: Why gRPC Demo - REST vs gRPC comparison service
+# This service exposes BOTH REST and gRPC endpoints for comparison
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grpc-comparison-config
+  namespace: grpc-tutorial
+data:
+  comparison.md: |
+    # REST vs gRPC Comparison
+
+    ## Performance Test Commands
+
+    ### REST (JSON over HTTP/1.1)
+    ```bash
+    # 1000 requests to REST endpoint
+    time for i in {1..1000}; do
+      curl -s http://$REST_IP/api/echo -d '{"message":"hello"}' > /dev/null
+    done
+    ```
+
+    ### gRPC (Protobuf over HTTP/2)
+    ```bash
+    # 1000 requests to gRPC endpoint
+    time for i in {1..1000}; do
+      grpcurl -plaintext -d '{"message":"hello"}' $GRPC_IP:50051 grpc.Echo/Echo > /dev/null
+    done
+    ```
+
+    ## What to Observe
+    - gRPC is typically 2-10x faster for small payloads
+    - gRPC uses 1/5 to 1/10 the bandwidth (binary vs JSON)
+    - gRPC connection reuse via HTTP/2 multiplexing
+    - gRPC requires tooling (grpcurl, etc.) vs simple curl
+---
+# gRPC Echo Service (using grpcbin)
+# Provides reflection and echo capabilities for testing
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-echo
+  namespace: grpc-tutorial
+  labels:
+    app: grpc-echo
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: grpc-echo
+  template:
+    metadata:
+      labels:
+        app: grpc-echo
+        version: v1
+    spec:
+      containers:
+        - name: grpc-echo
+          image: moul/grpcbin:latest
+          ports:
+            - containerPort: 9000
+              name: grpc
+            - containerPort: 9001
+              name: grpc-insecure
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          # Note: grpcbin has built-in gRPC health checking
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-echo
+  namespace: grpc-tutorial
+  labels:
+    app: grpc-echo
+spec:
+  selector:
+    app: grpc-echo
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 9001
+---
+# gRPC Echo V2 (for traffic splitting demos)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-echo-v2
+  namespace: grpc-tutorial
+  labels:
+    app: grpc-echo
+    version: v2
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: grpc-echo
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: grpc-echo
+        version: v2
+    spec:
+      containers:
+        - name: grpc-echo
+          image: moul/grpcbin:latest
+          ports:
+            - containerPort: 9001
+              name: grpc
+          env:
+            - name: GRPC_VERSION
+              value: "v2"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-echo-v2
+  namespace: grpc-tutorial
+  labels:
+    app: grpc-echo
+    version: v2
+spec:
+  selector:
+    app: grpc-echo
+    version: v2
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 9001
+---
+# Part 5a: HTTP/2 Load Balancing Problem Demo
+# Deploy multiple replicas and observe L4 LB failure
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-echo-lb-problem
+  namespace: grpc-tutorial
+  annotations:
+    description: |
+      This service uses ClusterIP (L4 LB).
+      HTTP/2 multiplexing means all requests go to ONE pod.
+      Watch: kubectl logs -l app=grpc-echo --all-containers -f
+spec:
+  selector:
+    app: grpc-echo
+    version: v1
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 9001
+---
+# Part 5a: Headless service for client-side LB demo
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-echo-headless
+  namespace: grpc-tutorial
+  annotations:
+    description: |
+      Headless service returns all pod IPs.
+      Client can implement round-robin or other LB strategy.
+spec:
+  clusterIP: None
+  selector:
+    app: grpc-echo
+    version: v1
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 9001
+---
+# Part 5f: gRPC Health Check Demo Service
+# Service with proper gRPC health checking protocol
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-healthcheck-demo
+  namespace: grpc-tutorial
+  labels:
+    app: grpc-healthcheck
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: grpc-healthcheck
+  template:
+    metadata:
+      labels:
+        app: grpc-healthcheck
+    spec:
+      containers:
+        - name: grpc-health
+          image: moul/grpcbin:latest
+          ports:
+            - containerPort: 9001
+              name: grpc
+          # Kubernetes 1.24+ native gRPC health probes
+          livenessProbe:
+            grpc:
+              port: 9001
+              service: grpc.health.v1.Health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            grpc:
+              port: 9001
+              service: grpc.health.v1.Health
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-healthcheck
+  namespace: grpc-tutorial
+spec:
+  selector:
+    app: grpc-healthcheck
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 9001
+---
+# Part 5e: Streaming Demo Service
+# For server/client/bidirectional streaming patterns
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-streaming
+  namespace: grpc-tutorial
+  labels:
+    app: grpc-streaming
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: grpc-streaming
+  template:
+    metadata:
+      labels:
+        app: grpc-streaming
+    spec:
+      containers:
+        - name: grpc-streaming
+          # grpcbin supports streaming RPCs
+          image: moul/grpcbin:latest
+          ports:
+            - containerPort: 9001
+              name: grpc
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-streaming
+  namespace: grpc-tutorial
+  annotations:
+    description: |
+      Service for streaming RPC demos.
+      Supports: ServerStreaming, ClientStreaming, BidiStreaming
+spec:
+  selector:
+    app: grpc-streaming
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 9001
+---
+# LoadBalancer services for external access during tutorial
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-echo-external
+  namespace: grpc-tutorial
+  labels:
+    app: grpc-echo
+spec:
+  type: LoadBalancer
+  selector:
+    app: grpc-echo
+    version: v1
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 9001

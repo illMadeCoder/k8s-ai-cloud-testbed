@@ -1,0 +1,179 @@
+# Part 5b: gRPC with Ingress (The Pain)
+# nginx-ingress requires specific annotations for gRPC
+# Different controllers have different annotation schemes
+---
+# nginx-ingress gRPC configuration
+# Requires multiple annotations and TLS (gRPC needs h2c or TLS)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grpc-nginx-ingress
+  namespace: grpc-tutorial
+  annotations:
+    # CRITICAL: Must specify gRPC backend protocol
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    # gRPC requires HTTP/2, which typically needs TLS
+    # For h2c (HTTP/2 cleartext), additional config needed
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # gRPC timeouts (in seconds)
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # gRPC streaming support - keep connections alive
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    # Enable gRPC-specific error handling
+    nginx.ingress.kubernetes.io/grpc-errors: "true"
+    # Optional: Enable gRPC health checking
+    # nginx.ingress.kubernetes.io/health-check-path: "/grpc.health.v1.Health/Check"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - grpc.gateway.local
+      secretName: tutorial-tls-cert
+  rules:
+    - host: grpc.gateway.local
+      http:  # Note: "http" is misleading - this is HTTP/2 for gRPC
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grpc-echo
+                port:
+                  number: 50051
+---
+# h2c (HTTP/2 cleartext) configuration - more complex
+# Required when you can't use TLS
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grpc-h2c-ingress
+  namespace: grpc-tutorial
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    # For h2c, need to disable SSL redirect
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # Server snippet for h2c support
+    nginx.ingress.kubernetes.io/server-snippet: |
+      grpc_read_timeout 3600s;
+      grpc_send_timeout 3600s;
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: grpc-h2c.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grpc-echo
+                port:
+                  number: 50051
+---
+# Multiple gRPC services - annotation repetition
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grpc-multi-service
+  namespace: grpc-tutorial
+  annotations:
+    # All these annotations must be repeated for each Ingress
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # No standard way to route by gRPC service name!
+    # Path-based routing is awkward for gRPC
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - grpc-services.gateway.local
+      secretName: tutorial-tls-cert
+  rules:
+    - host: grpc-services.gateway.local
+      http:
+        paths:
+          # Route by path prefix - not natural for gRPC
+          - path: /grpc.echo
+            pathType: Prefix
+            backend:
+              service:
+                name: grpc-echo
+                port:
+                  number: 50051
+          - path: /grpc.streaming
+            pathType: Prefix
+            backend:
+              service:
+                name: grpc-streaming
+                port:
+                  number: 50051
+---
+# Traefik gRPC configuration (for comparison)
+# NOTE: This requires Traefik ingress controller to be installed
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: grpc-traefik-ingress
+#   namespace: grpc-tutorial
+#   annotations:
+#     # Traefik uses different annotation scheme
+#     traefik.ingress.kubernetes.io/router.entrypoints: websecure
+#     # h2c configuration for Traefik
+#     traefik.ingress.kubernetes.io/service.serversscheme: h2c
+# spec:
+#   ingressClassName: traefik
+#   rules:
+#     - host: grpc-traefik.gateway.local
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: grpc-echo
+#                 port:
+#                   number: 50051
+---
+# Pain Points Summary ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grpc-ingress-pain-points
+  namespace: grpc-tutorial
+data:
+  summary.md: |
+    # gRPC Ingress Pain Points
+
+    ## 1. Annotation Hell
+    - `nginx.ingress.kubernetes.io/backend-protocol: "GRPC"` (nginx)
+    - `traefik.ingress.kubernetes.io/service.serversscheme: h2c` (traefik)
+    - `konghq.com/protocols: grpc` (kong)
+    - No standardization!
+
+    ## 2. TLS Complexity
+    - gRPC prefers TLS (h2 over TLS)
+    - h2c (cleartext HTTP/2) requires special config
+    - Different controllers handle this differently
+
+    ## 3. Health Checking
+    - gRPC health checking uses different protocol
+    - Most Ingress controllers don't natively support it
+    - Must use TCP or HTTP probes as workaround
+
+    ## 4. Routing Limitations
+    - No native gRPC service/method routing
+    - Must use path-based routing (awkward)
+    - Can't route by gRPC metadata headers easily
+
+    ## 5. Streaming Support
+    - Long-lived connections need timeout tuning
+    - Bidirectional streaming may have issues
+    - Connection pooling behaviors vary
+
+    ## 6. Load Balancing
+    - HTTP/2 multiplexing breaks L4 load balancing
+    - Need L7 LB or client-side LB
+    - Ingress controller support varies

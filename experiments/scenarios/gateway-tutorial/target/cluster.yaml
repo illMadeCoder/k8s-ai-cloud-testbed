@@ -1,0 +1,8 @@
+# Target cluster for Gateway Tutorial
+# Runs nginx-ingress, Envoy Gateway, and demo apps
+size: medium
+provider: kind
+
+# This cluster needs resources for multiple gateway implementations
+# nodes: 2
+# memory: 4Gi

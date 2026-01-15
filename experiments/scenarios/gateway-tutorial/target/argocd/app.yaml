@@ -1,0 +1,77 @@
+# Gateway Tutorial - Target Cluster App
+# Deploys nginx-ingress, Envoy Gateway, demo apps, and routing configurations
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-tutorial-target
+  namespace: argocd
+  labels:
+    experiment: gateway-tutorial
+    cluster: target
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # nginx-ingress controller (Part 1-2)
+    - repoURL: https://kubernetes.github.io/ingress-nginx
+      chart: ingress-nginx
+      targetRevision: 4.12.0
+      helm:
+        releaseName: ingress-nginx
+        valueFiles:
+          - $values/experiments/scenarios/gateway-tutorial/target/argocd/nginx-ingress-values.yaml
+    # Envoy Gateway (Part 3-5)
+    - repoURL: oci://docker.io/envoyproxy
+      chart: gateway-helm
+      targetRevision: v1.2.4
+      helm:
+        releaseName: envoy-gateway
+        valueFiles:
+          - $values/experiments/scenarios/gateway-tutorial/target/argocd/envoy-gateway-values.yaml
+    # Values reference
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+    # Demo apps and routing configurations
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/scenarios/gateway-tutorial/manifests
+
+  destination:
+    name: target
+    namespace: gateway-tutorial
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status
+    - group: networking.k8s.io
+      kind: Ingress
+      jsonPointers:
+        - /status
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      jsonPointers:
+        - /status
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      jsonPointers:
+        - /status
+    - group: gateway.networking.k8s.io
+      kind: GRPCRoute
+      jsonPointers:
+        - /status
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

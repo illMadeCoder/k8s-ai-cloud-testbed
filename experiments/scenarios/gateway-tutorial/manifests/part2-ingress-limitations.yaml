@@ -1,0 +1,203 @@
+# Part 2: Hitting Ingress Limitations
+# Demonstrates the "annotation hell" problem with Ingress
+#
+# Each feature requires nginx-specific annotations that:
+# - Are not portable across ingress controllers
+# - Have inconsistent naming and behavior
+# - Make configurations hard to read and maintain
+---
+# Part 2a: Rate Limiting (nginx-specific annotations)
+# Different controllers use completely different annotation names:
+# - nginx: nginx.ingress.kubernetes.io/limit-rps
+# - traefik: traefik.ingress.kubernetes.io/rate-limit
+# - kong: konghq.com/plugins (requires separate CRD)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rate-limited-api
+  namespace: gateway-tutorial
+  annotations:
+    # Rate limit: 10 requests per second per client IP
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    # Burst allowance
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    # Return 429 when rate limited
+    nginx.ingress.kubernetes.io/limit-req-status-code: "429"
+    # Connection limits
+    nginx.ingress.kubernetes.io/limit-connections: "5"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ratelimited.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+---
+# Part 2b: Header-Based Routing (limited/awkward support)
+# nginx-ingress requires server-snippets for header-based routing
+# This is fragile and requires allow-snippet-annotations: "true"
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: header-based-routing
+  namespace: gateway-tutorial
+  annotations:
+    # Route based on X-Version header (nginx-specific snippet)
+    nginx.ingress.kubernetes.io/server-snippet: |
+      set $target_service "echo-v1";
+      if ($http_x_version = "v2") {
+        set $target_service "echo-v2";
+      }
+    # This approach is:
+    # 1. Not portable to other ingress controllers
+    # 2. Requires enabling snippets (security risk)
+    # 3. Hard to understand and maintain
+    # 4. Error-prone with complex conditions
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: versioned.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo-v1  # Default, but snippet overrides
+                port:
+                  number: 80
+---
+# Part 2c: Basic Authentication (nginx annotations)
+# Requires creating a secret with htpasswd credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: basic-auth
+  namespace: gateway-tutorial
+type: Opaque
+stringData:
+  # Created with: htpasswd -nb admin password123
+  auth: |
+    admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: auth-protected
+  namespace: gateway-tutorial
+  annotations:
+    # Basic auth annotations (nginx-specific)
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required"
+    # Other controllers use different approaches:
+    # - traefik: middlewares with basicAuth
+    # - kong: plugins
+    # - ambassador: Filter resources
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: protected.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+---
+# Part 2d: Traffic Splitting / Canary (awkward with Ingress)
+# nginx-ingress canary requires a SECOND Ingress with special annotations
+# pointing to the same host - this is confusing and error-prone
+
+# Primary Ingress (receives most traffic)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canary-primary
+  namespace: gateway-tutorial
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: canary.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo-v1
+                port:
+                  number: 80
+---
+# Canary Ingress (receives percentage of traffic)
+# This pattern is confusing:
+# - Two Ingress resources for same host
+# - Weight is on the "new" version, not configurable per-route
+# - No easy way to do header-based canary
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canary-new-version
+  namespace: gateway-tutorial
+  annotations:
+    # Enable canary mode
+    nginx.ingress.kubernetes.io/canary: "true"
+    # Route 20% of traffic to this backend
+    nginx.ingress.kubernetes.io/canary-weight: "20"
+    # Alternative: route by header
+    # nginx.ingress.kubernetes.io/canary-by-header: "X-Canary"
+    # nginx.ingress.kubernetes.io/canary-by-header-value: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: canary.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo-v2
+                port:
+                  number: 80
+---
+# Part 2e: Request/Response Header Manipulation
+# More nginx-specific annotations
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: header-manipulation
+  namespace: gateway-tutorial
+  annotations:
+    # Add headers to request (going to backend)
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Custom-Header "from-ingress";
+      proxy_set_header X-Real-IP $remote_addr;
+    # Add headers to response (going to client)
+    nginx.ingress.kubernetes.io/custom-http-errors: "404,500,502,503,504"
+    # These snippets are:
+    # - nginx-specific syntax
+    # - Not portable
+    # - Require snippet permissions
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: headers.gateway.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80

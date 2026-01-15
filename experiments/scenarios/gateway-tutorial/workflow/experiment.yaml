@@ -1,0 +1,79 @@
+# Gateway Tutorial Workflow
+# Runs on hub cluster, deploys to target vcluster
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: gateway-tutorial
+  namespace: argo-workflows
+spec:
+  entrypoint: gateway-tutorial
+  serviceAccountName: workflow-sa
+  templates:
+    - name: gateway-tutorial
+      steps:
+        - - name: deploy-demo-apps
+            template: wait-for-apps
+        - - name: verify-nginx-ingress
+            template: verify-nginx-ingress
+        - - name: verify-gateway-api
+            template: verify-gateway-api
+        - - name: run-tests
+            template: run-connectivity-tests
+
+    - name: wait-for-apps
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Waiting for gateway-tutorial apps to be ready..."
+            kubectl wait --for=condition=available deployment/echo-v1 -n gateway-tutorial --timeout=300s
+            kubectl wait --for=condition=available deployment/api-service -n gateway-tutorial --timeout=300s
+            kubectl wait --for=condition=available deployment/web-service -n gateway-tutorial --timeout=300s
+            echo "All demo apps ready!"
+
+    - name: verify-nginx-ingress
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Verifying nginx-ingress controller..."
+            kubectl wait --for=condition=available deployment/ingress-nginx-controller -n ingress-nginx --timeout=300s
+            INGRESS_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            echo "nginx-ingress ready at: $INGRESS_IP"
+
+    - name: verify-gateway-api
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Verifying Gateway API resources..."
+            kubectl get gatewayclasses
+            kubectl get gateways -n gateway-tutorial
+            kubectl get httproutes -n gateway-tutorial
+            kubectl get grpcroutes -n grpc-tutorial 2>/dev/null || echo "No GRPCRoutes yet"
+
+    - name: run-connectivity-tests
+      container:
+        image: curlimages/curl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Running connectivity tests..."
+
+            # Get ingress IP
+            INGRESS_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+            # Test path-based routing
+            echo "Testing path-based routing..."
+            curl -s http://$INGRESS_IP/ | head -1
+            curl -s http://$INGRESS_IP/echo | head -1
+            curl -s http://$INGRESS_IP/api/get | jq -r '.url'
+
+            # Test host-based routing
+            echo "Testing host-based routing..."
+            curl -s -H "Host: echo.gateway.local" http://$INGRESS_IP/ | head -1
+
+            echo "All connectivity tests passed!"

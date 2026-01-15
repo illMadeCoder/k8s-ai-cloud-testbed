@@ -1,0 +1,353 @@
+# Part 4: Gateway API Deep Dive
+# Advanced routing patterns and traffic manipulation
+---
+# Part 4a: Advanced Matching - Query Parameters
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: query-param-routing
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "query.gateway.local"
+  rules:
+    # Route based on query parameter
+    - matches:
+        - queryParams:
+            - name: version
+              value: v2
+      backendRefs:
+        - name: echo-v2
+          port: 80
+    - backendRefs:
+        - name: echo-v1
+          port: 80
+---
+# Part 4b: Advanced Matching - HTTP Method
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: method-routing
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "methods.gateway.local"
+  rules:
+    # GET requests to read-only service
+    - matches:
+        - method: GET
+      backendRefs:
+        - name: api-service
+          port: 80
+    # POST/PUT/DELETE to different backend (simulated)
+    - matches:
+        - method: POST
+        - method: PUT
+        - method: DELETE
+      backendRefs:
+        - name: api-service
+          port: 80
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+              - name: X-Write-Operation
+                value: "true"
+---
+# Part 4c: Request Mirroring
+# Send copy of traffic to a second backend for testing
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: request-mirroring
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "mirror.gateway.local"
+  rules:
+    - backendRefs:
+        - name: echo-v1
+          port: 80
+      filters:
+        - type: RequestMirror
+          requestMirror:
+            backendRef:
+              name: echo-v2
+              port: 80
+---
+# Part 4d: URL Rewriting
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: url-rewriting
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "rewrite.gateway.local"
+  rules:
+    # Rewrite /old-api/* to /api/*
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /old-api
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: api-service
+          port: 80
+    # Rewrite hostname
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /external
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            hostname: api-service.gateway-tutorial.svc.cluster.local
+      backendRefs:
+        - name: api-service
+          port: 80
+---
+# Part 4e: Header Modification
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: header-modification
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "headers.gateway.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+      filters:
+        # Add headers to request
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+              - name: X-Gateway
+                value: "envoy-gateway"
+              - name: X-Request-Start
+                value: "%START_TIME%"
+            set:
+              - name: X-Forwarded-Proto
+                value: "https"
+            remove:
+              - "X-Debug"
+        # Add headers to response
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            add:
+              - name: X-Served-By
+                value: "gateway-tutorial"
+            set:
+              - name: Cache-Control
+                value: "no-store"
+---
+# Part 4f: Redirects
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: redirects
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "redirect.gateway.local"
+  rules:
+    # Redirect /old to /new
+    - matches:
+        - path:
+            type: Exact
+            value: /old
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /new
+            statusCode: 301
+    # Redirect HTTP to HTTPS
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /secure
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+    # Default backend
+    - backendRefs:
+        - name: web-service
+          port: 80
+---
+# Part 4g: Timeouts (via BackendTrafficPolicy - Envoy Gateway extension)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: timeout-policy
+  namespace: gateway-tutorial
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: slow-service-route
+  timeout:
+    http:
+      connectionIdleTimeout: 60s
+      maxConnectionDuration: 300s
+    tcp:
+      connectTimeout: 10s
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: slow-service-route
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "slow.gateway.local"
+  rules:
+    - backendRefs:
+        - name: slow-service
+          port: 80
+      timeouts:
+        request: 30s
+        backendRequest: 25s
+---
+# Part 4h: Retry Policy (via BackendTrafficPolicy)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: retry-policy
+  namespace: gateway-tutorial
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: api-with-retry
+  retry:
+    numRetries: 3
+    retryOn:
+      - "5xx"
+      - "reset"
+      - "connect-failure"
+    perRetry:
+      timeout: 5s
+      backOff:
+        baseInterval: 100ms
+        maxInterval: 1s
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-with-retry
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "retry.gateway.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+---
+# Part 4i: Rate Limiting (via BackendTrafficPolicy)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: rate-limit-policy
+  namespace: gateway-tutorial
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: rate-limited-route
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 10
+            unit: Second
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rate-limited-route
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "ratelimited.gateway.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+---
+# Part 4j: CORS Configuration (via SecurityPolicy)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: cors-policy
+  namespace: gateway-tutorial
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: cors-enabled-route
+  cors:
+    allowOrigins:
+      - type: Exact
+        value: "https://example.com"
+      - type: RegularExpression
+        value: "https://.*\\.example\\.com"
+    allowMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    allowHeaders:
+      - Content-Type
+      - Authorization
+      - X-Custom-Header
+    exposeHeaders:
+      - X-Request-Id
+    maxAge: 86400s
+    allowCredentials: true
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: cors-enabled-route
+  namespace: gateway-tutorial
+spec:
+  parentRefs:
+    - name: tutorial-gateway
+  hostnames:
+    - "cors.gateway.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
