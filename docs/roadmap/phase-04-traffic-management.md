@@ -60,6 +60,41 @@
 
 *gRPC has fundamentally different traffic management requirements than HTTP/1.1. HTTP/2 multiplexing, streaming RPCs, and binary protocols require specialized handling.*
 
+**5-zero: Why gRPC? Understanding the Motivation**
+
+*Before learning gRPC traffic patterns, understand why gRPC exists and when to use it.*
+
+- [ ] The problems gRPC solves:
+  - [ ] **Performance**: Binary serialization (protobuf) vs JSON text parsing
+  - [ ] **Strong typing**: Schema-first with .proto files, compile-time safety
+  - [ ] **Code generation**: Auto-generated clients/servers in any language
+  - [ ] **Streaming**: Native support for server/client/bidirectional streaming
+  - [ ] **HTTP/2**: Multiplexing, header compression, efficient connection use
+- [ ] When to choose gRPC over REST:
+  - [ ] Internal service-to-service communication (microservices)
+  - [ ] High-throughput, low-latency requirements
+  - [ ] Streaming data (real-time feeds, large file transfers)
+  - [ ] Polyglot environments (consistent contracts across languages)
+- [ ] When REST is still better:
+  - [ ] Public APIs (human-readable, browser-native)
+  - [ ] Simple CRUD operations
+  - [ ] When debugging simplicity matters more than performance
+  - [ ] Caching requirements (HTTP caching works naturally with REST)
+- [ ] The browser problem (critical limitation):
+  - [ ] Browsers use fetch API which doesn't support HTTP/2 trailers
+  - [ ] gRPC uses trailers for status codes and metadata
+  - [ ] Result: **Native gRPC doesn't work in browsers**
+  - [ ] Solutions: gRPC-Web (transcoding) or REST gateway
+- [ ] Trade-offs to understand:
+  - [ ] Debugging: Can't curl a gRPC endpoint easily (binary, needs tools)
+  - [ ] Tooling: Need grpcurl, Postman gRPC, or custom clients
+  - [ ] Learning curve: Protobuf schema language, code generation pipeline
+  - [ ] Ecosystem: REST has more middleware, documentation tools
+- [ ] Demo: Compare same API in REST vs gRPC
+  - [ ] Latency comparison under load
+  - [ ] Message size comparison
+  - [ ] Developer experience comparison
+
 **5a: gRPC Fundamentals & The Load Balancing Problem**
 - [ ] Deploy gRPC demo services (3-service chain)
 - [ ] Demonstrate the HTTP/2 load balancing problem:
