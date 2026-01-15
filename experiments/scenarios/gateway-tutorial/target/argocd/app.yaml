@@ -22,7 +22,7 @@ spec:
         valueFiles:
           - $values/experiments/scenarios/gateway-tutorial/target/argocd/nginx-ingress-values.yaml
     # Envoy Gateway (Part 3-5)
-    - repoURL: oci://docker.io/envoyproxy
+    - repoURL: https://gateway.envoyproxy.io/charts
       chart: gateway-helm
       targetRevision: v1.2.4
       helm:
