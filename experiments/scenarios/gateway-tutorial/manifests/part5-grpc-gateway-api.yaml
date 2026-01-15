@@ -159,27 +159,33 @@ spec:
 ---
 # Part 5c: gRPC Request Mirroring
 # Shadow traffic to v2 for testing
-apiVersion: gateway.networking.k8s.io/v1
-kind: GRPCRoute
-metadata:
-  name: grpc-mirroring
-  namespace: grpc-tutorial
-spec:
-  parentRefs:
-    - name: grpc-gateway
-      sectionName: grpc
-  hostnames:
-    - "grpc-mirror.gateway.local"
-  rules:
-    - backendRefs:
-        - name: grpc-echo
-          port: 50051
-      filters:
-        - type: RequestMirror
-          requestMirror:
-            backendRef:
-              name: grpc-echo-v2
-              port: 50051
+#
+# NOTE: Commented out due to Envoy Gateway v1.2.4 bug
+# Panic: interface conversion: interface {} is []v1.HTTPRouteFilter, not []v1.GRPCRouteFilter
+# Tracked: illm-k8s-ai-lab-a7k
+# Uncomment when using a fixed version of Envoy Gateway
+#
+# apiVersion: gateway.networking.k8s.io/v1
+# kind: GRPCRoute
+# metadata:
+#   name: grpc-mirroring
+#   namespace: grpc-tutorial
+# spec:
+#   parentRefs:
+#     - name: grpc-gateway
+#       sectionName: grpc
+#   hostnames:
+#     - "grpc-mirror.gateway.local"
+#   rules:
+#     - backendRefs:
+#         - name: grpc-echo
+#           port: 50051
+#       filters:
+#         - type: RequestMirror
+#           requestMirror:
+#             backendRef:
+#               name: grpc-echo-v2
+#               port: 50051
 ---
 # Part 5d: gRPC Timeouts and Retries (via BackendTrafficPolicy)
 apiVersion: gateway.envoyproxy.io/v1alpha1
