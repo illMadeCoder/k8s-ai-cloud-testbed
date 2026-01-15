@@ -133,7 +133,7 @@ spec:
     - port: 80
       targetPort: 8080
 ---
-# API Service - httpbin for API routing demonstrations
+# API Service - go-httpbin for API routing demonstrations
 # Provides /get, /post, /headers, /status/:code, /delay/:seconds, etc.
 apiVersion: apps/v1
 kind: Deployment
@@ -154,7 +154,10 @@ spec:
     spec:
       containers:
         - name: httpbin
-          image: kong/httpbin:0.1.0
+          image: mccutchen/go-httpbin:v2.15.0
+          env:
+            - name: PORT
+              value: "8080"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -164,7 +167,7 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           resources:
             requests:
               cpu: 20m
@@ -175,12 +178,12 @@ spec:
           livenessProbe:
             httpGet:
               path: /status/200
-              port: 80
+              port: 8080
             initialDelaySeconds: 5
           readinessProbe:
             httpGet:
               path: /status/200
-              port: 80
+              port: 8080
             initialDelaySeconds: 3
 ---
 apiVersion: v1
@@ -195,7 +198,7 @@ spec:
     app: api-service
   ports:
     - port: 80
-      targetPort: 80
+      targetPort: 8080
 ---
 # Web Service - nginx serving static content
 apiVersion: v1
@@ -328,7 +331,10 @@ spec:
     spec:
       containers:
         - name: httpbin
-          image: kong/httpbin:0.1.0
+          image: mccutchen/go-httpbin:v2.15.0
+          env:
+            - name: PORT
+              value: "8080"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -338,7 +344,7 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           resources:
             requests:
               cpu: 20m
@@ -361,4 +367,4 @@ spec:
     app: slow-service
   ports:
     - port: 80
-      targetPort: 80
+      targetPort: 8080
