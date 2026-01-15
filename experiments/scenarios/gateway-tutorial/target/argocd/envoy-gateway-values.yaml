@@ -22,5 +22,17 @@ config:
       level:
         default: info
 
+# Service configuration
+service:
+  annotations: {}
+
+# Deployment configuration
+deployment:
+  envoyGateway:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
 # Create default Gateway resource
 createGateway: false  # We'll create this manually in the tutorial
