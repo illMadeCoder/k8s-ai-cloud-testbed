@@ -9,13 +9,14 @@
 ---
 # GatewayClass - Managed by infrastructure admin
 # Defines which controller handles Gateway resources
-# (Usually created by Envoy Gateway helm chart, shown here for reference)
-# apiVersion: gateway.networking.k8s.io/v1
-# kind: GatewayClass
-# metadata:
-#   name: envoy-gateway
-# spec:
-#   controllerName: gateway.envoyproxy.io/gatewayclass-controller
+# NOTE: Envoy Gateway v1.2.4 helm chart does NOT create the GatewayClass,
+# so we create it here. The name 'eg' is Envoy Gateway's default.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
 ---
 # Gateway - Created by cluster operator
 # Defines the load balancer and listener configuration

@@ -327,3 +327,29 @@ spec:
     - name: grpc
       port: 50051
       targetPort: 9001
+---
+# grpcurl Testing Pod
+# Provides grpcurl for testing gRPC services within the cluster
+# Usage:
+#   kubectl exec -it -n grpc-tutorial grpcurl-test -- sh
+#   grpcurl -plaintext grpc-echo:50051 list
+#   grpcurl -plaintext grpc-echo:50051 grpcbin.GRPCBin/DummyUnary
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grpcurl-test
+  namespace: grpc-tutorial
+  labels:
+    app: grpcurl-test
+spec:
+  containers:
+    - name: grpcurl
+      image: fullstorydev/grpcurl:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
