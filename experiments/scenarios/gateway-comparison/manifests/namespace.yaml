@@ -1,0 +1,7 @@
+# Namespace for Gateway Comparison demo apps and routes
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway-comparison
+  labels:
+    experiment: gateway-comparison

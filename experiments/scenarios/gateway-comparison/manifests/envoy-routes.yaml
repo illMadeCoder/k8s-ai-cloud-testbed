@@ -1,0 +1,226 @@
+# Envoy Gateway Routes for Gateway Comparison
+# Uses Gateway API HTTPRoute and GRPCRoute (CNCF reference implementation)
+---
+# GatewayClass for Envoy Gateway
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+---
+# Gateway for Envoy
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: envoy-gateway
+  namespace: gateway-comparison
+spec:
+  gatewayClassName: eg
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: grpc
+      protocol: HTTP
+      port: 50051
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: GRPCRoute
+---
+# Path-based routing (Gateway API HTTPRoute)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: envoy-path-routing
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: envoy-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: api-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /echo
+      backendRefs:
+        - name: echo-v1
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: web-service
+          port: 80
+---
+# Host-based routing
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: envoy-api-host
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: envoy-gateway
+  hostnames:
+    - "api.envoy.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: envoy-echo-host
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: envoy-gateway
+  hostnames:
+    - "echo.envoy.local"
+  rules:
+    - backendRefs:
+        - name: echo-v1
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: envoy-web-host
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: envoy-gateway
+  hostnames:
+    - "web.envoy.local"
+  rules:
+    - backendRefs:
+        - name: web-service
+          port: 80
+---
+# Header manipulation (HTTPRoute filter)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: envoy-headers
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: envoy-gateway
+  hostnames:
+    - "headers.envoy.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+              - name: X-Gateway
+                value: "envoy-gateway"
+---
+# Traffic splitting (Gateway API weight-based)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: envoy-canary
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: envoy-gateway
+  hostnames:
+    - "canary.envoy.local"
+  rules:
+    - backendRefs:
+        - name: echo-v1
+          port: 80
+          weight: 80
+        - name: echo-v2
+          port: 80
+          weight: 20
+---
+# Rate limiting (Envoy Gateway BackendTrafficPolicy)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: envoy-rate-limit
+  namespace: gateway-comparison
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: envoy-rate-limited-route
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 10
+            unit: Second
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: envoy-rate-limited-route
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: envoy-gateway
+  hostnames:
+    - "ratelimited.envoy.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+---
+# GRPCRoute for Envoy Gateway
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: envoy-grpc
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: envoy-gateway
+      sectionName: grpc
+  hostnames:
+    - "grpc.envoy.local"
+  rules:
+    - backendRefs:
+        - name: grpc-echo
+          port: 50051
+---
+# gRPC traffic splitting
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: envoy-grpc-canary
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: envoy-gateway
+      sectionName: grpc
+  hostnames:
+    - "grpc-canary.envoy.local"
+  rules:
+    - backendRefs:
+        - name: grpc-echo
+          port: 50051
+          weight: 80
+        - name: grpc-echo-v2
+          port: 50051
+          weight: 20

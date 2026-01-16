@@ -1,0 +1,84 @@
+# Traefik Helm values for Gateway Comparison
+# Enables both Ingress and Gateway API support
+
+# Gateway API support
+providers:
+  kubernetesIngress:
+    enabled: true
+    ingressClass: traefik
+  kubernetesGateway:
+    enabled: true
+
+# Enable Gateway API provider (experimental)
+experimental:
+  kubernetesGateway:
+    enabled: true
+
+# GatewayClass configuration
+gatewayClass:
+  enabled: true
+  name: traefik
+
+# Service configuration
+service:
+  type: LoadBalancer
+  annotations:
+    metallb.universe.tf/allow-shared-ip: "gateway-comparison"
+
+# Port configuration
+ports:
+  web:
+    port: 8000
+    expose:
+      default: true
+    exposedPort: 80
+    protocol: TCP
+  websecure:
+    port: 8443
+    expose:
+      default: true
+    exposedPort: 443
+    protocol: TCP
+  grpc:
+    port: 9000
+    expose:
+      default: true
+    exposedPort: 9000
+    protocol: TCP
+    http2:
+      maxConcurrentStreams: 250
+
+# Enable metrics for comparison
+metrics:
+  prometheus:
+    enabled: true
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+
+# Resource limits appropriate for Kind
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Access logs for debugging
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true
+    format: json
+
+# IngressClass settings
+ingressClass:
+  enabled: true
+  isDefaultClass: false  # nginx is default for this comparison
+
+# Deployment configuration
+deployment:
+  replicas: 1

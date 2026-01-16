@@ -1,0 +1,8 @@
+# Target cluster for Gateway Comparison
+# Runs nginx-ingress, Traefik, Envoy Gateway, and demo apps side-by-side
+size: medium
+provider: kind
+
+# This cluster needs resources for THREE gateway implementations
+# nodes: 2
+# memory: 4Gi

@@ -1,0 +1,315 @@
+# Gateway Comparison Demo Apps
+# Shared services for comparing nginx, Traefik, and Envoy Gateway
+#
+# Services:
+# - echo-v1, echo-v2: For traffic splitting demos
+# - api-service: httpbin for API routing demos
+# - web-service: nginx for basic web routing
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway-comparison
+  labels:
+    experiment: gateway-comparison
+---
+# Echo Service V1 - Returns version identifier
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-v1
+  namespace: gateway-comparison
+  labels:
+    app: echo
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: echo
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: echo
+        version: v1
+    spec:
+      containers:
+        - name: echo
+          image: hashicorp/http-echo:1.0
+          args:
+            - "-text=Hello from echo-v1"
+            - "-listen=:8080"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-v1
+  namespace: gateway-comparison
+  labels:
+    app: echo
+    version: v1
+spec:
+  selector:
+    app: echo
+    version: v1
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+# Echo Service V2 - Returns version identifier (for canary/traffic splitting)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-v2
+  namespace: gateway-comparison
+  labels:
+    app: echo
+    version: v2
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: echo
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: echo
+        version: v2
+    spec:
+      containers:
+        - name: echo
+          image: hashicorp/http-echo:1.0
+          args:
+            - "-text=Hello from echo-v2"
+            - "-listen=:8080"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-v2
+  namespace: gateway-comparison
+  labels:
+    app: echo
+    version: v2
+spec:
+  selector:
+    app: echo
+    version: v2
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+# API Service - go-httpbin for API routing demonstrations
+# Provides /get, /post, /headers, /status/:code, /delay/:seconds, etc.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-service
+  namespace: gateway-comparison
+  labels:
+    app: api-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-service
+  template:
+    metadata:
+      labels:
+        app: api-service
+    spec:
+      containers:
+        - name: httpbin
+          image: mccutchen/go-httpbin:v2.15.0
+          env:
+            - name: PORT
+              value: "8080"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /status/200
+              port: 8080
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /status/200
+              port: 8080
+            initialDelaySeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: gateway-comparison
+  labels:
+    app: api-service
+spec:
+  selector:
+    app: api-service
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+# Web Service - nginx serving static content
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-content
+  namespace: gateway-comparison
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head><title>Gateway Comparison - Web Service</title></head>
+    <body>
+      <h1>Gateway Comparison Web Service</h1>
+      <p>This is the web-service backend for gateway comparison demos.</p>
+      <p>Test the same routes on all three gateways:</p>
+      <ul>
+        <li><b>nginx-ingress:</b> Uses Kubernetes Ingress resources</li>
+        <li><b>Traefik:</b> Uses Gateway API HTTPRoute + IngressRoute</li>
+        <li><b>Envoy Gateway:</b> Uses Gateway API HTTPRoute</li>
+      </ul>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-service
+  namespace: gateway-comparison
+  labels:
+    app: web-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-service
+  template:
+    metadata:
+      labels:
+        app: web-service
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [NET_BIND_SERVICE]
+            runAsNonRoot: true
+            runAsUser: 101
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: web-content
+              mountPath: /usr/share/nginx/html
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+      volumes:
+        - name: web-content
+          configMap:
+            name: web-content
+        - name: nginx-config
+          configMap:
+            name: nginx-nonroot-config
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-nonroot-config
+  namespace: gateway-comparison
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        server_name localhost;
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  namespace: gateway-comparison
+  labels:
+    app: web-service
+spec:
+  selector:
+    app: web-service
+  ports:
+    - port: 80
+      targetPort: 8080

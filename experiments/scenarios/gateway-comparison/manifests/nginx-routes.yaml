@@ -1,0 +1,192 @@
+# nginx-ingress Routes for Gateway Comparison
+# Uses Kubernetes Ingress resources with nginx annotations
+---
+# Path-based routing
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-path-routing
+  namespace: gateway-comparison
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-service
+                port:
+                  number: 80
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+          - path: /echo
+            pathType: Prefix
+            backend:
+              service:
+                name: echo-v1
+                port:
+                  number: 80
+---
+# Host-based routing
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-host-routing
+  namespace: gateway-comparison
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.nginx.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+    - host: echo.nginx.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo-v1
+                port:
+                  number: 80
+    - host: web.nginx.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-service
+                port:
+                  number: 80
+---
+# Rate limiting (nginx annotations)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-rate-limited
+  namespace: gateway-comparison
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ratelimited.nginx.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+---
+# Header manipulation (nginx snippet)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-headers
+  namespace: gateway-comparison
+  annotations:
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Gateway "nginx-ingress";
+      proxy_set_header X-Request-Start "$msec";
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: headers.nginx.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+---
+# Traffic splitting (canary)
+# Primary ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-canary-primary
+  namespace: gateway-comparison
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: canary.nginx.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo-v1
+                port:
+                  number: 80
+---
+# Canary ingress (20% traffic)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-canary-v2
+  namespace: gateway-comparison
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "20"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: canary.nginx.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo-v2
+                port:
+                  number: 80
+---
+# gRPC routing (nginx)
+# Note: nginx-ingress gRPC support is limited compared to Gateway API
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-grpc
+  namespace: gateway-comparison
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: grpc.nginx.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grpc-echo
+                port:
+                  number: 50051

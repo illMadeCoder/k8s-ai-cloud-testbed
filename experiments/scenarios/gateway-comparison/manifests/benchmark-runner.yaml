@@ -1,0 +1,250 @@
+# Benchmark Runner for Gateway Comparison
+# Provides scripts to test and compare all three gateways
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: benchmark-scripts
+  namespace: gateway-comparison
+data:
+  benchmark.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "=========================================="
+    echo "  GATEWAY COMPARISON BENCHMARK"
+    echo "=========================================="
+    echo ""
+
+    # Get gateway IPs
+    NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "NOT_READY")
+    TRAEFIK_IP=$(kubectl get svc traefik -n traefik-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "NOT_READY")
+    ENVOY_IP=$(kubectl get gateway envoy-gateway -n gateway-comparison -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || echo "NOT_READY")
+
+    echo "Gateway IPs:"
+    echo "  nginx-ingress:  $NGINX_IP"
+    echo "  Traefik:        $TRAEFIK_IP"
+    echo "  Envoy Gateway:  $ENVOY_IP"
+    echo ""
+
+    if [ "$NGINX_IP" = "NOT_READY" ] || [ "$TRAEFIK_IP" = "NOT_READY" ] || [ "$ENVOY_IP" = "NOT_READY" ]; then
+      echo "ERROR: Not all gateways are ready. Please wait for deployment."
+      exit 1
+    fi
+
+    echo "=========================================="
+    echo "  HTTP CONNECTIVITY TEST"
+    echo "=========================================="
+    echo ""
+
+    test_http() {
+      local name=$1
+      local ip=$2
+      local host=$3
+      local path=$4
+
+      RESP=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $host" "http://$ip$path" --connect-timeout 5 2>/dev/null || echo "FAIL")
+      if [ "$RESP" = "200" ]; then
+        echo "  ✓ $name ($host$path): OK"
+      else
+        echo "  ✗ $name ($host$path): $RESP"
+      fi
+    }
+
+    echo "Path routing:"
+    test_http "nginx" "$NGINX_IP" "" "/echo"
+    test_http "Traefik" "$TRAEFIK_IP" "" "/echo"
+    test_http "Envoy" "$ENVOY_IP" "" "/echo"
+
+    echo ""
+    echo "Host routing:"
+    test_http "nginx" "$NGINX_IP" "api.nginx.local" "/"
+    test_http "Traefik" "$TRAEFIK_IP" "api.traefik.local" "/"
+    test_http "Envoy" "$ENVOY_IP" "api.envoy.local" "/"
+
+    echo ""
+    echo "Header manipulation:"
+    for gw in nginx traefik envoy; do
+      case $gw in
+        nginx) IP=$NGINX_IP ;;
+        traefik) IP=$TRAEFIK_IP ;;
+        envoy) IP=$ENVOY_IP ;;
+      esac
+      HEADER=$(curl -s -H "Host: headers.$gw.local" "http://$IP/headers" 2>/dev/null | grep -o '"X-Gateway":[^,]*' || echo "NOT_FOUND")
+      echo "  $gw: $HEADER"
+    done
+
+    echo ""
+    echo "=========================================="
+    echo "  TRAFFIC SPLITTING TEST (20 requests)"
+    echo "=========================================="
+    echo ""
+
+    test_canary() {
+      local name=$1
+      local ip=$2
+      local host=$3
+
+      V1=0; V2=0
+      for i in $(seq 1 20); do
+        RESP=$(curl -s -H "Host: $host" "http://$ip/" --connect-timeout 2 2>/dev/null)
+        if echo "$RESP" | grep -q "echo-v2"; then
+          V2=$((V2+1))
+        elif echo "$RESP" | grep -q "echo-v1"; then
+          V1=$((V1+1))
+        fi
+      done
+      echo "  $name: v1=$V1, v2=$V2 (expect ~80/20)"
+    }
+
+    test_canary "nginx" "$NGINX_IP" "canary.nginx.local"
+    test_canary "Traefik" "$TRAEFIK_IP" "canary.traefik.local"
+    test_canary "Envoy" "$ENVOY_IP" "canary.envoy.local"
+
+    echo ""
+    echo "=========================================="
+    echo "  BENCHMARK COMPLETE"
+    echo "=========================================="
+
+  grpc-test.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "=========================================="
+    echo "  gRPC COMPARISON TEST"
+    echo "=========================================="
+    echo ""
+
+    # Get gateway IPs
+    NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+    TRAEFIK_IP=$(kubectl get svc traefik -n traefik-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+    ENVOY_IP=$(kubectl get gateway envoy-gateway -n gateway-comparison -o jsonpath='{.status.addresses[0].value}' 2>/dev/null)
+
+    echo "Testing gRPC services directly..."
+    echo ""
+
+    echo "Internal service (grpc-echo:50051):"
+    grpcurl -plaintext grpc-echo.gateway-comparison.svc.cluster.local:50051 list 2>/dev/null | head -3 && echo "  ✓ Service responding" || echo "  ✗ Service not responding"
+
+    echo ""
+    echo "Testing through gateways..."
+    echo ""
+
+    # Note: gRPC through ingress controllers varies in support
+    echo "Envoy Gateway (best gRPC support):"
+    if grpcurl -plaintext -authority grpc.envoy.local ${ENVOY_IP}:50051 list 2>/dev/null | grep -q "grpcbin"; then
+      echo "  ✓ GRPCRoute working"
+    else
+      echo "  ✗ GRPCRoute not working"
+    fi
+
+    echo ""
+    echo "Traefik (experimental GRPCRoute):"
+    if grpcurl -plaintext -authority grpc.traefik.local ${TRAEFIK_IP}:9000 list 2>/dev/null | grep -q "grpcbin"; then
+      echo "  ✓ GRPCRoute working"
+    else
+      echo "  ✗ GRPCRoute not working (may need TLS)"
+    fi
+
+    echo ""
+    echo "nginx-ingress (Ingress-based gRPC):"
+    if grpcurl -plaintext -authority grpc.nginx.local ${NGINX_IP}:80 list 2>/dev/null | grep -q "grpcbin"; then
+      echo "  ✓ gRPC Ingress working"
+    else
+      echo "  ✗ gRPC Ingress not working (check TLS requirement)"
+    fi
+
+  feature-matrix.sh: |
+    #!/bin/bash
+    echo "=========================================="
+    echo "  FEATURE COMPARISON MATRIX"
+    echo "=========================================="
+    echo ""
+    printf "%-30s %-15s %-15s %-15s\n" "Feature" "nginx" "Traefik" "Envoy GW"
+    printf "%-30s %-15s %-15s %-15s\n" "------------------------------" "---------------" "---------------" "---------------"
+    printf "%-30s %-15s %-15s %-15s\n" "Gateway API HTTPRoute" "Partial" "Yes" "Yes"
+    printf "%-30s %-15s %-15s %-15s\n" "Gateway API GRPCRoute" "No" "Experimental" "Yes"
+    printf "%-30s %-15s %-15s %-15s\n" "Native Ingress Support" "Yes" "Yes" "No"
+    printf "%-30s %-15s %-15s %-15s\n" "gRPC L7 Load Balancing" "Limited" "Yes" "Yes"
+    printf "%-30s %-15s %-15s %-15s\n" "Rate Limiting Method" "Annotation" "Middleware" "BackendPolicy"
+    printf "%-30s %-15s %-15s %-15s\n" "Header Manipulation" "Snippet" "HTTPRoute" "HTTPRoute"
+    printf "%-30s %-15s %-15s %-15s\n" "Traffic Splitting" "Canary Annot." "HTTPRoute" "HTTPRoute"
+    printf "%-30s %-15s %-15s %-15s\n" "Request Mirroring" "No" "Yes" "Yes"
+    printf "%-30s %-15s %-15s %-15s\n" "Config Portability" "Low" "Medium" "High"
+    printf "%-30s %-15s %-15s %-15s\n" "Maturity" "Stable" "Stable" "Newer"
+    printf "%-30s %-15s %-15s %-15s\n" "Community Size" "Large" "Large" "Growing"
+    echo ""
+    echo "Legend:"
+    echo "  - Annotation: nginx.ingress.kubernetes.io/* annotations"
+    echo "  - Snippet: nginx.ingress.kubernetes.io/configuration-snippet"
+    echo "  - Middleware: Traefik CRD (traefik.io/v1alpha1)"
+    echo "  - BackendPolicy: Envoy Gateway CRD (gateway.envoyproxy.io/v1alpha1)"
+    echo "  - HTTPRoute: Gateway API standard resource"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: benchmark-runner
+  namespace: gateway-comparison
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: benchmark-runner
+  template:
+    metadata:
+      labels:
+        app: benchmark-runner
+    spec:
+      serviceAccountName: benchmark-runner
+      containers:
+        - name: runner
+          image: nicolaka/netshoot:latest
+          command: ["sleep", "infinity"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 50m
+            limits:
+              memory: 256Mi
+              cpu: 200m
+      volumes:
+        - name: scripts
+          configMap:
+            name: benchmark-scripts
+            defaultMode: 0755
+---
+# ServiceAccount for benchmark runner to query cluster
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: benchmark-runner
+  namespace: gateway-comparison
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gateway-comparison-reader
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["gateways"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gateway-comparison-reader
+subjects:
+  - kind: ServiceAccount
+    name: benchmark-runner
+    namespace: gateway-comparison
+roleRef:
+  kind: ClusterRole
+  name: gateway-comparison-reader
+  apiGroup: rbac.authorization.k8s.io

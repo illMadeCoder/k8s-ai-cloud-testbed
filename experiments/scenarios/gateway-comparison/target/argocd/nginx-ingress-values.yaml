@@ -1,0 +1,49 @@
+# nginx-ingress Helm values for Gateway Comparison
+# Configured for Kind cluster with MetalLB
+
+controller:
+  # Use LoadBalancer service type (MetalLB provides external IP)
+  service:
+    type: LoadBalancer
+    annotations:
+      metallb.universe.tf/allow-shared-ip: "gateway-comparison"
+
+  # Enable metrics for comparison
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false  # Enable if Prometheus is deployed
+
+  # Resource limits appropriate for Kind
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  # Enable access logs for debugging
+  config:
+    log-format-upstream: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_length $request_time [$proxy_upstream_name] [$proxy_alternative_upstream_name] $upstream_addr $upstream_response_length $upstream_response_time $upstream_status $req_id'
+    # Enable snippets for header manipulation demos
+    allow-snippet-annotations: "true"
+    annotations-risk-level: "Critical"
+
+  # Admission webhooks
+  admissionWebhooks:
+    enabled: true
+
+  # Watch all namespaces
+  watchIngressWithoutClass: true
+
+  # IngressClass - nginx is the default for comparison
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: true
+    controllerValue: "k8s.io/ingress-nginx"
+
+# Disable default backend
+defaultBackend:
+  enabled: false

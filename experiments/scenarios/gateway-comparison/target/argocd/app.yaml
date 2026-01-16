@@ -1,0 +1,76 @@
+# Gateway Comparison - Main ArgoCD Application
+# Deploys demo apps, gRPC services, routes, and benchmark runner
+# Note: Gateway controllers (nginx, traefik, envoy) are deployed via separate apps
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-comparison
+  namespace: argocd
+  labels:
+    experiment: gateway-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # All manifests from git repo
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/scenarios/gateway-comparison/manifests
+  destination:
+    name: target
+    namespace: gateway-comparison
+  ignoreDifferences:
+    # Ignore status fields that controllers update
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status
+    - group: networking.k8s.io
+      kind: Ingress
+      jsonPointers:
+        - /status
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      jsonPointers:
+        - /status
+    - group: gateway.networking.k8s.io
+      kind: GatewayClass
+      jsonPointers:
+        - /status
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      jsonPointers:
+        - /status
+    - group: gateway.networking.k8s.io
+      kind: GRPCRoute
+      jsonPointers:
+        - /status
+    - group: traefik.io
+      kind: IngressRoute
+      jsonPointers:
+        - /status
+    - group: traefik.io
+      kind: Middleware
+      jsonPointers:
+        - /status
+    - group: gateway.envoyproxy.io
+      kind: BackendTrafficPolicy
+      jsonPointers:
+        - /status
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,123 @@
+# Gateway Comparison Workflow
+# Runs on hub cluster, deploys to target vcluster
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: gateway-comparison
+  namespace: argo-workflows
+spec:
+  entrypoint: gateway-comparison
+  serviceAccountName: workflow-sa
+  templates:
+    - name: gateway-comparison
+      steps:
+        - - name: wait-for-gateways
+            template: wait-for-gateways
+        - - name: wait-for-apps
+            template: wait-for-apps
+        - - name: verify-routes
+            template: verify-routes
+        - - name: run-comparison
+            template: run-comparison
+
+    - name: wait-for-gateways
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Waiting for gateway controllers..."
+
+            echo "Checking nginx-ingress..."
+            kubectl wait --for=condition=available deployment/ingress-nginx-controller -n ingress-nginx --timeout=300s
+
+            echo "Checking Traefik..."
+            kubectl wait --for=condition=available deployment/traefik -n traefik-system --timeout=300s
+
+            echo "Checking Envoy Gateway..."
+            kubectl wait --for=condition=available deployment/envoy-gateway -n envoy-gateway-system --timeout=300s
+
+            echo "All gateway controllers ready!"
+
+    - name: wait-for-apps
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Waiting for demo apps..."
+            kubectl wait --for=condition=available deployment/echo-v1 -n gateway-comparison --timeout=300s
+            kubectl wait --for=condition=available deployment/echo-v2 -n gateway-comparison --timeout=300s
+            kubectl wait --for=condition=available deployment/api-service -n gateway-comparison --timeout=300s
+            kubectl wait --for=condition=available deployment/web-service -n gateway-comparison --timeout=300s
+            kubectl wait --for=condition=available deployment/grpc-echo -n gateway-comparison --timeout=300s
+            echo "All demo apps ready!"
+
+    - name: verify-routes
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "=== Gateway Resources ==="
+            echo ""
+            echo "GatewayClasses:"
+            kubectl get gatewayclasses
+
+            echo ""
+            echo "Gateways:"
+            kubectl get gateways -A
+
+            echo ""
+            echo "HTTPRoutes:"
+            kubectl get httproutes -n gateway-comparison
+
+            echo ""
+            echo "GRPCRoutes:"
+            kubectl get grpcroutes -n gateway-comparison
+
+            echo ""
+            echo "Ingresses:"
+            kubectl get ingress -n gateway-comparison
+
+    - name: run-comparison
+      container:
+        image: nicolaka/netshoot:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "==========================================="
+            echo "  GATEWAY COMPARISON TEST"
+            echo "==========================================="
+
+            # Get gateway IPs
+            NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "NOT_READY")
+            TRAEFIK_IP=$(kubectl get svc traefik -n traefik-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "NOT_READY")
+            ENVOY_IP=$(kubectl get gateway envoy-gateway -n gateway-comparison -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || echo "NOT_READY")
+
+            echo ""
+            echo "Gateway IPs:"
+            echo "  nginx-ingress:  $NGINX_IP"
+            echo "  Traefik:        $TRAEFIK_IP"
+            echo "  Envoy Gateway:  $ENVOY_IP"
+            echo ""
+
+            if [ "$NGINX_IP" = "NOT_READY" ] || [ "$TRAEFIK_IP" = "NOT_READY" ] || [ "$ENVOY_IP" = "NOT_READY" ]; then
+              echo "WARNING: Not all gateways have IPs yet. Continuing with partial tests..."
+            fi
+
+            echo "=== Path Routing Test ==="
+            echo "nginx /echo:" && curl -s --connect-timeout 5 http://$NGINX_IP/echo 2>/dev/null | head -1 || echo "  FAIL"
+            echo "Traefik /echo:" && curl -s --connect-timeout 5 http://$TRAEFIK_IP/echo 2>/dev/null | head -1 || echo "  FAIL"
+            echo "Envoy /echo:" && curl -s --connect-timeout 5 http://$ENVOY_IP/echo 2>/dev/null | head -1 || echo "  FAIL"
+
+            echo ""
+            echo "=== Host Routing Test ==="
+            echo "nginx api:" && curl -s --connect-timeout 5 -H "Host: api.nginx.local" http://$NGINX_IP/ 2>/dev/null | head -1 || echo "  FAIL"
+            echo "Traefik api:" && curl -s --connect-timeout 5 -H "Host: api.traefik.local" http://$TRAEFIK_IP/ 2>/dev/null | head -1 || echo "  FAIL"
+            echo "Envoy api:" && curl -s --connect-timeout 5 -H "Host: api.envoy.local" http://$ENVOY_IP/ 2>/dev/null | head -1 || echo "  FAIL"
+
+            echo ""
+            echo "==========================================="
+            echo "  COMPARISON COMPLETE"
+            echo "==========================================="

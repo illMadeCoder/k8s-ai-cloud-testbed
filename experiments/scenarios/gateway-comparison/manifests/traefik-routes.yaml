@@ -1,0 +1,200 @@
+# Traefik Routes for Gateway Comparison
+# Uses Gateway API HTTPRoute + Traefik-specific IngressRoute where needed
+---
+# GatewayClass for Traefik
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: traefik
+spec:
+  controllerName: traefik.io/gateway-controller
+---
+# Gateway for Traefik
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: traefik-gateway
+  namespace: gateway-comparison
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: grpc
+      protocol: HTTP
+      port: 9000
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: GRPCRoute
+---
+# Path-based routing (Gateway API HTTPRoute)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: traefik-path-routing
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: traefik-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: api-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /echo
+      backendRefs:
+        - name: echo-v1
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: web-service
+          port: 80
+---
+# Host-based routing
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: traefik-api-host
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: traefik-gateway
+  hostnames:
+    - "api.traefik.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: traefik-echo-host
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: traefik-gateway
+  hostnames:
+    - "echo.traefik.local"
+  rules:
+    - backendRefs:
+        - name: echo-v1
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: traefik-web-host
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: traefik-gateway
+  hostnames:
+    - "web.traefik.local"
+  rules:
+    - backendRefs:
+        - name: web-service
+          port: 80
+---
+# Header manipulation (HTTPRoute filter)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: traefik-headers
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: traefik-gateway
+  hostnames:
+    - "headers.traefik.local"
+  rules:
+    - backendRefs:
+        - name: api-service
+          port: 80
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+              - name: X-Gateway
+                value: "traefik"
+---
+# Traffic splitting (Gateway API weight-based)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: traefik-canary
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: traefik-gateway
+  hostnames:
+    - "canary.traefik.local"
+  rules:
+    - backendRefs:
+        - name: echo-v1
+          port: 80
+          weight: 80
+        - name: echo-v2
+          port: 80
+          weight: 20
+---
+# Rate limiting via Traefik Middleware (IngressRoute)
+# Note: Traefik's Gateway API doesn't have native rate limiting yet
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit
+  namespace: gateway-comparison
+spec:
+  rateLimit:
+    average: 10
+    burst: 20
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-rate-limited
+  namespace: gateway-comparison
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`ratelimited.traefik.local`)
+      kind: Rule
+      services:
+        - name: api-service
+          port: 80
+      middlewares:
+        - name: rate-limit
+---
+# GRPCRoute for Traefik (experimental)
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: traefik-grpc
+  namespace: gateway-comparison
+spec:
+  parentRefs:
+    - name: traefik-gateway
+      sectionName: grpc
+  hostnames:
+    - "grpc.traefik.local"
+  rules:
+    - backendRefs:
+        - name: grpc-echo
+          port: 50051

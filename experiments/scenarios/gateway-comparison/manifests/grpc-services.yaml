@@ -1,0 +1,131 @@
+# gRPC Services for Gateway Comparison
+# Used to compare gRPC routing across nginx, Traefik, and Envoy Gateway
+---
+# gRPC Echo Service V1 (using grpcbin)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-echo
+  namespace: gateway-comparison
+  labels:
+    app: grpc-echo
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: grpc-echo
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: grpc-echo
+        version: v1
+    spec:
+      containers:
+        - name: grpc-echo
+          image: moul/grpcbin:latest
+          ports:
+            - containerPort: 9000
+              name: grpc
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-echo
+  namespace: gateway-comparison
+  labels:
+    app: grpc-echo
+    version: v1
+spec:
+  selector:
+    app: grpc-echo
+    version: v1
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 9000
+---
+# gRPC Echo Service V2 (for traffic splitting demos)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-echo-v2
+  namespace: gateway-comparison
+  labels:
+    app: grpc-echo
+    version: v2
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: grpc-echo
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: grpc-echo
+        version: v2
+    spec:
+      containers:
+        - name: grpc-echo
+          image: moul/grpcbin:latest
+          ports:
+            - containerPort: 9000
+              name: grpc
+          env:
+            - name: GRPC_VERSION
+              value: "v2"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-echo-v2
+  namespace: gateway-comparison
+  labels:
+    app: grpc-echo
+    version: v2
+spec:
+  selector:
+    app: grpc-echo
+    version: v2
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 9000
+---
+# grpcurl Testing Pod
+# Provides grpcurl for testing gRPC services
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grpcurl-test
+  namespace: gateway-comparison
+  labels:
+    app: grpcurl-test
+spec:
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
