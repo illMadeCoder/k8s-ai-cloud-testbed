@@ -1,19 +1,18 @@
-# ArgoCD values for Kind hub (GitOps-managed)
+# ArgoCD values for Talos hub (GitOps-managed)
 #
 # This is the ongoing config - changes here are synced by ArgoCD.
 # The bootstrap values file is only used for initial install.
 #
-# ENVIRONMENT CONFIG: If changing Kind network, also update:
-#   - manifests/metallb-config/kustomization.yaml (POOL_RANGE)
+# ENVIRONMENT CONFIG: kube-vip pool 192.168.1.240-250
 #   - values/dns-stack.yaml (loadBalancerIP)
-#   - platform/hub/bootstrap/argocd-values-kind.yaml (loadBalancerIP)
-#   - platform/hub/cluster/Taskfile.yaml (DNS_IP)
+#   - values/openbao.yaml (loadBalancerIP)
+#   - platform/hub/bootstrap/argocd-values-talos.yaml (loadBalancerIP)
 
 server:
   service:
     type: LoadBalancer
-    # Must be within MetalLB pool range (see manifests/metallb-config/kustomization.yaml)
-    loadBalancerIP: 172.19.255.201  # ArgoCD gets .201, DNS gets .200
+    # kube-vip pool: DNS=.240, ArgoCD=.241, OpenBao=.242
+    loadBalancerIP: 192.168.1.241
 
   # Use internal TLS certificate (issued by OpenBao internal CA)
   # Includes SANs for both external domain and internal service names

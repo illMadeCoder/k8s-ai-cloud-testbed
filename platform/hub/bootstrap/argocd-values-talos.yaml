@@ -1,0 +1,14 @@
+# ArgoCD values for Talos hub cluster (bootstrap only)
+#
+# Used by: task talos:bootstrap (or manual helm install)
+# After bootstrap, ArgoCD manages itself via platform/hub/values/argocd.yaml
+#
+# ENVIRONMENT CONFIG: kube-vip pool 192.168.1.240-250
+#   - platform/hub/values/argocd.yaml (loadBalancerIP)
+#   - platform/hub/values/dns-stack.yaml (loadBalancerIP)
+#   - platform/hub/values/openbao.yaml (loadBalancerIP)
+
+server:
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 192.168.1.241  # ArgoCD gets .241, DNS gets .240

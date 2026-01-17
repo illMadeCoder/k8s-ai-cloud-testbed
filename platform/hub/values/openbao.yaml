@@ -1,10 +1,9 @@
-# OpenBao Helm values for Kind hub
+# OpenBao Helm values for Talos hub
 #
-# Uses file storage with hostPath for persistence across cluster recreations.
-# Data persists in ~/.illmlab/openbao-data on the host.
+# Uses file storage with PVC (local-path-provisioner) for persistence.
 #
 # After bootstrap, OpenBao needs to be initialized and unsealed:
-#   - First run: `bao operator init` (saves keys to ~/.illmlab/openbao-keys.json)
+#   - First run: `bao operator init` (saves keys to ~/.illmlab/openbao-keys-talos.json)
 #   - Subsequent runs: `bao operator unseal` with saved keys
 
 global:
@@ -15,7 +14,7 @@ server:
   dev:
     enabled: false
 
-  # Resource limits for Kind
+  # Resource limits
   resources:
     requests:
       cpu: 100m
@@ -24,20 +23,20 @@ server:
       cpu: 500m
       memory: 256Mi
 
-  # Expose via LoadBalancer for Kind
-  # IP assignments: DNS=.200, ArgoCD=.201, OpenBao=.202
+  # Expose via LoadBalancer (kube-vip)
+  # kube-vip pool: DNS=.240, ArgoCD=.241, OpenBao=.242
   service:
     type: LoadBalancer
-    loadBalancerIP: 172.19.255.202
+    loadBalancerIP: 192.168.1.242
 
-  # File storage configuration
+  # File storage configuration using local-path-provisioner
   dataStorage:
     enabled: true
-    size: 1Gi
-    storageClass: null  # Use default
+    size: 10Gi
+    storageClass: local-path
     accessMode: ReadWriteOnce
 
-  # Standalone mode (no HA for local dev)
+  # Standalone mode (no HA for home lab)
   standalone:
     enabled: true
     config: |
@@ -53,20 +52,13 @@ server:
         path = "/vault/data"
       }
 
-  # HA disabled for local dev
+  # HA disabled for home lab
   ha:
     enabled: false
 
-  # Use hostPath volume for persistence across cluster recreations
-  volumes:
-    - name: openbao-persistent
-      hostPath:
-        path: /mnt/openbao-data
-        type: DirectoryOrCreate
-
-  volumeMounts:
-    - name: openbao-persistent
-      mountPath: /vault/data
+  # No hostPath - using PVC with local-path instead
+  volumes: []
+  volumeMounts: []
 
 # Injector for automatic secret injection into pods
 injector:

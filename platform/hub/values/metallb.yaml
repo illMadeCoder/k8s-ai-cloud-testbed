@@ -1,4 +1,0 @@
-# MetalLB values for Kind
-#
-# Note: IPAddressPool and L2Advertisement CRs are deployed separately
-# via metallb-config application (sync-wave: 0, after this deploys).
