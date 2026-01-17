@@ -9,27 +9,34 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   package: xpkg.upbound.io/upbound/provider-family-aws:v2.3.0
-  controllerConfigRef:
-    name: aws-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-runtime-config
 ---
-# Controller configuration for AWS providers
-# Uses IRSA (IAM Roles for Service Accounts) for authentication
-apiVersion: pkg.crossplane.io/v1alpha1
-kind: ControllerConfig
+# DeploymentRuntimeConfig for AWS providers (v2 replacement for ControllerConfig)
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
 metadata:
-  name: aws-controller-config
+  name: aws-runtime-config
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  podSecurityContext:
-    fsGroup: 2000
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  deploymentTemplate:
+    spec:
+      template:
+        spec:
+          securityContext:
+            fsGroup: 2000
+          containers:
+            - name: package-runtime
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
 ---
 # AWS RDS Provider (PostgreSQL, MySQL)
 apiVersion: pkg.crossplane.io/v1
@@ -40,8 +47,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-rds:v2.3.0
-  controllerConfigRef:
-    name: aws-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-runtime-config
 ---
 # AWS S3 Provider (Object Storage)
 apiVersion: pkg.crossplane.io/v1
@@ -52,8 +61,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-s3:v2.3.0
-  controllerConfigRef:
-    name: aws-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-runtime-config
 ---
 # AWS ElastiCache Provider (Redis, Memcached)
 apiVersion: pkg.crossplane.io/v1
@@ -64,8 +75,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-elasticache:v2.3.0
-  controllerConfigRef:
-    name: aws-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-runtime-config
 ---
 # AWS SQS Provider (Message Queues)
 apiVersion: pkg.crossplane.io/v1
@@ -76,8 +89,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-sqs:v2.3.0
-  controllerConfigRef:
-    name: aws-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-runtime-config
 ---
 # AWS Route53 Provider (DNS)
 apiVersion: pkg.crossplane.io/v1
@@ -88,8 +103,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-route53:v2.3.0
-  controllerConfigRef:
-    name: aws-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-runtime-config
 ---
 # AWS EC2 Provider (VPC, Subnets, Security Groups)
 apiVersion: pkg.crossplane.io/v1
@@ -100,8 +117,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-ec2:v2.3.0
-  controllerConfigRef:
-    name: aws-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-runtime-config
 ---
 # AWS EKS Provider (Kubernetes Service)
 apiVersion: pkg.crossplane.io/v1
@@ -112,5 +131,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-eks:v2.3.0
-  controllerConfigRef:
-    name: aws-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-runtime-config

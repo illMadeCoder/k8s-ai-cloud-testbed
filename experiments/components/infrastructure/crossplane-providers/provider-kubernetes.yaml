@@ -10,24 +10,32 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.14.1
-  controllerConfigRef:
-    name: kubernetes-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: kubernetes-runtime-config
 ---
-# Controller configuration for Kubernetes provider
-apiVersion: pkg.crossplane.io/v1alpha1
-kind: ControllerConfig
+# DeploymentRuntimeConfig for Kubernetes provider (v2 replacement for ControllerConfig)
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
 metadata:
-  name: kubernetes-controller-config
+  name: kubernetes-runtime-config
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
+  deploymentTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: package-runtime
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
 ---
 # ProviderConfig for in-cluster Kubernetes operations
 # Uses the service account identity (cluster-admin needed for cross-namespace operations)

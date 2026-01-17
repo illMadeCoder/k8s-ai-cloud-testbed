@@ -9,26 +9,34 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   package: xpkg.upbound.io/upbound/provider-family-gcp:v2.4.0
-  controllerConfigRef:
-    name: gcp-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-runtime-config
 ---
-# Controller configuration for GCP providers
-apiVersion: pkg.crossplane.io/v1alpha1
-kind: ControllerConfig
+# DeploymentRuntimeConfig for GCP providers (v2 replacement for ControllerConfig)
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
 metadata:
-  name: gcp-controller-config
+  name: gcp-runtime-config
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  podSecurityContext:
-    fsGroup: 65532
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  deploymentTemplate:
+    spec:
+      template:
+        spec:
+          securityContext:
+            fsGroup: 65532
+          containers:
+            - name: package-runtime
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
 ---
 # GCP SQL Provider (Cloud SQL - PostgreSQL, MySQL)
 apiVersion: pkg.crossplane.io/v1
@@ -39,8 +47,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-sql:v2.4.0
-  controllerConfigRef:
-    name: gcp-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-runtime-config
 ---
 # GCP Storage Provider (Cloud Storage)
 apiVersion: pkg.crossplane.io/v1
@@ -51,8 +61,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-storage:v2.4.0
-  controllerConfigRef:
-    name: gcp-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-runtime-config
 ---
 # GCP Redis Provider (Memorystore)
 apiVersion: pkg.crossplane.io/v1
@@ -63,8 +75,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-redis:v2.4.0
-  controllerConfigRef:
-    name: gcp-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-runtime-config
 ---
 # GCP Pub/Sub Provider (Message Queues)
 apiVersion: pkg.crossplane.io/v1
@@ -75,8 +89,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-pubsub:v2.4.0
-  controllerConfigRef:
-    name: gcp-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-runtime-config
 ---
 # GCP DNS Provider
 apiVersion: pkg.crossplane.io/v1
@@ -87,8 +103,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-dns:v2.4.0
-  controllerConfigRef:
-    name: gcp-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-runtime-config
 ---
 # GCP Compute Provider (VPC, Subnets, Firewall)
 apiVersion: pkg.crossplane.io/v1
@@ -99,8 +117,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-compute:v2.4.0
-  controllerConfigRef:
-    name: gcp-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-runtime-config
 ---
 # GCP Container Provider (GKE)
 apiVersion: pkg.crossplane.io/v1
@@ -111,5 +131,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-container:v2.4.0
-  controllerConfigRef:
-    name: gcp-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-runtime-config

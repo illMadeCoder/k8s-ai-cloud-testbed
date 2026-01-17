@@ -9,30 +9,37 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   package: xpkg.upbound.io/upbound/provider-family-azure:v2.3.0
-  controllerConfigRef:
-    name: azure-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
 ---
-# Controller configuration for Azure providers
-# Uses Workload Identity for authentication (no secrets needed)
-apiVersion: pkg.crossplane.io/v1alpha1
-kind: ControllerConfig
+# DeploymentRuntimeConfig for Azure providers (v2 replacement for ControllerConfig)
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
 metadata:
-  name: azure-controller-config
+  name: azure-runtime-config
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  metadata:
-    labels:
-      azure.workload.identity/use: "true"
-  podSecurityContext:
-    fsGroup: 65532
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  deploymentTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            azure.workload.identity/use: "true"
+        spec:
+          securityContext:
+            fsGroup: 65532
+          containers:
+            - name: package-runtime
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
 ---
 # Azure SQL Provider (PostgreSQL, MySQL)
 apiVersion: pkg.crossplane.io/v1
@@ -43,8 +50,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-sql:v2.3.0
-  controllerConfigRef:
-    name: azure-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
 ---
 # Azure Storage Provider (Blob, Files)
 apiVersion: pkg.crossplane.io/v1
@@ -55,8 +64,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-storage:v2.3.0
-  controllerConfigRef:
-    name: azure-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
 ---
 # Azure Cache Provider (Redis)
 apiVersion: pkg.crossplane.io/v1
@@ -67,8 +78,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-cache:v2.3.0
-  controllerConfigRef:
-    name: azure-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
 ---
 # Azure Service Bus Provider (Queues)
 apiVersion: pkg.crossplane.io/v1
@@ -79,8 +92,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-servicebus:v2.3.0
-  controllerConfigRef:
-    name: azure-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
 ---
 # Azure Network Provider (DNS, VNet)
 apiVersion: pkg.crossplane.io/v1
@@ -91,8 +106,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-network:v2.3.0
-  controllerConfigRef:
-    name: azure-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
 ---
 # Azure Management Provider (Resource Groups)
 apiVersion: pkg.crossplane.io/v1
@@ -103,8 +120,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-management:v2.3.0
-  controllerConfigRef:
-    name: azure-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
 ---
 # Azure ContainerService Provider (AKS)
 apiVersion: pkg.crossplane.io/v1
@@ -115,5 +134,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-containerservice:v2.3.0
-  controllerConfigRef:
-    name: azure-controller-config
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
