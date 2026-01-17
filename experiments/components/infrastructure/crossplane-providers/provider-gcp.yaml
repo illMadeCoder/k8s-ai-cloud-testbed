@@ -1,6 +1,6 @@
 ---
 # Upbound GCP Provider Family
-# Installs the base provider and specific resource providers
+# Minimal set for benchmarking lab: family + container + storage
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -14,7 +14,7 @@ spec:
     kind: DeploymentRuntimeConfig
     name: gcp-runtime-config
 ---
-# DeploymentRuntimeConfig for GCP providers (v2 replacement for ControllerConfig)
+# DeploymentRuntimeConfig for GCP providers
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
@@ -44,21 +44,7 @@ spec:
                   cpu: 500m
                   memory: 512Mi
 ---
-# GCP SQL Provider (Cloud SQL - PostgreSQL, MySQL)
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-gcp-sql
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-gcp-sql:v2.4.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
----
-# GCP Storage Provider (Cloud Storage)
+# GCP Storage Provider (Cloud Storage - for experiment artifacts)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -72,63 +58,7 @@ spec:
     kind: DeploymentRuntimeConfig
     name: gcp-runtime-config
 ---
-# GCP Redis Provider (Memorystore)
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-gcp-redis
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-gcp-redis:v2.4.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
----
-# GCP Pub/Sub Provider (Message Queues)
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-gcp-pubsub
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-gcp-pubsub:v2.4.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
----
-# GCP DNS Provider
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-gcp-dns
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-gcp-dns:v2.4.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
----
-# GCP Compute Provider (VPC, Subnets, Firewall)
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-gcp-compute
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-gcp-compute:v2.4.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
----
-# GCP Container Provider (GKE)
+# GCP Container Provider (GKE - for experiment clusters)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:

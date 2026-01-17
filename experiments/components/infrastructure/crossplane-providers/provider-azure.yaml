@@ -1,6 +1,6 @@
 ---
 # Upbound Azure Provider Family
-# Installs the base provider and specific resource providers
+# Minimal set for benchmarking lab: family + management + network + containerservice
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -14,7 +14,7 @@ spec:
     kind: DeploymentRuntimeConfig
     name: azure-runtime-config
 ---
-# DeploymentRuntimeConfig for Azure providers (v2 replacement for ControllerConfig)
+# DeploymentRuntimeConfig for Azure providers
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
@@ -45,77 +45,7 @@ spec:
                   cpu: 500m
                   memory: 512Mi
 ---
-# Azure SQL Provider (PostgreSQL, MySQL)
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-azure-sql
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-azure-sql:v2.3.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
----
-# Azure Storage Provider (Blob, Files)
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-azure-storage
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-azure-storage:v2.3.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
----
-# Azure Cache Provider (Redis)
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-azure-cache
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-azure-cache:v2.3.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
----
-# Azure Service Bus Provider (Queues)
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-azure-servicebus
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-azure-servicebus:v2.3.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
----
-# Azure Network Provider (DNS, VNet)
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-azure-network
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  package: xpkg.upbound.io/upbound/provider-azure-network:v2.3.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
----
-# Azure Management Provider (Resource Groups)
+# Azure Management Provider (Resource Groups - required for all Azure resources)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -129,7 +59,21 @@ spec:
     kind: DeploymentRuntimeConfig
     name: azure-runtime-config
 ---
-# Azure ContainerService Provider (AKS)
+# Azure Network Provider (VNet, Subnet - required for AKS)
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-azure-network
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  package: xpkg.upbound.io/upbound/provider-azure-network:v2.3.0
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
+---
+# Azure ContainerService Provider (AKS - for experiment clusters)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
