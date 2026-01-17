@@ -24,7 +24,13 @@ metadata:
 spec:
   deploymentTemplate:
     spec:
+      selector:
+        matchLabels:
+          pkg.crossplane.io/family: provider-family-aws
       template:
+        metadata:
+          labels:
+            pkg.crossplane.io/family: provider-family-aws
         spec:
           securityContext:
             fsGroup: 2000

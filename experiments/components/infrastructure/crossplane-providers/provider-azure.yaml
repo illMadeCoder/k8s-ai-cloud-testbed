@@ -24,9 +24,13 @@ metadata:
 spec:
   deploymentTemplate:
     spec:
+      selector:
+        matchLabels:
+          pkg.crossplane.io/family: provider-family-azure
       template:
         metadata:
           labels:
+            pkg.crossplane.io/family: provider-family-azure
             azure.workload.identity/use: "true"
         spec:
           securityContext:

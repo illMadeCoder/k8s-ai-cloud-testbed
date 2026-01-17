@@ -25,7 +25,13 @@ metadata:
 spec:
   deploymentTemplate:
     spec:
+      selector:
+        matchLabels:
+          pkg.crossplane.io/provider: provider-helm
       template:
+        metadata:
+          labels:
+            pkg.crossplane.io/provider: provider-helm
         spec:
           containers:
             - name: package-runtime

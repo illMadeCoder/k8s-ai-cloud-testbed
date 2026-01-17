@@ -25,7 +25,13 @@ metadata:
 spec:
   deploymentTemplate:
     spec:
+      selector:
+        matchLabels:
+          pkg.crossplane.io/provider: provider-kubernetes
       template:
+        metadata:
+          labels:
+            pkg.crossplane.io/provider: provider-kubernetes
         spec:
           containers:
             - name: package-runtime

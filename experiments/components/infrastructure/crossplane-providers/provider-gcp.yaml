@@ -24,7 +24,13 @@ metadata:
 spec:
   deploymentTemplate:
     spec:
+      selector:
+        matchLabels:
+          pkg.crossplane.io/family: provider-family-gcp
       template:
+        metadata:
+          labels:
+            pkg.crossplane.io/family: provider-family-gcp
         spec:
           securityContext:
             fsGroup: 65532
