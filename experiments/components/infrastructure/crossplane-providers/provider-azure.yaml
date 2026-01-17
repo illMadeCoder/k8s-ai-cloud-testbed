@@ -8,7 +8,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  package: xpkg.upbound.io/upbound/provider-family-azure:v1.3.0
+  package: xpkg.upbound.io/upbound/provider-family-azure:v2.3.0
   controllerConfigRef:
     name: azure-controller-config
 ---
@@ -42,7 +42,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-azure-sql:v1.3.0
+  package: xpkg.upbound.io/upbound/provider-azure-sql:v2.3.0
   controllerConfigRef:
     name: azure-controller-config
 ---
@@ -54,7 +54,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-azure-storage:v1.3.0
+  package: xpkg.upbound.io/upbound/provider-azure-storage:v2.3.0
   controllerConfigRef:
     name: azure-controller-config
 ---
@@ -66,7 +66,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-azure-cache:v1.3.0
+  package: xpkg.upbound.io/upbound/provider-azure-cache:v2.3.0
   controllerConfigRef:
     name: azure-controller-config
 ---
@@ -78,7 +78,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-azure-servicebus:v1.3.0
+  package: xpkg.upbound.io/upbound/provider-azure-servicebus:v2.3.0
   controllerConfigRef:
     name: azure-controller-config
 ---
@@ -90,7 +90,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-azure-network:v1.3.0
+  package: xpkg.upbound.io/upbound/provider-azure-network:v2.3.0
   controllerConfigRef:
     name: azure-controller-config
 ---
@@ -102,7 +102,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-azure-management:v1.3.0
+  package: xpkg.upbound.io/upbound/provider-azure-management:v2.3.0
   controllerConfigRef:
     name: azure-controller-config
 ---
@@ -114,6 +114,6 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-azure-containerservice:v1.3.0
+  package: xpkg.upbound.io/upbound/provider-azure-containerservice:v2.3.0
   controllerConfigRef:
     name: azure-controller-config

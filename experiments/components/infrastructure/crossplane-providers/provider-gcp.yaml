@@ -1,28 +1,27 @@
 ---
-# Upbound AWS Provider Family
+# Upbound GCP Provider Family
 # Installs the base provider and specific resource providers
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-family-aws
+  name: provider-family-gcp
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  package: xpkg.upbound.io/upbound/provider-family-aws:v2.3.0
+  package: xpkg.upbound.io/upbound/provider-family-gcp:v2.4.0
   controllerConfigRef:
-    name: aws-controller-config
+    name: gcp-controller-config
 ---
-# Controller configuration for AWS providers
-# Uses IRSA (IAM Roles for Service Accounts) for authentication
+# Controller configuration for GCP providers
 apiVersion: pkg.crossplane.io/v1alpha1
 kind: ControllerConfig
 metadata:
-  name: aws-controller-config
+  name: gcp-controller-config
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   podSecurityContext:
-    fsGroup: 2000
+    fsGroup: 65532
   resources:
     requests:
       cpu: 100m
@@ -31,86 +30,86 @@ spec:
       cpu: 500m
       memory: 512Mi
 ---
-# AWS RDS Provider (PostgreSQL, MySQL)
+# GCP SQL Provider (Cloud SQL - PostgreSQL, MySQL)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aws-rds
+  name: provider-gcp-sql
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-rds:v2.3.0
+  package: xpkg.upbound.io/upbound/provider-gcp-sql:v2.4.0
   controllerConfigRef:
-    name: aws-controller-config
+    name: gcp-controller-config
 ---
-# AWS S3 Provider (Object Storage)
+# GCP Storage Provider (Cloud Storage)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aws-s3
+  name: provider-gcp-storage
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-s3:v2.3.0
+  package: xpkg.upbound.io/upbound/provider-gcp-storage:v2.4.0
   controllerConfigRef:
-    name: aws-controller-config
+    name: gcp-controller-config
 ---
-# AWS ElastiCache Provider (Redis, Memcached)
+# GCP Redis Provider (Memorystore)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aws-elasticache
+  name: provider-gcp-redis
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-elasticache:v2.3.0
+  package: xpkg.upbound.io/upbound/provider-gcp-redis:v2.4.0
   controllerConfigRef:
-    name: aws-controller-config
+    name: gcp-controller-config
 ---
-# AWS SQS Provider (Message Queues)
+# GCP Pub/Sub Provider (Message Queues)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aws-sqs
+  name: provider-gcp-pubsub
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-sqs:v2.3.0
+  package: xpkg.upbound.io/upbound/provider-gcp-pubsub:v2.4.0
   controllerConfigRef:
-    name: aws-controller-config
+    name: gcp-controller-config
 ---
-# AWS Route53 Provider (DNS)
+# GCP DNS Provider
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aws-route53
+  name: provider-gcp-dns
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-route53:v2.3.0
+  package: xpkg.upbound.io/upbound/provider-gcp-dns:v2.4.0
   controllerConfigRef:
-    name: aws-controller-config
+    name: gcp-controller-config
 ---
-# AWS EC2 Provider (VPC, Subnets, Security Groups)
+# GCP Compute Provider (VPC, Subnets, Firewall)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aws-ec2
+  name: provider-gcp-compute
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-ec2:v2.3.0
+  package: xpkg.upbound.io/upbound/provider-gcp-compute:v2.4.0
   controllerConfigRef:
-    name: aws-controller-config
+    name: gcp-controller-config
 ---
-# AWS EKS Provider (Kubernetes Service)
+# GCP Container Provider (GKE)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aws-eks
+  name: provider-gcp-container
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-eks:v2.3.0
+  package: xpkg.upbound.io/upbound/provider-gcp-container:v2.4.0
   controllerConfigRef:
-    name: aws-controller-config
+    name: gcp-controller-config
