@@ -14,8 +14,11 @@ apiVersion: apiextensions.crossplane.io/v1alpha1
 kind: EnvironmentConfig
 metadata:
   name: cluster-info
+  labels:
+    app.kubernetes.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 data:
   # Cloud provider - determines which composition is selected
   # Values: azure, aws, local

@@ -31,7 +31,7 @@ spec:
 ---
 # ProviderConfig for in-cluster Kubernetes operations
 # Uses the service account identity (cluster-admin needed for cross-namespace operations)
-apiVersion: kubernetes.crossplane.io/v1alpha1
+apiVersion: kubernetes.crossplane.io/v1beta1
 kind: ProviderConfig
 metadata:
   name: kubernetes-incluster
