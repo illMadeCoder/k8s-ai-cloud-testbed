@@ -9,15 +9,13 @@ providers:
   kubernetesGateway:
     enabled: true
 
-# Enable Gateway API provider (experimental)
-experimental:
-  kubernetesGateway:
-    enabled: true
+# Gateway API provider (no longer experimental in v3.1+)
+# Remove experimental.kubernetesGateway, use providers.kubernetesGateway instead
 
 # GatewayClass configuration
+# Disabled - we create GatewayClass in manifests/traefik-routes.yaml
 gatewayClass:
-  enabled: true
-  name: traefik
+  enabled: false
 
 # Service configuration
 service:
@@ -26,10 +24,10 @@ service:
     metallb.universe.tf/allow-shared-ip: "gateway-comparison"
 
 # Port configuration
-# Use port 80 directly for Gateway API compatibility
+# Keep default internal ports, expose on standard ports
 ports:
   web:
-    port: 80
+    port: 8000
     expose:
       default: true
     exposedPort: 80
