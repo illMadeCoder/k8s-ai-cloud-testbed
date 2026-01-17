@@ -26,9 +26,10 @@ service:
     metallb.universe.tf/allow-shared-ip: "gateway-comparison"
 
 # Port configuration
+# Use port 80 directly for Gateway API compatibility
 ports:
   web:
-    port: 8000
+    port: 80
     expose:
       default: true
     exposedPort: 80
