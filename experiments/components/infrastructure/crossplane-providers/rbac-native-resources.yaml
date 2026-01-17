@@ -1,0 +1,31 @@
+# RBAC ClusterRole for Crossplane Native Resource Composition
+#
+# Crossplane v2 can compose ANY Kubernetes resource (not just MRs),
+# but needs explicit RBAC permissions. This ClusterRole is aggregated
+# into Crossplane's service account via the special label.
+#
+# Resources included:
+# - Secrets: For ArgoCD cluster registration
+# - ConfigMaps: For configuration data
+# - ArgoCD Applications: For automatic app deployment
+# - ArgoCD ApplicationSets: For templated app deployment
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-compose-native-resources
+  labels:
+    # This label causes Kubernetes to aggregate rules into crossplane-admin
+    rbac.crossplane.io/aggregate-to-crossplane: "true"
+rules:
+  # Core resources for composition
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["*"]
+  # ArgoCD resources for automated cluster registration and app deployment
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications", "applicationsets", "appprojects"]
+    verbs: ["*"]
+  # Argo Workflows for experiment orchestration
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates", "cronworkflows"]
+    verbs: ["*"]
