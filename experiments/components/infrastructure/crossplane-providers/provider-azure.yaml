@@ -105,3 +105,15 @@ spec:
   package: xpkg.upbound.io/upbound/provider-azure-management:v1.3.0
   controllerConfigRef:
     name: azure-controller-config
+---
+# Azure ContainerService Provider (AKS)
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-azure-containerservice
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  package: xpkg.upbound.io/upbound/provider-azure-containerservice:v1.3.0
+  controllerConfigRef:
+    name: azure-controller-config
