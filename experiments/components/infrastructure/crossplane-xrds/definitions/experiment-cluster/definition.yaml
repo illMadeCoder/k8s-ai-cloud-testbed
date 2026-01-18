@@ -46,6 +46,7 @@ spec:
                     - talos
                     - aks
                     - eks
+                    - gke
                 scenario:
                   type: string
                   description: Experiment scenario name (e.g., otel-tutorial)

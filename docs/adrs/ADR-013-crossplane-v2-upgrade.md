@@ -179,6 +179,82 @@ spec:
 
 **Impact**: ~143 CRDs → ~20 CRDs (only those we use)
 
+### MRAP-in-Composition Pattern
+
+Instead of installing all cloud provider CRDs at hub startup (which consumes ~600MB per provider family), we embed MRDs inside compositions. CRDs only activate when an experiment needs them.
+
+```
+BEFORE: Static Provider Installation (~2.4GB total)
+─────────────────────────────────────────────────
+Hub Startup:
+  └── Install all providers → All CRDs installed → 600MB × 4 families
+
+AFTER: MRAP-in-Composition (Dynamic Activation)
+───────────────────────────────────────────────
+Hub Startup:
+  └── Install provider-families only → ~30MB each (ghost CRDs)
+
+ExperimentCluster claim (AKS):
+  └── Composition activates:
+      ├── MRD: azure-containerservice (KubernetesCluster, NodePool)
+      ├── MRD: azure-network (VirtualNetwork, Subnet)
+      └── MRD: azure-resources (ResourceGroup)
+
+      Total: ~29MB instead of ~600MB
+```
+
+**Implementation**: Compositions include MRD resources that Crossplane creates alongside infrastructure:
+
+```yaml
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xexperimentclusters.aks.illm.io
+spec:
+  compositeTypeRef:
+    apiVersion: illm.io/v1alpha1
+    kind: XExperimentCluster
+
+  resources:
+    # Activate only the CRDs this composition needs
+    - name: mrd-azure-containerservice
+      base:
+        apiVersion: pkg.crossplane.io/v1alpha1
+        kind: ManagedResourceDefinition
+        spec:
+          providerRef:
+            name: provider-family-azure
+          resources:
+            - group: containerservice.azure.upbound.io
+              kinds: [KubernetesCluster, KubernetesClusterNodePool]
+
+    - name: mrd-azure-network
+      base:
+        apiVersion: pkg.crossplane.io/v1alpha1
+        kind: ManagedResourceDefinition
+        spec:
+          providerRef:
+            name: provider-family-azure
+          resources:
+            - group: network.azure.upbound.io
+              kinds: [VirtualNetwork, Subnet]
+
+    # Now the actual infrastructure (CRDs activated above)
+    - name: resource-group
+      base:
+        apiVersion: azure.upbound.io/v1beta1
+        kind: ResourceGroup
+        # ...
+```
+
+**Benefits**:
+- Memory: ~29MB per active experiment vs ~600MB per provider family
+- Isolation: Each experiment activates only what it needs
+- Cleanup: MRDs deleted when experiment is deleted → CRDs deactivate
+- Multi-cloud: Can run AKS, EKS, GKE experiments simultaneously with minimal overhead
+
+**Trade-off**: First experiment using a cloud takes ~30s longer (CRD activation). Subsequent experiments using same CRDs are instant.
+
 ### Namespace-Scoped Resources
 
 ```yaml

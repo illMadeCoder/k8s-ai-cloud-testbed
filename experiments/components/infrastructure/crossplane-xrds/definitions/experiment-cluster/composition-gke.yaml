@@ -1,0 +1,309 @@
+---
+# GKE Composition for ExperimentCluster XRD
+# Creates a Google Kubernetes Engine cluster for experiments
+#
+# Resources created:
+# 1. VPC Network (exp-{scenario}-network)
+# 2. Subnetwork (exp-{scenario}-subnet)
+# 3. GKE Cluster (exp-{scenario})
+# 4. GKE Node Pool (exp-{scenario}-np)
+#
+# Connection secrets:
+# - Kubeconfig written to crossplane-system/exp-{scenario}-kubeconfig
+#
+# Prerequisites:
+# - GCP ProviderConfig named "default" with credentials
+# - provider-family-gcp installed (provides ghost CRDs)
+#
+# MRAP Pattern:
+# This composition includes ManagedResourceDefinitions that activate only the
+# CRDs needed for GKE clusters. When the claim is deleted, MRDs are deleted,
+# and the controllers deactivate - saving memory on the hub cluster.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xexperimentclusters.gke.illm.io
+  labels:
+    provider: gke
+    crossplane.io/xrd: xexperimentclusters.illm.io
+spec:
+  compositeTypeRef:
+    apiVersion: illm.io/v1alpha1
+    kind: XExperimentCluster
+
+  writeConnectionSecretsToNamespace: crossplane-system
+
+  patchSets:
+    - name: metadata
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels
+          toFieldPath: metadata.labels
+          policy:
+            mergeOptions:
+              keepMapValues: true
+    - name: common-labels
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.labels["illm-io-scenario"]
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.provider
+          toFieldPath: spec.forProvider.labels["illm-io-provider"]
+
+  resources:
+    # ============================================================
+    # MRAP: ManagedResourceDefinitions for CRD Activation
+    # These activate controllers only when this composition is used
+    # ============================================================
+
+    # MRD: GCP Compute resources (Network, Subnetwork)
+    - name: mrd-gcp-compute
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: pkg.crossplane.io/v1alpha1
+              kind: ManagedResourceDefinition
+              metadata:
+                name: placeholder
+                labels:
+                  illm.io/experiment: "true"
+              spec:
+                providerRef:
+                  name: provider-family-gcp
+                resources:
+                  - group: compute.gcp.upbound.io
+                    kinds:
+                      - Network
+                      - Subnetwork
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "mrd-%s-gcp-compute"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+
+    # MRD: GCP Container resources (Cluster, NodePool)
+    - name: mrd-gcp-container
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: pkg.crossplane.io/v1alpha1
+              kind: ManagedResourceDefinition
+              metadata:
+                name: placeholder
+                labels:
+                  illm.io/experiment: "true"
+              spec:
+                providerRef:
+                  name: provider-family-gcp
+                resources:
+                  - group: container.gcp.upbound.io
+                    kinds:
+                      - Cluster
+                      - NodePool
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "mrd-%s-gcp-container"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+
+    # ============================================================
+    # GCP Resources (created after MRDs activate controllers)
+    # ============================================================
+
+    # 1. VPC Network
+    - name: network
+      base:
+        apiVersion: compute.gcp.upbound.io/v1beta1
+        kind: Network
+        spec:
+          forProvider:
+            autoCreateSubnetworks: false
+            description: "Experiment cluster network"
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-network"
+
+    # 2. Subnetwork
+    - name: subnetwork
+      base:
+        apiVersion: compute.gcp.upbound.io/v1beta1
+        kind: Subnetwork
+        spec:
+          forProvider:
+            region: us-central1
+            ipCidrRange: "10.0.0.0/20"
+            networkSelector:
+              matchControllerRef: true
+            secondaryIpRange:
+              - rangeName: pods
+                ipCidrRange: "10.1.0.0/16"
+              - rangeName: services
+                ipCidrRange: "10.2.0.0/20"
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-subnet"
+
+    # 3. GKE Cluster
+    - name: gke-cluster
+      base:
+        apiVersion: container.gcp.upbound.io/v1beta1
+        kind: Cluster
+        spec:
+          forProvider:
+            location: us-central1
+            # Use regional cluster for HA, or zonal for cost savings
+            # location: us-central1-a  # Zonal (cheaper)
+            initialNodeCount: 1
+            removeDefaultNodePool: true
+            networkSelector:
+              matchControllerRef: true
+            subnetworkSelector:
+              matchControllerRef: true
+            ipAllocationPolicy:
+              - clusterSecondaryRangeName: pods
+                servicesSecondaryRangeName: services
+            releaseChannel:
+              - channel: REGULAR
+            workloadIdentityConfig:
+              - workloadPool: placeholder
+            # Logging and monitoring
+            loggingService: logging.googleapis.com/kubernetes
+            monitoringService: monitoring.googleapis.com/kubernetes
+          writeConnectionSecretToRef:
+            namespace: crossplane-system
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s"
+        # Kubernetes version (GKE uses minMasterVersion)
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.k8sVersion
+          toFieldPath: spec.forProvider.minMasterVersion
+        # Connection secret name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.writeConnectionSecretToRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-kubeconfig"
+        # Workload identity pool (requires project ID)
+        # Note: This is a placeholder - in practice, use a patch from ProviderConfig
+        # or external secret to set the actual project ID
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.workloadIdentityConfig[0].workloadPool
+          transforms:
+            - type: string
+              string:
+                fmt: "PROJECT_ID.svc.id.goog"
+        # Status: Write endpoint to status
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.endpoint
+          toFieldPath: status.server
+          transforms:
+            - type: string
+              string:
+                fmt: "https://%s"
+        # Status: Write cluster name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: status.clusterName
+          transforms:
+            - type: string
+              string:
+                fmt: "gke-%s"
+        # Status: Write provider
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.provider
+          toFieldPath: status.provider
+        - patchSetName: common-labels
+          type: PatchSet
+
+    # 4. GKE Node Pool
+    - name: node-pool
+      base:
+        apiVersion: container.gcp.upbound.io/v1beta1
+        kind: NodePool
+        spec:
+          forProvider:
+            location: us-central1
+            clusterSelector:
+              matchControllerRef: true
+            nodeCount: 2
+            nodeConfig:
+              - machineType: e2-standard-2
+                preemptible: false
+                oauthScopes:
+                  - https://www.googleapis.com/auth/cloud-platform
+                labels:
+                  illm-io-experiment: "true"
+                  illm-io-managed-by: crossplane
+            management:
+              - autoRepair: true
+                autoUpgrade: true
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-np"
+        # Size mapping: Machine type
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.nodeConfig[0].machineType
+          transforms:
+            - type: map
+              map:
+                small: e2-standard-2
+                medium: e2-standard-4
+                large: e2-standard-8
+        # Size mapping: Node count
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.nodeCount
+          transforms:
+            - type: map
+              map:
+                small: 2
+                medium: 3
+                large: 5

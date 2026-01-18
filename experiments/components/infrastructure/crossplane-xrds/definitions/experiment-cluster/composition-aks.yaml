@@ -21,7 +21,12 @@
 # Prerequisites:
 # - Azure ProviderConfig named "default" with credentials
 # - Subscription and tenant configured in ProviderConfig
-# - provider-azure-containerservice installed
+# - provider-family-azure installed (provides ghost CRDs)
+#
+# MRAP Pattern:
+# This composition includes ManagedResourceDefinitions that activate only the
+# CRDs needed for AKS clusters. When the claim is deleted, MRDs are deleted,
+# and the controllers deactivate - saving memory on the hub cluster.
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
@@ -55,6 +60,122 @@ spec:
           toFieldPath: spec.forProvider.tags["illm.io/provider"]
 
   resources:
+    # ============================================================
+    # MRAP: ManagedResourceDefinitions for CRD Activation
+    # These activate controllers only when this composition is used
+    # ============================================================
+
+    # MRD: Azure base resources (ResourceGroup)
+    - name: mrd-azure-resources
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: pkg.crossplane.io/v1alpha1
+              kind: ManagedResourceDefinition
+              metadata:
+                name: placeholder
+                labels:
+                  illm.io/experiment: "true"
+              spec:
+                providerRef:
+                  name: provider-family-azure
+                resources:
+                  - group: azure.upbound.io
+                    kinds:
+                      - ResourceGroup
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "mrd-%s-azure-resources"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+
+    # MRD: Azure network resources (VirtualNetwork, Subnet)
+    - name: mrd-azure-network
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: pkg.crossplane.io/v1alpha1
+              kind: ManagedResourceDefinition
+              metadata:
+                name: placeholder
+                labels:
+                  illm.io/experiment: "true"
+              spec:
+                providerRef:
+                  name: provider-family-azure
+                resources:
+                  - group: network.azure.upbound.io
+                    kinds:
+                      - VirtualNetwork
+                      - Subnet
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "mrd-%s-azure-network"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+
+    # MRD: Azure container service (KubernetesCluster, KubernetesClusterNodePool)
+    - name: mrd-azure-containerservice
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: pkg.crossplane.io/v1alpha1
+              kind: ManagedResourceDefinition
+              metadata:
+                name: placeholder
+                labels:
+                  illm.io/experiment: "true"
+              spec:
+                providerRef:
+                  name: provider-family-azure
+                resources:
+                  - group: containerservice.azure.upbound.io
+                    kinds:
+                      - KubernetesCluster
+                      - KubernetesClusterNodePool
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "mrd-%s-azure-containerservice"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+
+    # ============================================================
+    # Azure Resources (created after MRDs activate controllers)
+    # ============================================================
+
     # 1. Resource Group
     - name: resource-group
       base:

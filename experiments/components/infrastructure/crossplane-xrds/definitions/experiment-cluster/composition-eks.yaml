@@ -1,0 +1,650 @@
+---
+# EKS Composition for ExperimentCluster XRD
+# Creates an Amazon Elastic Kubernetes Service cluster for experiments
+#
+# Resources created:
+# 1. VPC (exp-{scenario}-vpc)
+# 2. Subnets (exp-{scenario}-subnet-a, exp-{scenario}-subnet-b)
+# 3. Internet Gateway (exp-{scenario}-igw)
+# 4. Route Table (exp-{scenario}-rt)
+# 5. IAM Roles (exp-{scenario}-cluster-role, exp-{scenario}-node-role)
+# 6. EKS Cluster (exp-{scenario})
+# 7. EKS Node Group (exp-{scenario}-ng)
+#
+# Connection secrets:
+# - Kubeconfig written to crossplane-system/exp-{scenario}-kubeconfig
+#
+# Prerequisites:
+# - AWS ProviderConfig named "default" with credentials
+# - provider-family-aws installed (provides ghost CRDs)
+#
+# MRAP Pattern:
+# This composition includes ManagedResourceDefinitions that activate only the
+# CRDs needed for EKS clusters. When the claim is deleted, MRDs are deleted,
+# and the controllers deactivate - saving memory on the hub cluster.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xexperimentclusters.eks.illm.io
+  labels:
+    provider: eks
+    crossplane.io/xrd: xexperimentclusters.illm.io
+spec:
+  compositeTypeRef:
+    apiVersion: illm.io/v1alpha1
+    kind: XExperimentCluster
+
+  writeConnectionSecretsToNamespace: crossplane-system
+
+  patchSets:
+    - name: metadata
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels
+          toFieldPath: metadata.labels
+          policy:
+            mergeOptions:
+              keepMapValues: true
+    - name: common-tags
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.tags["illm.io/scenario"]
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.provider
+          toFieldPath: spec.forProvider.tags["illm.io/provider"]
+
+  resources:
+    # ============================================================
+    # MRAP: ManagedResourceDefinitions for CRD Activation
+    # These activate controllers only when this composition is used
+    # ============================================================
+
+    # MRD: AWS EC2 resources (VPC, Subnet, SecurityGroup, IGW, RouteTable)
+    - name: mrd-aws-ec2
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: pkg.crossplane.io/v1alpha1
+              kind: ManagedResourceDefinition
+              metadata:
+                name: placeholder
+                labels:
+                  illm.io/experiment: "true"
+              spec:
+                providerRef:
+                  name: provider-family-aws
+                resources:
+                  - group: ec2.aws.upbound.io
+                    kinds:
+                      - VPC
+                      - Subnet
+                      - SecurityGroup
+                      - InternetGateway
+                      - RouteTable
+                      - Route
+                      - RouteTableAssociation
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "mrd-%s-aws-ec2"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+
+    # MRD: AWS IAM resources (Role, RolePolicyAttachment)
+    - name: mrd-aws-iam
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: pkg.crossplane.io/v1alpha1
+              kind: ManagedResourceDefinition
+              metadata:
+                name: placeholder
+                labels:
+                  illm.io/experiment: "true"
+              spec:
+                providerRef:
+                  name: provider-family-aws
+                resources:
+                  - group: iam.aws.upbound.io
+                    kinds:
+                      - Role
+                      - RolePolicyAttachment
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "mrd-%s-aws-iam"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+
+    # MRD: AWS EKS resources (Cluster, NodeGroup)
+    - name: mrd-aws-eks
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          providerConfigRef:
+            name: kubernetes-incluster
+          forProvider:
+            manifest:
+              apiVersion: pkg.crossplane.io/v1alpha1
+              kind: ManagedResourceDefinition
+              metadata:
+                name: placeholder
+                labels:
+                  illm.io/experiment: "true"
+              spec:
+                providerRef:
+                  name: provider-family-aws
+                resources:
+                  - group: eks.aws.upbound.io
+                    kinds:
+                      - Cluster
+                      - NodeGroup
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "mrd-%s-aws-eks"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.forProvider.manifest.metadata.labels["illm.io/scenario"]
+
+    # ============================================================
+    # AWS Resources (created after MRDs activate controllers)
+    # ============================================================
+
+    # 1. VPC
+    - name: vpc
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: VPC
+        spec:
+          forProvider:
+            region: us-east-1
+            cidrBlock: "10.0.0.0/16"
+            enableDnsHostnames: true
+            enableDnsSupport: true
+            tags:
+              illm.io/experiment: "true"
+              illm.io/managed-by: crossplane
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-vpc"
+        - patchSetName: common-tags
+          type: PatchSet
+
+    # 2. Internet Gateway
+    - name: igw
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: InternetGateway
+        spec:
+          forProvider:
+            region: us-east-1
+            vpcIdSelector:
+              matchControllerRef: true
+            tags:
+              illm.io/experiment: "true"
+              illm.io/managed-by: crossplane
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-igw"
+
+    # 3. Subnet A (us-east-1a)
+    - name: subnet-a
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: Subnet
+        metadata:
+          labels:
+            zone: us-east-1a
+        spec:
+          forProvider:
+            region: us-east-1
+            availabilityZone: us-east-1a
+            cidrBlock: "10.0.0.0/24"
+            vpcIdSelector:
+              matchControllerRef: true
+            mapPublicIpOnLaunch: true
+            tags:
+              illm.io/experiment: "true"
+              illm.io/managed-by: crossplane
+              kubernetes.io/role/elb: "1"
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-subnet-a"
+
+    # 4. Subnet B (us-east-1b)
+    - name: subnet-b
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: Subnet
+        metadata:
+          labels:
+            zone: us-east-1b
+        spec:
+          forProvider:
+            region: us-east-1
+            availabilityZone: us-east-1b
+            cidrBlock: "10.0.1.0/24"
+            vpcIdSelector:
+              matchControllerRef: true
+            mapPublicIpOnLaunch: true
+            tags:
+              illm.io/experiment: "true"
+              illm.io/managed-by: crossplane
+              kubernetes.io/role/elb: "1"
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-subnet-b"
+
+    # 5. Route Table
+    - name: route-table
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: RouteTable
+        spec:
+          forProvider:
+            region: us-east-1
+            vpcIdSelector:
+              matchControllerRef: true
+            tags:
+              illm.io/experiment: "true"
+              illm.io/managed-by: crossplane
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-rt"
+
+    # 6. Route to Internet Gateway
+    - name: route-igw
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: Route
+        spec:
+          forProvider:
+            region: us-east-1
+            routeTableIdSelector:
+              matchControllerRef: true
+            destinationCidrBlock: "0.0.0.0/0"
+            gatewayIdSelector:
+              matchControllerRef: true
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-route-igw"
+
+    # 7. Route Table Association A
+    - name: rta-a
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: RouteTableAssociation
+        spec:
+          forProvider:
+            region: us-east-1
+            routeTableIdSelector:
+              matchControllerRef: true
+            subnetIdSelector:
+              matchControllerRef: true
+              matchLabels:
+                zone: us-east-1a
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-rta-a"
+
+    # 8. Route Table Association B
+    - name: rta-b
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: RouteTableAssociation
+        spec:
+          forProvider:
+            region: us-east-1
+            routeTableIdSelector:
+              matchControllerRef: true
+            subnetIdSelector:
+              matchControllerRef: true
+              matchLabels:
+                zone: us-east-1b
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-rta-b"
+
+    # 9. EKS Cluster IAM Role
+    - name: cluster-role
+      base:
+        apiVersion: iam.aws.upbound.io/v1beta1
+        kind: Role
+        spec:
+          forProvider:
+            assumeRolePolicy: |
+              {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": "eks.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                  }
+                ]
+              }
+            tags:
+              illm.io/experiment: "true"
+              illm.io/managed-by: crossplane
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-cluster-role"
+
+    # 10. Cluster Role Policy Attachment
+    - name: cluster-role-policy
+      base:
+        apiVersion: iam.aws.upbound.io/v1beta1
+        kind: RolePolicyAttachment
+        spec:
+          forProvider:
+            policyArn: arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+            roleSelector:
+              matchControllerRef: true
+              matchLabels:
+                role: cluster
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-cluster-policy"
+
+    # 11. Node Group IAM Role
+    - name: node-role
+      base:
+        apiVersion: iam.aws.upbound.io/v1beta1
+        kind: Role
+        metadata:
+          labels:
+            role: node
+        spec:
+          forProvider:
+            assumeRolePolicy: |
+              {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": "ec2.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                  }
+                ]
+              }
+            tags:
+              illm.io/experiment: "true"
+              illm.io/managed-by: crossplane
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-node-role"
+
+    # 12. Node Role - Worker Node Policy
+    - name: node-role-worker-policy
+      base:
+        apiVersion: iam.aws.upbound.io/v1beta1
+        kind: RolePolicyAttachment
+        spec:
+          forProvider:
+            policyArn: arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+            roleSelector:
+              matchControllerRef: true
+              matchLabels:
+                role: node
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-node-worker-policy"
+
+    # 13. Node Role - CNI Policy
+    - name: node-role-cni-policy
+      base:
+        apiVersion: iam.aws.upbound.io/v1beta1
+        kind: RolePolicyAttachment
+        spec:
+          forProvider:
+            policyArn: arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+            roleSelector:
+              matchControllerRef: true
+              matchLabels:
+                role: node
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-node-cni-policy"
+
+    # 14. Node Role - ECR Policy
+    - name: node-role-ecr-policy
+      base:
+        apiVersion: iam.aws.upbound.io/v1beta1
+        kind: RolePolicyAttachment
+        spec:
+          forProvider:
+            policyArn: arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+            roleSelector:
+              matchControllerRef: true
+              matchLabels:
+                role: node
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-node-ecr-policy"
+
+    # 15. EKS Cluster
+    - name: eks-cluster
+      base:
+        apiVersion: eks.aws.upbound.io/v1beta1
+        kind: Cluster
+        spec:
+          forProvider:
+            region: us-east-1
+            version: "1.31"
+            roleArnSelector:
+              matchControllerRef: true
+              matchLabels:
+                role: cluster
+            vpcConfig:
+              - endpointPrivateAccess: true
+                endpointPublicAccess: true
+                subnetIdSelector:
+                  matchControllerRef: true
+            tags:
+              illm.io/experiment: "true"
+              illm.io/managed-by: crossplane
+          writeConnectionSecretToRef:
+            namespace: crossplane-system
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s"
+        # Kubernetes version
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.k8sVersion
+          toFieldPath: spec.forProvider.version
+        # Connection secret name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: spec.writeConnectionSecretToRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-kubeconfig"
+        # Status: Write endpoint to status
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.endpoint
+          toFieldPath: status.server
+        # Status: Write cluster name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: status.clusterName
+          transforms:
+            - type: string
+              string:
+                fmt: "eks-%s"
+        # Status: Write provider
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.provider
+          toFieldPath: status.provider
+        - patchSetName: common-tags
+          type: PatchSet
+
+    # 16. EKS Node Group
+    - name: node-group
+      base:
+        apiVersion: eks.aws.upbound.io/v1beta1
+        kind: NodeGroup
+        spec:
+          forProvider:
+            region: us-east-1
+            clusterNameSelector:
+              matchControllerRef: true
+            nodeRoleArnSelector:
+              matchControllerRef: true
+              matchLabels:
+                role: node
+            subnetIdSelector:
+              matchControllerRef: true
+            scalingConfig:
+              - desiredSize: 2
+                maxSize: 4
+                minSize: 1
+            instanceTypes:
+              - t3.medium
+            tags:
+              illm.io/experiment: "true"
+              illm.io/managed-by: crossplane
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.scenario
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "exp-%s-ng"
+        # Size mapping: Instance type
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.instanceTypes[0]
+          transforms:
+            - type: map
+              map:
+                small: t3.medium
+                medium: t3.large
+                large: t3.xlarge
+        # Size mapping: Desired size
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.scalingConfig[0].desiredSize
+          transforms:
+            - type: map
+              map:
+                small: 2
+                medium: 3
+                large: 5
+        # Size mapping: Max size
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.scalingConfig[0].maxSize
+          transforms:
+            - type: map
+              map:
+                small: 4
+                medium: 6
+                large: 10
