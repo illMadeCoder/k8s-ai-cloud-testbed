@@ -28,17 +28,8 @@ spec:
             - "--url"
             - "PLACEHOLDER_SMEE_URL"
             - "--target"
-            # Internal HTTPS - cert includes service name as SAN (zero-trust)
-            - "https://argocd-server.argocd.svc.cluster.local/api/webhook"
-          # Trust internal CA
-          env:
-            - name: NODE_EXTRA_CA_CERTS
-              value: /etc/ssl/certs/internal-ca.crt
-          volumeMounts:
-            - name: internal-ca
-              mountPath: /etc/ssl/certs/internal-ca.crt
-              subPath: ca.crt
-              readOnly: true
+            # Internal HTTP - in-cluster traffic doesn't need TLS
+            - "http://argocd-server.argocd.svc.cluster.local/api/webhook"
           resources:
             requests:
               cpu: 10m
@@ -46,7 +37,3 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
-      volumes:
-        - name: internal-ca
-          secret:
-            secretName: openbao-internal-ca
