@@ -19,25 +19,9 @@ This directory contains planning documents and proposals being considered for th
 
 **Summary:** Proposal to expand metrics beyond CPU/RAM to include I/O and network metrics using eBPF tools.
 
-**Key Points:**
-- Current metrics (CPU/RAM) miss critical bottlenecks
-- I/O metrics: Disk latency, IOPS, throughput, queue depth
-- Network metrics: TCP retransmits, socket buffers, connection overhead
-- eBPF tools: biosnoop, tcptop, tcpretrans, cachestat
-- Integration with Pixie, Parca, Tetragon
+**Status:** 🔄 **REVISED** - Now proposed as **Appendix T** (priority appendix)
 
-**Impact on Roadmap:**
-- Phase 3: Add eBPF & System Metrics sub-phase
-- Phase 5: Enhance database benchmark with I/O analysis
-- Phase 7: Add network I/O overhead to mesh benchmark
-- Phase 10: Full stack I/O attribution in capstone
-
-**Questions to Answer:**
-- Should Pixie be Phase 3.6 or separate phase?
-- How much eBPF in core vs appendix?
-- Should we have an "eBPF Deep Dive" appendix?
-
-**Status:** ✅ Drafted, awaiting review
+**Revision:** eBPF content should be advanced/deep dive material after Phase 3 fundamentals, not in core phase itself.
 
 ---
 
@@ -46,31 +30,30 @@ This directory contains planning documents and proposals being considered for th
 
 **Summary:** Philosophical framework for visualizing traffic as energy flow through service meshes, with security as identity verification.
 
-**Key Concepts:**
-- **Traffic = Energy flow** (not just requests/second)
-- **Latency = Resistance** (friction in the system)
-- **Queue depth = Energy reservoirs** (backup/pressure)
-- **CPU = Heat** (byproduct, not the primary constraint)
-- **Service Mesh = Distributed sensors + valves + armor**
+**Status:** 🔄 **REVISED** - Now proposed as **Appendix U** (priority appendix)
 
-**4 Phases:**
-1. **Glass Window** - Visualize flow with Hubble/Pixie
-2. **Gauge** - Measure friction with USE Method (Utilization, Saturation, Errors)
-3. **Valve & Armor** - Control flow and prove identity with Linkerd
-4. **Federation** - Multi-cluster trust boundaries
+**Revision:** Chi philosophy should be mastery content after Phase 7 fundamentals, not in core phase itself.
 
-**Impact on Roadmap:**
-- Phase 7: Enhanced Service Mesh section with Chi framework
-- Integration with eBPF strategy (complementary)
-- New experiments: chi-glass-window, chi-gauge-saturation, chi-valve-smart-routing
-- FinOps: Mesh ROI analysis (cost vs benefits)
+---
 
-**Questions to Answer:**
-- Should Chi be Phase 7 or separate phase 7.5?
-- Which mesh for Chi lab? (Linkerd vs Istio vs Cilium)
-- How much multi-cluster in core vs appendix?
+### 3. Revised Structure
+**File:** `REVISED-STRUCTURE.md` ⭐ **NEW**
 
-**Status:** ✅ Drafted, awaiting review
+**Summary:** Updated proposal based on feedback - fundamentals in core, deep dives in priority appendices.
+
+**Key Changes:**
+- **Phase 3 (Core):** Prometheus, Loki, Tempo basics only
+- **Appendix T (Priority):** eBPF & Advanced Metrics (after Phase 3)
+- **Phase 7 (Core):** Service mesh fundamentals only
+- **Appendix U (Priority):** Chi Observability Stack (after Phase 7)
+- **Appendix G (Priority):** Deployment Strategies (after Phase 4)
+
+**Learning Paths:**
+- Core only: 5-6 months (portfolio-ready)
+- Core + Priority appendices: 6-7 months (mastery)
+- Core + All appendices: 8-10 months (expert)
+
+**Status:** ✅ Ready for review
 
 ---
 
