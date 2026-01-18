@@ -1,89 +1,79 @@
 # illm-k8s-ai-lab Roadmap
 
-A learning-focused Kubernetes experiment roadmap for **Cloud Architect**, **Platform Architect**, and **Solutions Architect** roles. Tutorial-style with hands-on exercises; benchmarks come after fundamentals.
+A **benchmarking-focused** Kubernetes experiment lab for **Cloud Architect**, **Platform Architect**, and **Solutions Architect** roles. Deploy, measure, cost-attribute each technology in the ecosystem.
 
 ## How to Use This Roadmap
 
 - **Sequential but flexible** - Phases build on each other, but skip ahead if you have experience
 - **Each phase has experiments** - Found in `experiments/scenarios/<topic>/`
-- **ADRs are continuous** - Document decisions as you make them, not as a separate phase (49+ ADRs throughout)
-- **FinOps is integrated** - Cost considerations in every relevant phase, not just Phase 1.6 and 11.6
-- **Appendices are optional** - Deep dives for specialized needs (MLOps, Compliance)
-- **Run experiments manually first** - Automation comes from understanding, not before it
-- **AI assistance emerges organically** - We'll add AI tooling based on actual pain points discovered while running experiments
+- **ADRs are continuous** - Document decisions as you make them (49+ ADRs throughout)
+- **FinOps in every phase** - Cost considerations integrated, not bolted on
+- **Appendices are optional** - Deep dives for specialized needs
+- **Run experiments manually first** - Automation comes from understanding
 
 ### Cross-Cutting Concerns
 
 | Concern | Where It Appears |
 |---------|-----------------|
 | **ADRs** | Every phase - document decisions as you make them |
-| **FinOps** | Phase 1.6 (foundation), 3.7, 6.5, 9.6, 10.6, 11.6 (full), 15.5 |
-| **SLOs/SLAs** | Phase 3.2 (foundation), 5.6 (deployments), 12.4 (chaos), Appendix A.6 (contracts) |
-| **Security** | Phase 7 (foundation), 8 (network), plus security sections throughout |
-| **Testing** | Phase 2.5 (foundation), plus validation in every experiment |
+| **FinOps** | Every phase - cost per component, cost per transaction |
+| **SLOs/SLAs** | Phase 3 (foundation), Phase 10 (capstone) |
+| **Security** | Phase 6 (consolidated security & policy) |
+| **Testing** | Phase 2 (foundation), plus validation in every experiment |
 
 | | |
 |---|---|
-| **Target** | ~90 experiments across 16 phases + appendices |
+| **Target** | ~50-55 core experiments across 10 phases + appendices |
 | **Environment** | Kind (local), Talos on N100 (home lab), AKS/EKS (cloud) |
-| **Focus** | Portfolio-ready experiments with ADRs |
+| **Focus** | Benchmarking each technology with data-driven decisions |
+| **Timeline** | 5-6 months (core), 6-7 months (with priority appendices) |
 
 **Principles:**
 - Supply chain security from day one (Phase 2)
-- Build something before securing it (Data & Storage before Security)
-- Build system complexity, then chaos test it (Phase 12)
-- Workflow automation after manual understanding (Phase 13)
-- ADRs mandatory for technology decisions (continuous, not a phase)
+- Build something before securing it (Data before Security)
+- Benchmark everything - measure before recommending
+- ADRs mandatory for technology decisions
 - Runbooks accompany operational components
 
 ---
 
-## Phases
+## Phases (10 Core)
 
-*Reordered: Security moved after Data & Storage so you have something to secure.*
-
-| Phase | Topic | Status | Details |
-|-------|-------|--------|---------|
-| 1 | [Platform Bootstrap & GitOps](docs/roadmap/phase-01-platform-bootstrap.md) | Complete | Hub, orchestrator, Argo Workflows, Talos, GitLab CI |
-| 2 | [CI/CD & Supply Chain](docs/roadmap/phase-02-cicd-supply-chain.md) | Complete | Image building, scanning, SBOM, signing, Image Updater |
-| 3 | [Observability](docs/roadmap/phase-03-observability.md) | In Progress | Metrics, logging, tracing, dashboards |
-| 4 | [Traffic Management](docs/roadmap/phase-04-traffic-management.md) | Not Started | Ingress, load balancing, DNS |
-| 5 | [Deployment Strategies](docs/roadmap/phase-05-deployment-strategies.md) | Not Started | Blue-green, canary, progressive delivery |
-| 6 | [Data & Storage](docs/roadmap/phase-06-data-storage.md) | Not Started | Persistent volumes, operators, backup |
-| 7 | [Security Foundations](docs/roadmap/phase-07-security.md) | Not Started | Secrets, RBAC, admission control, policy |
-| 8 | [Network Security](docs/roadmap/phase-08-network-security.md) | Not Started | Network policies, firewalls, DDoS, WAF |
-| 9 | [Service Mesh](docs/roadmap/phase-09-service-mesh.md) | Not Started | Istio, Linkerd, mTLS, traffic policies |
-| 10 | [Messaging & Events](docs/roadmap/phase-10-messaging.md) | Not Started | Kafka, RabbitMQ, NATS, CloudEvents |
-| 11 | [Autoscaling](docs/roadmap/phase-11-autoscaling.md) | Not Started | HPA, VPA, KEDA, cluster autoscaling |
-| 12 | [Chaos Engineering](docs/roadmap/phase-12-chaos-engineering.md) | Not Started | Fault injection, resilience testing |
-| 13 | [Workflow Orchestration](docs/roadmap/phase-13-workflow-orchestration.md) | Not Started | Advanced Argo patterns, events, Tekton |
-| 14 | [Developer Experience](docs/roadmap/phase-14-developer-experience.md) | Not Started | Backstage, golden paths, self-service |
-| 15 | [Advanced Benchmarks](docs/roadmap/phase-15-advanced-benchmarks.md) | Not Started | Database, messaging, mesh comparisons |
-
-### The Capstone
+*Consolidated from 16 phases. Focus on benchmarking each technology.*
 
 | Phase | Topic | Status | Details |
 |-------|-------|--------|---------|
-| 16 | [Web Serving Architecture](docs/roadmap/phase-16-web-serving-finale.md) | Not Started | Threading models, HTTP/2/3, gRPC, GraphQL, proxies, runtimes |
+| 1 | [Platform Bootstrap & GitOps](docs/roadmap/phase-01-platform-bootstrap.md) | Complete | Hub, orchestrator, Argo Workflows, Crossplane |
+| 2 | [CI/CD & Supply Chain](docs/roadmap/phase-02-cicd-supply-chain.md) | Complete | Image building, scanning, SBOM, signing |
+| 3 | [Observability](docs/roadmap/phase-03-observability.md) | In Progress | Prometheus, Loki, Tempo, Grafana, SLOs |
+| 4 | [Traffic Management](docs/roadmap/phase-04-traffic-management.md) | Not Started | Gateway API, ingress comparison |
+| 5 | [Data & Persistence](docs/roadmap/phase-05-data-persistence.md) | Not Started | PostgreSQL, Redis, backup, benchmark |
+| 6 | [Security & Policy](docs/roadmap/phase-06-security-policy.md) | Not Started | TLS, secrets (ESO), RBAC, Kyverno, NetworkPolicy |
+| 7 | [Service Mesh](docs/roadmap/phase-07-service-mesh.md) | Not Started | Istio vs Linkerd vs Cilium, overhead benchmark |
+| 8 | [Messaging & Events](docs/roadmap/phase-08-messaging-events.md) | Not Started | Kafka vs RabbitMQ vs NATS, throughput benchmark |
+| 9 | [Autoscaling & Resources](docs/roadmap/phase-09-autoscaling-resources.md) | Not Started | HPA, VPA, KEDA, cluster autoscaling |
+| 10 | [Performance & Cost Engineering](docs/roadmap/phase-10-performance-cost-engineering.md) | Not Started | Runtime comparison, full stack benchmark, cost per transaction |
 
-*The crown jewel - after mastering all infrastructure layers, examine what actually serves the traffic.*
+### The Capstone (Phase 10)
+
+*Synthesize everything: Runtime comparison (Go/Rust/.NET/Node/Bun), full stack composition benchmark, cost per transaction. Data-driven system engineering.*
 
 ---
 
 ## Progression
 
 ```
-Foundation          Traffic & Releases       Stateful + Security
-─────────────────   ──────────────────────   ─────────────────────────
-1. Platform         4. Traffic Management    6.  Data & Storage
-2. CI/CD            5. Deployment            7.  Security (now has context)
-3. Observability                             8.  Network Security
+Foundation              Stateful + Security        Complexity
+───────────────────     ───────────────────────    ───────────────────────
+1. Platform Bootstrap   5. Data & Persistence      7. Service Mesh
+2. CI/CD & Supply Chain 6. Security & Policy       8. Messaging & Events
+3. Observability                                   9. Autoscaling
+4. Traffic Management
 
-Complexity          Validate                 Synthesis
-─────────────────   ──────────────────────   ─────────────────────────
-9.  Service Mesh    12. Chaos                15. Advanced Benchmarks
-10. Messaging       13. Workflow             16. Web Serving (capstone)
-11. Autoscaling     14. Developer Experience
+                        Capstone
+                        ───────────────────────
+                        10. Performance & Cost
+                            (Full stack benchmark)
 ```
 
 ---
@@ -96,19 +86,32 @@ Complexity          Validate                 Synthesis
 
 ### Appendices (Optional Deep Dives)
 
+**Priority Appendices (After Core Phases)**
+- [N: Deployment Strategies](docs/roadmap/appendix-n-deployment-strategies.md) - Blue-green, canary, progressive delivery, feature flags
+- [O: gRPC & HTTP/2 Patterns](docs/roadmap/appendix-o-grpc-http2.md) - Protocol deep dive, load balancing, observability
+- [T: eBPF & Advanced Metrics](docs/roadmap/appendix-t-ebpf-metrics.md) - I/O tracing, Pixie, Parca, Tetragon
+- [U: Chi Observability Stack](docs/roadmap/appendix-u-chi-observability.md) - Traffic as energy flow, USE Method, service mesh philosophy
+
+**Specialized Topics (Moved from Core)**
+- [P: Chaos Engineering](docs/roadmap/appendix-p-chaos-engineering.md) - Fault injection, resilience testing
+- [Q: Advanced Workflow Patterns](docs/roadmap/appendix-q-advanced-workflows.md) - Argo Events, Tekton, advanced CI/CD
+- [R: Internal Developer Platforms](docs/roadmap/appendix-r-developer-platforms.md) - Backstage, golden paths, self-service
+- [S: Web Serving Internals](docs/roadmap/appendix-s-web-serving-internals.md) - Threading models, HTTP/2/3, proxies, runtimes
+
+**Reference Appendices**
 - [A: MLOps & AI Infrastructure](docs/roadmap/appendix-mlops.md) - Kubeflow, KServe, vector DBs, GPU scheduling
-- [B: Identity & Authentication](docs/roadmap/appendix-identity-auth.md) - Password security, JWT/JWE, OAuth flows, OIDC, API keys/PATs, IdP deployment
-- [C: PKI & Certificate Management](docs/roadmap/appendix-pki-certs.md) - X.509, TLS, step-ca, cert-manager, mTLS, SPIFFE
-- [D: Compliance & Security Operations](docs/roadmap/appendix-compliance-soc.md) - SOC, PCI-DSS, HIPAA/PHI, hardening
-- [E: Distributed Systems Fundamentals](docs/roadmap/appendix-distributed-systems.md) - Consensus, CAP, distributed transactions, clocks, replication
-- [F: API Design & Contracts](docs/roadmap/appendix-api-design.md) - REST, GraphQL, gRPC, versioning, OpenAPI, contract testing
-- [G: Container & Runtime Internals](docs/roadmap/appendix-container-internals.md) - Namespaces, cgroups, OCI, runtimes, security primitives
-- [H: Performance Engineering](docs/roadmap/appendix-performance-engineering.md) - Profiling, load testing, capacity planning, latency optimization
-- [I: Event-Driven Architecture](docs/roadmap/appendix-event-driven.md) - Event sourcing, CQRS, Saga, outbox pattern, schema evolution
-- [J: Database Internals](docs/roadmap/appendix-database-internals.md) - Storage engines, indexing, query optimization, replication, sharding
-- [K: SRE Practices & Incident Management](docs/roadmap/appendix-sre-practices.md) - SLOs, on-call, incident response, post-mortems, toil reduction
-- [L: Multi-Cloud & Disaster Recovery](docs/roadmap/appendix-multicloud-dr.md) - Multi-cloud strategy, DR planning, failover, geographic distribution
-- [M: SLSA Framework Deep Dive](docs/roadmap/appendix-slsa.md) - SLSA Levels 1-4, provenance, attestations, Sigstore, verification
+- [B: Identity & Authentication](docs/roadmap/appendix-identity-auth.md) - OAuth, OIDC, JWT/JWE, API keys, IdP
+- [C: PKI & Certificate Management](docs/roadmap/appendix-pki-certs.md) - X.509, mTLS, SPIFFE
+- [D: Compliance & Security Operations](docs/roadmap/appendix-compliance-soc.md) - SOC, PCI-DSS, HIPAA/PHI
+- [E: Distributed Systems Fundamentals](docs/roadmap/appendix-distributed-systems.md) - Consensus, CAP, clocks
+- [F: API Design & Contracts](docs/roadmap/appendix-api-design.md) - REST, GraphQL, OpenAPI
+- [G: Container & Runtime Internals](docs/roadmap/appendix-container-internals.md) - Namespaces, cgroups, OCI
+- [H: Performance Engineering](docs/roadmap/appendix-performance-engineering.md) - Profiling, load testing
+- [I: Event-Driven Architecture](docs/roadmap/appendix-event-driven.md) - Event sourcing, CQRS, Saga
+- [J: Database Internals](docs/roadmap/appendix-database-internals.md) - Storage engines, indexing, sharding
+- [K: SRE Practices & Incident Management](docs/roadmap/appendix-sre-practices.md) - On-call, post-mortems
+- [L: Multi-Cloud & Disaster Recovery](docs/roadmap/appendix-multicloud-dr.md) - DR planning, failover
+- [M: SLSA Framework Deep Dive](docs/roadmap/appendix-slsa.md) - Provenance, attestations, Sigstore
 
 ---
 

@@ -1,6 +1,8 @@
-## Phase 9: Service Mesh
+## Phase 7: Service Mesh
 
 *Service mesh builds on traffic management with mTLS, observability, and advanced traffic control.*
+
+> **Deep Dive:** For the Chi observability philosophy (traffic as energy flow, USE Method, smart routing deep dive), see [Appendix U: Chi Observability Stack](docs/roadmap/appendix-u-chi-observability.md). This phase covers mesh comparison and overhead benchmarking.
 
 ### 9.0 Service Mesh Decision Framework
 

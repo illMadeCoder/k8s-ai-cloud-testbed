@@ -60,6 +60,8 @@
 
 *gRPC has fundamentally different traffic management requirements than HTTP/1.1. HTTP/2 multiplexing, streaming RPCs, and binary protocols require specialized handling.*
 
+> **Deep Dive:** For comprehensive gRPC coverage including load balancing strategies, streaming patterns, gRPC-Web, transcoding, and observability, see [Appendix O: gRPC & HTTP/2 Patterns](docs/roadmap/appendix-o-grpc-http2.md). This section covers the essentials for Gateway API routing.
+
 **5-zero: Why gRPC? Understanding the Motivation**
 
 *Before learning gRPC traffic patterns, understand why gRPC exists and when to use it.*

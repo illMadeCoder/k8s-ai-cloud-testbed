@@ -1,8 +1,10 @@
-## Phase 15: Advanced Topics & Benchmarks
+## Phase 10: Performance & Cost Engineering
 
-*Deep dives and performance comparisons - now that fundamentals are solid.*
+*The capstone - synthesize everything into data-driven system engineering. Benchmark each technology, measure full stack composition, calculate cost per transaction.*
 
-### 15.1 Database Performance Comparison
+> **Deep Dive:** For eBPF-based I/O profiling during benchmarks, see [Appendix T: eBPF & Advanced Metrics](docs/roadmap/appendix-t-ebpf-metrics.md).
+
+### 10.1 Database Performance Comparison
 
 **Goal:** Compare relational databases for Kubernetes workloads
 
@@ -31,7 +33,7 @@
 
 ---
 
-### 15.2 Message Queue Performance Comparison
+### 10.2 Message Queue Performance Comparison
 
 **Goal:** Compare messaging systems under load
 
@@ -58,7 +60,7 @@
 
 ---
 
-### 15.3 Service Mesh Performance Comparison
+### 10.3 Service Mesh Performance Comparison
 
 **Goal:** Measure service mesh overhead
 
@@ -86,7 +88,7 @@
 
 ---
 
-### 15.4 Runtime Performance Comparison
+### 10.4 Runtime Performance Comparison
 
 **Goal:** Compare web server runtimes for API workloads
 
@@ -118,7 +120,7 @@
 
 ---
 
-### 15.5 Cost-Efficiency Benchmarking
+### 10.5 Cost-Efficiency Benchmarking
 
 **Goal:** Add cost as a first-class benchmark dimension
 
@@ -157,4 +159,81 @@
 - [ ] **ADR:** Document cost as benchmark dimension
 
 ---
+
+### 10.6 Cost Tooling (Kubecost / OpenCost)
+
+**Goal:** Deploy cost allocation and visibility tooling
+
+**Learning objectives:**
+- Understand Kubernetes cost allocation models
+- Deploy and configure cost visibility tools
+- Integrate cost data with benchmarking
+
+**Tasks:**
+- [ ] Create `experiments/scenarios/cost-tooling/`
+- [ ] Deploy OpenCost (CNCF):
+  - [ ] Helm deployment
+  - [ ] Cloud provider pricing integration
+  - [ ] Prometheus metrics export
+- [ ] Deploy Kubecost (optional comparison):
+  - [ ] Free tier deployment
+  - [ ] Compare with OpenCost
+- [ ] Cost allocation:
+  - [ ] Namespace-level cost breakdown
+  - [ ] Label-based cost attribution (team, project)
+  - [ ] Idle resource identification
+  - [ ] Right-sizing recommendations
+- [ ] Integration with benchmarks:
+  - [ ] Cost per experiment calculation
+  - [ ] Before/after cost comparison
+  - [ ] Cost anomaly alerting
+- [ ] Grafana dashboards:
+  - [ ] Cost by namespace
+  - [ ] Cost trending over time
+  - [ ] Cost efficiency metrics
+- [ ] Document cost tooling patterns
+- [ ] **ADR:** OpenCost vs Kubecost selection
+
+---
+
+### 10.7 Full Stack Composition Benchmark
+
+**Goal:** Measure end-to-end system with all layers
+
+**Learning objectives:**
+- Understand how layers compound
+- Isolate overhead by layer
+- Make holistic optimization decisions
+
+**Tasks:**
+- [ ] Create `experiments/scenarios/full-stack-benchmark/`
+- [ ] Deploy full stack:
+  ```
+  Client → Gateway → Mesh → App → Database → Messaging
+  ```
+- [ ] Baseline measurements:
+  - [ ] App only (no gateway, no mesh)
+  - [ ] + Gateway overhead
+  - [ ] + Mesh overhead
+  - [ ] + Observability overhead
+- [ ] End-to-end metrics:
+  - [ ] Request latency breakdown by layer
+  - [ ] Cost attribution by component
+  - [ ] Resource consumption by layer
+- [ ] Optimization experiments:
+  - [ ] Remove mesh for internal traffic
+  - [ ] Tune gateway connection pools
+  - [ ] Optimize database queries
+- [ ] Document full stack patterns
+- [ ] **Portfolio piece:** Full stack architecture decision guide
+
+---
+
+### 10.8 Success Criteria
+
+- [ ] All technology benchmarks documented with data
+- [ ] Cost per transaction calculated for each option
+- [ ] Full stack composition overhead understood
+- [ ] Cost tooling deployed and integrated
+- [ ] Data-driven ADRs for technology selection
 

@@ -4,6 +4,8 @@
 
 *Section order follows the "three pillars" pattern: metrics → logs → traces, then SLOs once you understand what you're measuring.*
 
+> **Deep Dive:** For eBPF-based observability (I/O tracing, Pixie, Parca, Tetragon), see [Appendix T: eBPF & Advanced Metrics](docs/roadmap/appendix-t-ebpf-metrics.md). This phase covers standard Prometheus/Loki/Tempo fundamentals.
+
 ### 3.1 Prometheus & Grafana Deep Dive
 
 **Goal:** Master metrics collection, PromQL, alerting, and dashboards
