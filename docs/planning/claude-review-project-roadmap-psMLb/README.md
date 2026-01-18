@@ -41,6 +41,39 @@ This directory contains planning documents and proposals being considered for th
 
 ---
 
+### 2. The "Chi" Observability Stack
+**File:** `chi-observability-stack.md`
+
+**Summary:** Philosophical framework for visualizing traffic as energy flow through service meshes, with security as identity verification.
+
+**Key Concepts:**
+- **Traffic = Energy flow** (not just requests/second)
+- **Latency = Resistance** (friction in the system)
+- **Queue depth = Energy reservoirs** (backup/pressure)
+- **CPU = Heat** (byproduct, not the primary constraint)
+- **Service Mesh = Distributed sensors + valves + armor**
+
+**4 Phases:**
+1. **Glass Window** - Visualize flow with Hubble/Pixie
+2. **Gauge** - Measure friction with USE Method (Utilization, Saturation, Errors)
+3. **Valve & Armor** - Control flow and prove identity with Linkerd
+4. **Federation** - Multi-cluster trust boundaries
+
+**Impact on Roadmap:**
+- Phase 7: Enhanced Service Mesh section with Chi framework
+- Integration with eBPF strategy (complementary)
+- New experiments: chi-glass-window, chi-gauge-saturation, chi-valve-smart-routing
+- FinOps: Mesh ROI analysis (cost vs benefits)
+
+**Questions to Answer:**
+- Should Chi be Phase 7 or separate phase 7.5?
+- Which mesh for Chi lab? (Linkerd vs Istio vs Cilium)
+- How much multi-cluster in core vs appendix?
+
+**Status:** ✅ Drafted, awaiting review
+
+---
+
 ## Main Roadmap Documents (In Branch Root)
 
 These have already been created and pushed:
