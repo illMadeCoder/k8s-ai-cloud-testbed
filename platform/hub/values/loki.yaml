@@ -12,9 +12,15 @@ singleBinary:
     limits:
       cpu: 500m
       memory: 512Mi
-  # Persistence disabled - using S3
+  # Enable emptyDir for local data (WAL, cache)
   persistence:
     enabled: false
+  extraVolumes:
+    - name: data
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: data
+      mountPath: /var/loki
 
 loki:
   auth_enabled: false
