@@ -1,0 +1,222 @@
+version: '3'
+
+# Talos Hub - Hub cluster running on Talos hardware
+#
+# Usage:
+#   task talos-hub:status      # Show hub status
+#   task talos-hub:reset       # Reset hub (delete all non-system resources)
+#   task talos-hub:redeploy    # Reset and redeploy hub application
+
+silent: true
+
+vars:
+  CONTEXT: talos-hub
+  # Namespaces to preserve during reset
+  PRESERVED_NS: "kube-system kube-public kube-node-lease default local-path-storage argocd"
+  OPENBAO_KEYS_FILE: ~/.illmlab/openbao-keys.json
+
+tasks:
+  status:
+    desc: Show Talos hub status
+    cmds:
+      - |
+        echo "=== Talos Hub Status ==="
+        echo ""
+
+        echo "=== Nodes ==="
+        kubectl --context {{.CONTEXT}} get nodes -o wide
+
+        echo ""
+        echo "=== ArgoCD Applications ==="
+        kubectl --context {{.CONTEXT}} get applications -n argocd -o custom-columns="NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status" 2>/dev/null || echo "ArgoCD not running"
+
+        echo ""
+        echo "=== Namespaces ==="
+        kubectl --context {{.CONTEXT}} get namespaces
+
+  reset:
+    desc: Reset Talos hub (delete all non-system resources, keep ArgoCD)
+    cmds:
+      - |
+        echo "=============================================="
+        echo "  RESETTING TALOS HUB"
+        echo "=============================================="
+        echo ""
+
+        # Step 0: Clean up webhooks that block namespace deletion
+        echo "Step 0: Cleaning up admission webhooks..."
+        for wh in $(kubectl --context {{.CONTEXT}} get validatingwebhookconfigurations -o name 2>/dev/null | grep -E "kyverno|cert-manager"); do
+          echo "  Deleting $wh"
+          kubectl --context {{.CONTEXT}} delete "$wh" --ignore-not-found 2>/dev/null || true
+        done
+        for wh in $(kubectl --context {{.CONTEXT}} get mutatingwebhookconfigurations -o name 2>/dev/null | grep -E "kyverno|cert-manager"); do
+          echo "  Deleting $wh"
+          kubectl --context {{.CONTEXT}} delete "$wh" --ignore-not-found 2>/dev/null || true
+        done
+
+        # Step 1: Delete hub application (remove finalizer first)
+        echo ""
+        echo "Step 1: Deleting hub application..."
+        kubectl --context {{.CONTEXT}} patch application hub -n argocd -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+        kubectl --context {{.CONTEXT}} delete application hub -n argocd --wait=false 2>/dev/null || true
+
+        # Step 2: Delete all child apps except argocd (remove finalizers)
+        echo ""
+        echo "Step 2: Deleting child applications..."
+        for app in $(kubectl --context {{.CONTEXT}} get applications -n argocd -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+          if [ "$app" != "argocd" ]; then
+            echo "  Deleting $app"
+            kubectl --context {{.CONTEXT}} patch application "$app" -n argocd -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+            kubectl --context {{.CONTEXT}} delete application "$app" -n argocd --wait=false 2>/dev/null || true
+          fi
+        done
+
+        # Step 3: Wait for apps to be deleted
+        echo ""
+        echo "Step 3: Waiting for apps to be deleted..."
+        for i in $(seq 1 30); do
+          COUNT=$(kubectl --context {{.CONTEXT}} get applications -n argocd --no-headers 2>/dev/null | wc -l)
+          if [ "$COUNT" -le 1 ]; then
+            echo "  Apps cleaned up (only argocd remains)"
+            break
+          fi
+          echo "  Waiting... $COUNT apps remaining ($i/30)"
+          sleep 2
+        done
+
+        # Step 4: Delete non-system namespaces
+        echo ""
+        echo "Step 4: Deleting non-system namespaces..."
+        PRESERVED="{{.PRESERVED_NS}}"
+        for ns in $(kubectl --context {{.CONTEXT}} get namespaces -o jsonpath='{.items[*].metadata.name}'); do
+          SKIP=false
+          for p in $PRESERVED; do
+            if [ "$ns" = "$p" ]; then
+              SKIP=true
+              break
+            fi
+          done
+          if [ "$SKIP" = "false" ]; then
+            echo "  Deleting namespace: $ns"
+            kubectl --context {{.CONTEXT}} delete namespace "$ns" --wait=false 2>/dev/null || true
+          fi
+        done
+
+        # Step 5: Clean up any stuck resources with ArgoCD finalizers
+        echo ""
+        echo "Step 5: Cleaning up stuck resources..."
+        for ns in $(kubectl --context {{.CONTEXT}} get namespaces --field-selector=status.phase=Terminating -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+          echo "  Checking namespace: $ns"
+          for res in $(kubectl --context {{.CONTEXT}} get all,jobs,secrets,configmaps -n "$ns" -o name 2>/dev/null); do
+            kubectl --context {{.CONTEXT}} patch "$res" -n "$ns" -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+          done
+        done
+
+        # Step 6: Wait for namespace cleanup
+        echo ""
+        echo "Step 6: Waiting for namespace cleanup..."
+        for i in $(seq 1 30); do
+          REMAINING=$(kubectl --context {{.CONTEXT}} get namespaces --field-selector=status.phase=Terminating -o name 2>/dev/null | wc -l)
+          if [ "$REMAINING" -eq 0 ]; then
+            echo "  All namespaces cleaned up!"
+            break
+          fi
+          echo "  $REMAINING namespaces still terminating... ($i/30)"
+          sleep 3
+        done
+
+        echo ""
+        echo "=== Reset Complete ==="
+        kubectl --context {{.CONTEXT}} get namespaces
+
+  redeploy:
+    desc: Reset and redeploy Talos hub
+    cmds:
+      - task: reset
+      - |
+        echo ""
+        echo "=============================================="
+        echo "  REDEPLOYING TALOS HUB"
+        echo "=============================================="
+        echo ""
+
+        # Step 1: Apply hub application
+        echo "Step 1: Applying hub application..."
+        kubectl --context {{.CONTEXT}} apply -f platform/hub/bootstrap/hub-application.yaml
+
+        # Step 2: Wait for apps to be created
+        echo ""
+        echo "Step 2: Waiting for apps to be created..."
+        for i in $(seq 1 60); do
+          COUNT=$(kubectl --context {{.CONTEXT}} get applications -n argocd --no-headers 2>/dev/null | wc -l)
+          if [ "$COUNT" -ge 15 ]; then
+            echo "  $COUNT apps created"
+            break
+          fi
+          echo "  Waiting... $COUNT apps ($i/60)"
+          sleep 5
+        done
+
+        # Step 3: Initialize OpenBao if needed
+        echo ""
+        echo "Step 3: Checking OpenBao..."
+        for i in $(seq 1 30); do
+          if kubectl --context {{.CONTEXT}} get pod openbao-0 -n openbao &>/dev/null; then
+            echo "  OpenBao pod exists"
+            break
+          fi
+          echo "  Waiting for OpenBao pod... ($i/30)"
+          sleep 5
+        done
+
+        # Wait for pod to be running
+        kubectl --context {{.CONTEXT}} wait --for=condition=ready pod/openbao-0 -n openbao --timeout=120s 2>/dev/null || true
+
+        # Check if initialized
+        INIT_STATUS=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao status -format=json 2>/dev/null | jq -r '.initialized' || echo "unknown")
+
+        if [ "$INIT_STATUS" = "false" ]; then
+          echo "  OpenBao needs initialization..."
+          INIT_OUTPUT=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao operator init -key-shares=1 -key-threshold=1 -format=json 2>&1)
+
+          # Save keys
+          echo "$INIT_OUTPUT" > {{.OPENBAO_KEYS_FILE}}
+          chmod 600 {{.OPENBAO_KEYS_FILE}}
+          echo "  Keys saved to {{.OPENBAO_KEYS_FILE}}"
+
+          # Unseal
+          UNSEAL_KEY=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[0]')
+          kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao operator unseal "$UNSEAL_KEY"
+
+          # Get root token
+          ROOT_TOKEN=$(echo "$INIT_OUTPUT" | jq -r '.root_token')
+
+          # Enable KV v2
+          kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$ROOT_TOKEN bao secrets enable -path=secret kv-v2" || true
+
+          # Create ESO token
+          kubectl --context {{.CONTEXT}} create secret generic openbao-token -n external-secrets --from-literal=token="$ROOT_TOKEN" --dry-run=client -o yaml | kubectl --context {{.CONTEXT}} apply -f -
+
+          echo "  OpenBao initialized and configured"
+        elif [ "$INIT_STATUS" = "true" ]; then
+          # Check if sealed
+          SEALED=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao status -format=json 2>/dev/null | jq -r '.sealed')
+          if [ "$SEALED" = "true" ]; then
+            if [ -f "{{.OPENBAO_KEYS_FILE}}" ]; then
+              UNSEAL_KEY=$(jq -r '.unseal_keys_b64[0]' {{.OPENBAO_KEYS_FILE}})
+              kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao operator unseal "$UNSEAL_KEY"
+              echo "  OpenBao unsealed"
+            else
+              echo "  ERROR: OpenBao is sealed but no keys file found at {{.OPENBAO_KEYS_FILE}}"
+            fi
+          else
+            echo "  OpenBao already initialized and unsealed"
+          fi
+        fi
+
+        echo ""
+        echo "=============================================="
+        echo "  REDEPLOY COMPLETE"
+        echo "=============================================="
+        echo ""
+        echo "Run 'task talos-hub:status' to check status"
