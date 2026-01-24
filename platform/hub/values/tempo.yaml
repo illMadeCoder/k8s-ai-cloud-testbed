@@ -1,0 +1,77 @@
+# Tempo values for hub cluster
+# Uses SeaweedFS S3-compatible storage backend
+
+tempo:
+  # Receivers - accept traces from various protocols
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+    jaeger:
+      protocols:
+        thrift_http:
+          endpoint: "0.0.0.0:14268"
+        grpc:
+          endpoint: "0.0.0.0:14250"
+    zipkin:
+      endpoint: "0.0.0.0:9411"
+
+  # S3 storage configuration pointing to SeaweedFS
+  storage:
+    trace:
+      backend: s3
+      s3:
+        bucket: tempo-traces
+        endpoint: seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+        region: us-east-1
+        access_key: any
+        secret_key: any
+        insecure: true
+        forcepathstyle: true
+      wal:
+        path: /var/tempo/wal
+
+  # Query settings
+  query_frontend:
+    search:
+      duration_slo: 5s
+      throughput_bytes_slo: 1.073741824e+09
+
+  # Metrics generator disabled (no Prometheus remote write endpoint yet)
+  metrics_generator:
+    enabled: false
+
+  # Retention - 7 days
+  compactor:
+    compaction:
+      block_retention: 168h
+
+  # Overrides
+  overrides:
+    defaults:
+      ingestion:
+        rate_limit_bytes: 15000000
+        burst_size_bytes: 20000000
+      search:
+        max_duration: 0s
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Persistence disabled - using S3
+persistence:
+  enabled: false
+
+serviceMonitor:
+  enabled: true

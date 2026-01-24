@@ -1,0 +1,104 @@
+# Grafana Mimir values for hub cluster
+# Uses SeaweedFS S3-compatible storage backend
+# Running in monolithic mode for simplicity
+
+deploymentMode: monolithic
+
+mimir:
+  structuredConfig:
+    common:
+      storage:
+        backend: s3
+        s3:
+          endpoint: seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+          bucket_name: mimir-blocks
+          access_key_id: any
+          secret_access_key: any
+          insecure: true
+
+    # 7 day retention
+    limits:
+      compactor_blocks_retention_period: 168h
+
+    # Blocks storage
+    blocks_storage:
+      backend: s3
+      s3:
+        endpoint: seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+        bucket_name: mimir-blocks
+        access_key_id: any
+        secret_access_key: any
+        insecure: true
+
+    # Ruler storage
+    ruler_storage:
+      backend: s3
+      s3:
+        endpoint: seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+        bucket_name: mimir-ruler
+        access_key_id: any
+        secret_access_key: any
+        insecure: true
+
+    # Alertmanager storage
+    alertmanager_storage:
+      backend: s3
+      s3:
+        endpoint: seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+        bucket_name: mimir-alertmanager
+        access_key_id: any
+        secret_access_key: any
+        insecure: true
+
+# Disable distributed components (using monolithic)
+ingester:
+  replicas: 0
+distributor:
+  replicas: 0
+querier:
+  replicas: 0
+query_frontend:
+  replicas: 0
+query_scheduler:
+  replicas: 0
+ruler:
+  replicas: 0
+compactor:
+  replicas: 0
+store_gateway:
+  replicas: 0
+alertmanager:
+  replicas: 0
+overrides_exporter:
+  replicas: 0
+
+# Monolithic deployment
+monolithic:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  persistentVolume:
+    enabled: false
+
+# Disable nginx and minio (we have SeaweedFS)
+nginx:
+  enabled: false
+minio:
+  enabled: false
+
+# Gateway for API access
+gateway:
+  enabledNonEnterprise: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

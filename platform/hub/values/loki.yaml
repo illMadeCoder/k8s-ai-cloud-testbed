@@ -1,0 +1,95 @@
+# Loki values for hub cluster
+# Uses SeaweedFS S3-compatible storage backend
+
+deploymentMode: SingleBinary
+
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Persistence disabled - using S3
+  persistence:
+    enabled: false
+
+loki:
+  auth_enabled: false
+
+  commonConfig:
+    replication_factor: 1
+    path_prefix: /var/loki
+
+  # Schema configuration with S3 object store
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+  # S3 storage configuration pointing to SeaweedFS
+  storage:
+    type: s3
+    bucketNames:
+      chunks: loki-chunks
+      ruler: loki-ruler
+    s3:
+      endpoint: http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+      region: us-east-1
+      accessKeyId: any
+      secretAccessKey: any
+      s3ForcePathStyle: true
+      insecure: true
+
+  limits_config:
+    retention_period: 168h  # 7 days
+    ingestion_rate_mb: 4
+    ingestion_burst_size_mb: 6
+    max_query_series: 5000
+
+# Disable components not needed in single binary
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+# Gateway for API access
+gateway:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+test:
+  enabled: false
+
+monitoring:
+  dashboards:
+    enabled: false
+  rules:
+    enabled: false
+  serviceMonitor:
+    enabled: true
+
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
+minio:
+  enabled: false
