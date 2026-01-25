@@ -1,10 +1,6 @@
 # PeerAuthentication policies for mTLS
-# All PERMISSIVE until sidecars are enabled
-# To enable mTLS:
-#   1. kubectl label ns observability istio-injection=enabled
-#   2. kubectl rollout restart deployment -n observability
-#   3. Change mode to STRICT
 ---
+# Mesh-wide: PERMISSIVE allows gradual migration
 apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:
@@ -13,3 +9,14 @@ metadata:
 spec:
   mtls:
     mode: PERMISSIVE
+---
+# Observability namespace: STRICT mTLS
+# All LGTM services get end-to-end encryption
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: strict-mtls
+  namespace: observability
+spec:
+  mtls:
+    mode: STRICT

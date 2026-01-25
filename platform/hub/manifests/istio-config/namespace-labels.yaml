@@ -1,0 +1,9 @@
+# Label namespaces for Istio sidecar injection
+# Pods need to be restarted after this is applied
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    istio-injection: enabled
