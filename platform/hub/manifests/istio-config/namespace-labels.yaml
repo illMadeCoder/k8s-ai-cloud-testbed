@@ -1,5 +1,23 @@
-# Label namespaces for Istio sidecar injection
-# Istio requires privileged PSS for init container capabilities (NET_ADMIN, NET_RAW)
+# Label namespaces for Istio
+# Istio requires privileged PSS for CNI and sidecar capabilities
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-system
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-ingress
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
 ---
 apiVersion: v1
 kind: Namespace
