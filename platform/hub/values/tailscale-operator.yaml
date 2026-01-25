@@ -6,8 +6,8 @@
 # SETUP REQUIRED:
 # 1. Create OAuth client at https://login.tailscale.com/admin/settings/oauth
 #    - Scopes: Devices (read, write), Auth Keys (write)
-# 2. Store credentials in OpenBao:
-#    task hub:secret -- kv/tailscale client_id=<id> client_secret=<secret>
+# 2. Store credentials in OpenBao (secret/ mount):
+#    bao kv put -mount=secret tailscale client_id=<id> client_secret=<secret>
 # 3. ExternalSecret syncs to operator-oauth secret automatically
 
 # Use pre-existing secret (created by ExternalSecret)
