@@ -1,0 +1,29 @@
+# Tailscale Kubernetes Operator values for hub cluster
+#
+# Exposes cluster services to your Tailscale network (tailnet).
+# Access services like grafana.your-tailnet.ts.net from anywhere.
+#
+# SETUP REQUIRED:
+# 1. Create OAuth client at https://login.tailscale.com/admin/settings/oauth
+#    - Scopes: Devices (read, write), Auth Keys (write)
+# 2. Store credentials in OpenBao:
+#    task hub:secret -- kv/tailscale client_id=<id> client_secret=<secret>
+# 3. ExternalSecret syncs to operator-oauth secret automatically
+
+# Use pre-existing secret (created by ExternalSecret)
+oauth:
+  clientId: "from-secret"
+  clientSecret: "from-secret"
+
+# Tell operator to use existing secret
+operatorConfig:
+  logging: info
+
+# Resource limits appropriate for homelab
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
