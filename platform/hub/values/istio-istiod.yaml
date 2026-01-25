@@ -1,0 +1,64 @@
+# Istio Control Plane (istiod)
+# Homelab-optimized with Tempo tracing integration
+
+pilot:
+  # Homelab-friendly resources
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Enable tracing to Tempo
+  traceSampling: 100.0
+
+  # Reduce resource overhead
+  autoscaleEnabled: false
+  replicaCount: 1
+
+# Global mesh configuration
+meshConfig:
+  # Default to no sidecars - opt-in per namespace
+  enableAutoMtls: true
+
+  # Access logging for debugging
+  accessLogFile: /dev/stdout
+
+  # Tracing configuration for Tempo
+  enableTracing: true
+  defaultConfig:
+    tracing:
+      zipkin:
+        address: tempo.observability.svc.cluster.local:9411
+      sampling: 100.0
+
+  # Outbound traffic policy - allow external by default
+  outboundTrafficPolicy:
+    mode: ALLOW_ANY
+
+# Global settings
+global:
+  # Use distroless images for security
+  variant: distroless
+
+  # Proxy resources (for sidecars)
+  proxy:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+  # Proxy init container resources
+  proxy_init:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi

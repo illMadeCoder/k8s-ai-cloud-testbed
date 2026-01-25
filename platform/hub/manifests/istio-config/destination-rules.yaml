@@ -1,0 +1,69 @@
+# DestinationRules for traffic policies
+# Configure mTLS and load balancing for backend services
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: grafana
+  namespace: istio-ingress
+spec:
+  host: grafana.observability.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: mimir
+  namespace: istio-ingress
+spec:
+  host: mimir-gateway.observability.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: loki
+  namespace: istio-ingress
+spec:
+  host: loki-gateway.observability.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: tempo
+  namespace: istio-ingress
+spec:
+  host: tempo.observability.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+# ArgoCD and OpenBao don't have sidecars yet, use DISABLE
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: argocd
+  namespace: istio-ingress
+spec:
+  host: argocd-server.argocd.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: DISABLE
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: openbao
+  namespace: istio-ingress
+spec:
+  host: openbao.openbao.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: DISABLE

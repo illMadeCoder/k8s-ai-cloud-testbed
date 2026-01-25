@@ -1,0 +1,20 @@
+# Tailscale LoadBalancer service for Istio Ingress Gateway
+# Routes external traffic from Tailscale to Istio
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-tailscale
+  namespace: istio-ingress
+  annotations:
+    tailscale.com/hostname: "hub"
+    tailscale.com/proxy-class: "kernel-proxy"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  selector:
+    app: istio-ingressgateway
+    istio: ingressgateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

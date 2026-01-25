@@ -1,0 +1,5 @@
+# Istio Base - CRDs and cluster-wide resources
+# Minimal configuration for homelab
+
+# Use default CRD installation
+defaultRevision: default
