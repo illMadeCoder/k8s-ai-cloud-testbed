@@ -1,0 +1,12 @@
+# Tailscale namespace with privileged PSS
+#
+# The Tailscale operator requires elevated permissions to manage
+# network proxies and configure iptables/nftables rules.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tailscale
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
