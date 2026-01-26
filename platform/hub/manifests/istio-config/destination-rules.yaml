@@ -76,7 +76,7 @@ spec:
   host: kiali.istio-system.svc.cluster.local
   trafficPolicy:
     tls:
-      mode: ISTIO_MUTUAL
+      mode: DISABLE  # Kiali in istio-system has no sidecar
 ---
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
