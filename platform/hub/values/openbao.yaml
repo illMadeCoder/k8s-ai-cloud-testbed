@@ -29,11 +29,12 @@ server:
     type: LoadBalancer
     loadBalancerIP: 192.168.1.242
 
-  # File storage configuration using local-path-provisioner
+  # File storage configuration using local-path-retain (Retain policy)
+  # PV survives PVC deletion so secrets persist across cluster resets
   dataStorage:
     enabled: true
     size: 10Gi
-    storageClass: local-path
+    storageClass: local-path-retain
     accessMode: ReadWriteOnce
 
   # Standalone mode (no HA for home lab)

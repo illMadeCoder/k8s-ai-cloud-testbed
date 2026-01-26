@@ -1,0 +1,30 @@
+# Storage Configuration
+#
+# StorageClasses for the hub cluster.
+# Includes local-path-retain for data that should survive resets.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: storage
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+    environment: talos
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"  # Before everything else
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    targetRevision: HEAD
+    path: platform/hub/manifests/storage
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

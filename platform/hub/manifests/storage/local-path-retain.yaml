@@ -1,0 +1,12 @@
+# StorageClass with Retain policy for persistent data that should survive reset
+#
+# Used by OpenBao to keep secrets across cluster resets.
+# The PV remains after PVC deletion; manually delete PV to fully remove data.
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-path-retain
+provisioner: rancher.io/local-path
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
