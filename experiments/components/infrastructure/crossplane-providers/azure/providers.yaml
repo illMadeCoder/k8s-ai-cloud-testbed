@@ -14,7 +14,19 @@ spec:
     kind: DeploymentRuntimeConfig
     name: azure-runtime-config
 ---
-# Resource Groups (required for all Azure resources)
+# Core Azure resources (ResourceGroups, etc.)
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-azure-azure
+spec:
+  package: xpkg.upbound.io/upbound/provider-azure-azure:v2.3.0
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-runtime-config
+---
+# Management Groups (different from Resource Groups!)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
