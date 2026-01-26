@@ -12,7 +12,7 @@ silent: true
 vars:
   CONTEXT: talos-hub
   # Namespaces to preserve during reset
-  PRESERVED_NS: "kube-system kube-public kube-node-lease default local-path-storage argocd openbao"
+  PRESERVED_NS: "kube-system kube-public kube-node-lease default local-path-storage argocd"
   OPENBAO_KEYS_FILE: ~/.illmlab/openbao-keys.json
 
 tasks:
