@@ -1,8 +1,13 @@
 ---
-# AWS Provider Family + All Individual Providers
-# Wave 4: Second cloud provider
+# AWS Provider Family + Individual Providers (CRD-only)
+#
+# Architecture:
+# - provider-family-aws: Runs the controller, handles ALL AWS API calls
+# - Individual providers: Install CRDs only (replicas: 0), no controller pods
+#
+# This saves significant CPU/memory on resource-constrained clusters.
 ---
-# Family provider (base - handles all AWS API calls)
+# Family provider - this is the ONLY one that runs a controller pod
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -14,7 +19,7 @@ spec:
     kind: DeploymentRuntimeConfig
     name: aws-runtime-config
 ---
-# S3 (object storage)
+# S3 (object storage) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -24,9 +29,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: aws-runtime-config
+    name: aws-crd-only
 ---
-# EKS (Kubernetes clusters)
+# EKS (Kubernetes clusters) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -36,9 +41,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: aws-runtime-config
+    name: aws-crd-only
 ---
-# RDS (PostgreSQL, MySQL)
+# RDS (PostgreSQL, MySQL) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -48,9 +53,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: aws-runtime-config
+    name: aws-crd-only
 ---
-# ElastiCache (Redis, Memcached)
+# ElastiCache (Redis, Memcached) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -60,9 +65,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: aws-runtime-config
+    name: aws-crd-only
 ---
-# SQS (message queues)
+# SQS (message queues) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -72,9 +77,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: aws-runtime-config
+    name: aws-crd-only
 ---
-# Route53 (DNS)
+# Route53 (DNS) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -84,9 +89,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: aws-runtime-config
+    name: aws-crd-only
 ---
-# EC2 (VPC, Subnets, Security Groups)
+# EC2 (VPC, Subnets, Security Groups) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -96,4 +101,4 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: aws-runtime-config
+    name: aws-crd-only

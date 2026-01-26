@@ -1,8 +1,13 @@
 ---
-# Azure Provider Family + All Individual Providers
-# Wave 3: First cloud provider (primary for this lab)
+# Azure Provider Family + Individual Providers (CRD-only)
+#
+# Architecture:
+# - provider-family-azure: Runs the controller, handles ALL Azure API calls
+# - Individual providers: Install CRDs only (replicas: 0), no controller pods
+#
+# This saves significant CPU/memory on resource-constrained clusters.
 ---
-# Family provider (base - handles all Azure API calls)
+# Family provider - this is the ONLY one that runs a controller pod
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -14,7 +19,7 @@ spec:
     kind: DeploymentRuntimeConfig
     name: azure-runtime-config
 ---
-# Core Azure resources (ResourceGroups, etc.)
+# Core Azure resources (ResourceGroups, etc.) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -24,9 +29,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
+    name: azure-crd-only
 ---
-# Management Groups (different from Resource Groups!)
+# Management Groups - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -36,9 +41,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
+    name: azure-crd-only
 ---
-# Virtual Networks, Subnets (required for AKS)
+# Virtual Networks, Subnets - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -48,9 +53,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
+    name: azure-crd-only
 ---
-# AKS (Kubernetes clusters)
+# AKS (Kubernetes clusters) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -60,9 +65,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
+    name: azure-crd-only
 ---
-# Blob Storage, Files
+# Blob Storage, Files - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -72,9 +77,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
+    name: azure-crd-only
 ---
-# Azure SQL, PostgreSQL, MySQL
+# Azure SQL, PostgreSQL, MySQL - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -84,9 +89,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
+    name: azure-crd-only
 ---
-# Azure Cache for Redis
+# Azure Cache for Redis - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -96,9 +101,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
+    name: azure-crd-only
 ---
-# Service Bus (message queues)
+# Service Bus (message queues) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -108,4 +113,4 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: azure-runtime-config
+    name: azure-crd-only

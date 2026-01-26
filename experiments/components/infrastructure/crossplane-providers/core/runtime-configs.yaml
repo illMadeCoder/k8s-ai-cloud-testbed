@@ -2,11 +2,45 @@
 # DeploymentRuntimeConfigs for all providers
 # These must exist BEFORE providers reference them
 #
+# Architecture (Upbound provider families):
+# - Family providers (provider-family-{cloud}) run controllers that reconcile ALL resources
+# - Individual providers (provider-{cloud}-{service}) only install CRDs
+# - Use *-crd-only configs (replicas: 0) for individual providers to save resources
+#
 # Memory notes:
 # - Providers with many CRDs need 300-500MB at startup
 # - OOM at 256Mi caused cluster instability (provider OOM → API server auth errors)
 # - Using 512Mi limit with 256Mi request for headroom
-# - Long-term fix: Use MRAPs to reduce CRD count and memory usage
+---
+# CRD-only configs for individual providers (no controller pods needed)
+# The family provider handles all reconciliation
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: azure-crd-only
+spec:
+  deploymentTemplate:
+    spec:
+      replicas: 0
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: aws-crd-only
+spec:
+  deploymentTemplate:
+    spec:
+      replicas: 0
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: gcp-crd-only
+spec:
+  deploymentTemplate:
+    spec:
+      replicas: 0
 ---
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig

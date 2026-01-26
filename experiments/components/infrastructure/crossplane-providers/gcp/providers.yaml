@@ -1,8 +1,13 @@
 ---
-# GCP Provider Family + All Individual Providers
-# Wave 5: Third cloud provider
+# GCP Provider Family + Individual Providers (CRD-only)
+#
+# Architecture:
+# - provider-family-gcp: Runs the controller, handles ALL GCP API calls
+# - Individual providers: Install CRDs only (replicas: 0), no controller pods
+#
+# This saves significant CPU/memory on resource-constrained clusters.
 ---
-# Family provider (base - handles all GCP API calls)
+# Family provider - this is the ONLY one that runs a controller pod
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -14,7 +19,7 @@ spec:
     kind: DeploymentRuntimeConfig
     name: gcp-runtime-config
 ---
-# Cloud Storage (object storage)
+# Cloud Storage (object storage) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -24,9 +29,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
+    name: gcp-crd-only
 ---
-# GKE (Kubernetes clusters)
+# GKE (Kubernetes clusters) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -36,9 +41,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
+    name: gcp-crd-only
 ---
-# Cloud SQL (PostgreSQL, MySQL)
+# Cloud SQL (PostgreSQL, MySQL) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -48,9 +53,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
+    name: gcp-crd-only
 ---
-# Memorystore (Redis)
+# Memorystore (Redis) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -60,9 +65,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
+    name: gcp-crd-only
 ---
-# Pub/Sub (message queues)
+# Pub/Sub (message queues) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -72,9 +77,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
+    name: gcp-crd-only
 ---
-# Cloud DNS
+# Cloud DNS - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -84,9 +89,9 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
+    name: gcp-crd-only
 ---
-# Compute Engine (VPC, Subnets, Firewall)
+# Compute Engine (VPC, Subnets, Firewall) - CRDs only
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
@@ -96,4 +101,4 @@ spec:
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
-    name: gcp-runtime-config
+    name: gcp-crd-only
