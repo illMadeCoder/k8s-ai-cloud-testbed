@@ -43,13 +43,13 @@ tasks:
         echo "=============================================="
         echo ""
 
-        # Step 0: Clean up webhooks that block namespace deletion
+        # Step 0: Clean up ALL webhooks that block namespace deletion
         echo "Step 0: Cleaning up admission webhooks..."
-        for wh in $(kubectl --context {{.CONTEXT}} get validatingwebhookconfigurations -o name 2>/dev/null | grep -E "kyverno|cert-manager"); do
+        for wh in $(kubectl --context {{.CONTEXT}} get validatingwebhookconfigurations -o name 2>/dev/null | grep -E "kyverno|cert-manager|external-secrets|istio|openbao"); do
           echo "  Deleting $wh"
           kubectl --context {{.CONTEXT}} delete "$wh" --ignore-not-found 2>/dev/null || true
         done
-        for wh in $(kubectl --context {{.CONTEXT}} get mutatingwebhookconfigurations -o name 2>/dev/null | grep -E "kyverno|cert-manager"); do
+        for wh in $(kubectl --context {{.CONTEXT}} get mutatingwebhookconfigurations -o name 2>/dev/null | grep -E "kyverno|cert-manager|external-secrets|istio|openbao"); do
           echo "  Deleting $wh"
           kubectl --context {{.CONTEXT}} delete "$wh" --ignore-not-found 2>/dev/null || true
         done
@@ -102,14 +102,22 @@ tasks:
           fi
         done
 
-        # Step 5: Clean up any stuck resources with ArgoCD finalizers
+        # Step 5: Clean up any stuck resources with finalizers
         echo ""
         echo "Step 5: Cleaning up stuck resources..."
         for ns in $(kubectl --context {{.CONTEXT}} get namespaces --field-selector=status.phase=Terminating -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
           echo "  Checking namespace: $ns"
+          # Clean up PVCs first (they block namespace deletion)
+          for pvc in $(kubectl --context {{.CONTEXT}} get pvc -n "$ns" -o name 2>/dev/null); do
+            echo "    Removing finalizers from $pvc"
+            kubectl --context {{.CONTEXT}} patch "$pvc" -n "$ns" -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+          done
+          # Clean up other resources
           for res in $(kubectl --context {{.CONTEXT}} get all,jobs,secrets,configmaps -n "$ns" -o name 2>/dev/null); do
             kubectl --context {{.CONTEXT}} patch "$res" -n "$ns" -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
           done
+          # Force finalize the namespace if still stuck
+          kubectl --context {{.CONTEXT}} get ns "$ns" -o json 2>/dev/null | jq '.spec.finalizers = []' | kubectl --context {{.CONTEXT}} replace --raw "/api/v1/namespaces/$ns/finalize" -f - 2>/dev/null || true
         done
 
         # Step 6: Wait for namespace cleanup
@@ -169,15 +177,26 @@ tasks:
           sleep 5
         done
 
-        # Wait for pod to be running
-        kubectl --context {{.CONTEXT}} wait --for=condition=ready pod/openbao-0 -n openbao --timeout=120s 2>/dev/null || true
+        # Wait for openbao container to be running (not sidecar)
+        for i in $(seq 1 60); do
+          PHASE=$(kubectl --context {{.CONTEXT}} get pod openbao-0 -n openbao -o jsonpath='{.status.phase}' 2>/dev/null)
+          if [ "$PHASE" = "Running" ]; then
+            echo "  OpenBao pod is running"
+            break
+          fi
+          echo "  Waiting for OpenBao to start... ($i/60)"
+          sleep 2
+        done
+
+        # Wait a moment for the bao process to start
+        sleep 5
 
         # Check if initialized
-        INIT_STATUS=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao status -format=json 2>/dev/null | jq -r '.initialized' || echo "unknown")
+        INIT_STATUS=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -c openbao -- bao status -format=json 2>/dev/null | jq -r '.initialized' || echo "unknown")
 
         if [ "$INIT_STATUS" = "false" ]; then
           echo "  OpenBao needs initialization..."
-          INIT_OUTPUT=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao operator init -key-shares=1 -key-threshold=1 -format=json 2>&1)
+          INIT_OUTPUT=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -c openbao -- bao operator init -key-shares=1 -key-threshold=1 -format=json 2>&1)
 
           # Save keys
           echo "$INIT_OUTPUT" > {{.OPENBAO_KEYS_FILE}}
@@ -186,33 +205,67 @@ tasks:
 
           # Unseal
           UNSEAL_KEY=$(echo "$INIT_OUTPUT" | jq -r '.unseal_keys_b64[0]')
-          kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao operator unseal "$UNSEAL_KEY"
+          kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -c openbao -- bao operator unseal "$UNSEAL_KEY"
 
           # Get root token
           ROOT_TOKEN=$(echo "$INIT_OUTPUT" | jq -r '.root_token')
 
           # Enable KV v2
-          kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$ROOT_TOKEN bao secrets enable -path=secret kv-v2" || true
+          kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -c openbao -- sh -c "BAO_TOKEN=$ROOT_TOKEN bao secrets enable -path=secret kv-v2" || true
 
-          # Create ESO token
-          kubectl --context {{.CONTEXT}} create secret generic openbao-token -n external-secrets --from-literal=token="$ROOT_TOKEN" --dry-run=client -o yaml | kubectl --context {{.CONTEXT}} apply -f -
+          # Create ESO token in external-secrets namespace (wait for namespace to exist)
+          for i in $(seq 1 30); do
+            if kubectl --context {{.CONTEXT}} get namespace external-secrets &>/dev/null; then
+              kubectl --context {{.CONTEXT}} create secret generic openbao-token -n external-secrets --from-literal=token="$ROOT_TOKEN" --dry-run=client -o yaml | kubectl --context {{.CONTEXT}} apply -f -
+              echo "  ESO token created"
+              break
+            fi
+            echo "  Waiting for external-secrets namespace... ($i/30)"
+            sleep 5
+          done
+
+          # Restart ESO to pick up new token
+          kubectl --context {{.CONTEXT}} rollout restart deployment -n external-secrets 2>/dev/null || true
 
           echo "  OpenBao initialized and configured"
         elif [ "$INIT_STATUS" = "true" ]; then
           # Check if sealed
-          SEALED=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao status -format=json 2>/dev/null | jq -r '.sealed')
+          SEALED=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -c openbao -- bao status -format=json 2>/dev/null | jq -r '.sealed')
           if [ "$SEALED" = "true" ]; then
             if [ -f "{{.OPENBAO_KEYS_FILE}}" ]; then
               UNSEAL_KEY=$(jq -r '.unseal_keys_b64[0]' {{.OPENBAO_KEYS_FILE}})
-              kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -- bao operator unseal "$UNSEAL_KEY"
+              kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -c openbao -- bao operator unseal "$UNSEAL_KEY"
               echo "  OpenBao unsealed"
             else
               echo "  ERROR: OpenBao is sealed but no keys file found at {{.OPENBAO_KEYS_FILE}}"
             fi
           else
             echo "  OpenBao already initialized and unsealed"
+
+            # Verify ESO token is valid
+            ROOT_TOKEN=$(jq -r '.root_token' {{.OPENBAO_KEYS_FILE}} 2>/dev/null || echo "")
+            if [ -n "$ROOT_TOKEN" ]; then
+              TOKEN_VALID=$(kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -c openbao -- sh -c "BAO_TOKEN=$ROOT_TOKEN bao token lookup" 2>/dev/null && echo "true" || echo "false")
+              if [ "$TOKEN_VALID" = "false" ]; then
+                echo "  WARNING: Stored root token is invalid. OpenBao may need reinitialization."
+              fi
+            fi
           fi
         fi
+
+        # Step 4: Wait for apps to sync
+        echo ""
+        echo "Step 4: Waiting for apps to sync..."
+        for i in $(seq 1 120); do
+          TOTAL=$(kubectl --context {{.CONTEXT}} get applications -n argocd --no-headers 2>/dev/null | wc -l)
+          SYNCED=$(kubectl --context {{.CONTEXT}} get applications -n argocd -o jsonpath='{.items[?(@.status.sync.status=="Synced")].metadata.name}' 2>/dev/null | wc -w)
+          if [ "$TOTAL" -gt 0 ] && [ "$SYNCED" -ge "$((TOTAL * 80 / 100))" ]; then
+            echo "  $SYNCED/$TOTAL apps synced (>80%)"
+            break
+          fi
+          echo "  $SYNCED/$TOTAL apps synced ($i/120)"
+          sleep 5
+        done
 
         echo ""
         echo "=============================================="
