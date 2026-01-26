@@ -1,6 +1,5 @@
 # DestinationRules for traffic policies
-# Observability services use ISTIO_MUTUAL (have sidecars)
-# Other services use DISABLE (no sidecars yet)
+# All services in mesh use ISTIO_MUTUAL for mTLS
 ---
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
@@ -55,7 +54,7 @@ spec:
   host: argocd-server.argocd.svc.cluster.local
   trafficPolicy:
     tls:
-      mode: DISABLE
+      mode: ISTIO_MUTUAL
 ---
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
@@ -66,7 +65,7 @@ spec:
   host: openbao.openbao.svc.cluster.local
   trafficPolicy:
     tls:
-      mode: DISABLE
+      mode: ISTIO_MUTUAL
 ---
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
@@ -77,9 +76,8 @@ spec:
   host: kiali.istio-system.svc.cluster.local
   trafficPolicy:
     tls:
-      mode: DISABLE
+      mode: ISTIO_MUTUAL
 ---
-# SeaweedFS - storage backend for observability
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:
