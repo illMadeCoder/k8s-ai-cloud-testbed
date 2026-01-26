@@ -37,7 +37,9 @@ volume:
   logs:
     type: emptyDir
   idx:
-    type: emptyDir
+    type: persistentVolumeClaim
+    size: 1Gi
+    storageClass: local-path
 
 # Filer - provides S3 API and filesystem interface
 filer:
