@@ -5,13 +5,19 @@
 # - provider-family-gcp: Runs the controller, handles ALL GCP API calls
 # - Individual providers: Install CRDs only (replicas: 0), no controller pods
 #
-# This saves significant CPU/memory on resource-constrained clusters.
+# Sync waves phase CRD installation to avoid API server overload:
+# - Wave 0: Family provider (controller)
+# - Wave 1: Heavy CRD providers (compute)
+# - Wave 2: Medium providers (container)
+# - Wave 3: Smaller providers
 ---
 # Family provider - this is the ONLY one that runs a controller pod
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-family-gcp
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   package: xpkg.upbound.io/upbound/provider-family-gcp:v2.4.0
   runtimeConfigRef:
@@ -19,13 +25,15 @@ spec:
     kind: DeploymentRuntimeConfig
     name: gcp-runtime-config
 ---
-# Cloud Storage (object storage) - CRDs only
+# Compute Engine (VPC, Subnets, Firewall) - CRDs only (HEAVY)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-gcp-storage
+  name: provider-gcp-compute
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-gcp-storage:v2.4.0
+  package: xpkg.upbound.io/upbound/provider-gcp-compute:v2.4.0
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
@@ -36,8 +44,24 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-gcp-container
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-container:v2.4.0
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-crd-only
+---
+# Cloud Storage (object storage) - CRDs only
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-gcp-storage
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  package: xpkg.upbound.io/upbound/provider-gcp-storage:v2.4.0
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
@@ -48,6 +72,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-gcp-sql
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-sql:v2.4.0
   runtimeConfigRef:
@@ -60,6 +86,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-gcp-redis
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-redis:v2.4.0
   runtimeConfigRef:
@@ -72,6 +100,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-gcp-pubsub
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-pubsub:v2.4.0
   runtimeConfigRef:
@@ -84,20 +114,10 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-gcp-dns
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-gcp-dns:v2.4.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: gcp-crd-only
----
-# Compute Engine (VPC, Subnets, Firewall) - CRDs only
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-gcp-compute
-spec:
-  package: xpkg.upbound.io/upbound/provider-gcp-compute:v2.4.0
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig

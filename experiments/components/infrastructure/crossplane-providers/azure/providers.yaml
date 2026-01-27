@@ -5,13 +5,19 @@
 # - provider-family-azure: Runs the controller, handles ALL Azure API calls
 # - Individual providers: Install CRDs only (replicas: 0), no controller pods
 #
-# This saves significant CPU/memory on resource-constrained clusters.
+# Sync waves phase CRD installation to avoid API server overload:
+# - Wave 0: Family provider (controller)
+# - Wave 1: Heavy CRD providers (network = 119 CRDs)
+# - Wave 2: Medium providers (containerservice)
+# - Wave 3: Smaller providers
 ---
 # Family provider - this is the ONLY one that runs a controller pod
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-family-azure
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   package: xpkg.upbound.io/upbound/provider-family-azure:v2.3.0
   runtimeConfigRef:
@@ -19,35 +25,13 @@ spec:
     kind: DeploymentRuntimeConfig
     name: azure-runtime-config
 ---
-# Core Azure resources (ResourceGroups, etc.) - CRDs only
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-azure-azure
-spec:
-  package: xpkg.upbound.io/upbound/provider-azure-azure:v2.3.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: azure-crd-only
----
-# Management Groups - CRDs only
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-azure-management
-spec:
-  package: xpkg.upbound.io/upbound/provider-azure-management:v2.3.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: azure-crd-only
----
-# Virtual Networks, Subnets - CRDs only
+# Virtual Networks, Subnets - CRDs only (HEAVY: ~119 CRDs)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-azure-network
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-network:v2.3.0
   runtimeConfigRef:
@@ -60,8 +44,38 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-azure-containerservice
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-containerservice:v2.3.0
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-crd-only
+---
+# Core Azure resources (ResourceGroups, etc.) - CRDs only
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-azure-azure
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  package: xpkg.upbound.io/upbound/provider-azure-azure:v2.3.0
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: azure-crd-only
+---
+# Management Groups - CRDs only
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-azure-management
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  package: xpkg.upbound.io/upbound/provider-azure-management:v2.3.0
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
@@ -72,6 +86,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-azure-storage
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-storage:v2.3.0
   runtimeConfigRef:
@@ -84,6 +100,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-azure-sql
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-sql:v2.3.0
   runtimeConfigRef:
@@ -96,6 +114,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-azure-cache
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-cache:v2.3.0
   runtimeConfigRef:
@@ -108,6 +128,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-azure-servicebus
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-azure-servicebus:v2.3.0
   runtimeConfigRef:

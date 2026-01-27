@@ -59,6 +59,17 @@ metadata:
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/warn: privileged
 ---
+# Crossplane needs privileged for provider pods
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crossplane-system
+  labels:
+    istio-injection: disabled
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
 # Kyverno excluded from mesh - init containers need K8s API access
 # before sidecar proxy starts. Kyverno is a policy engine that
 # primarily talks to K8s API, not other mesh services.

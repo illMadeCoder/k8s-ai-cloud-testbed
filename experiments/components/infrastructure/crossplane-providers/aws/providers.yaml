@@ -5,13 +5,19 @@
 # - provider-family-aws: Runs the controller, handles ALL AWS API calls
 # - Individual providers: Install CRDs only (replicas: 0), no controller pods
 #
-# This saves significant CPU/memory on resource-constrained clusters.
+# Sync waves phase CRD installation to avoid API server overload:
+# - Wave 0: Family provider (controller)
+# - Wave 1: Heavy CRD providers (ec2 = ~145 CRDs)
+# - Wave 2: Medium providers (eks, rds)
+# - Wave 3: Smaller providers
 ---
 # Family provider - this is the ONLY one that runs a controller pod
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-family-aws
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   package: xpkg.upbound.io/upbound/provider-family-aws:v2.3.0
   runtimeConfigRef:
@@ -19,13 +25,15 @@ spec:
     kind: DeploymentRuntimeConfig
     name: aws-runtime-config
 ---
-# S3 (object storage) - CRDs only
+# EC2 (VPC, Subnets, Security Groups) - CRDs only (HEAVY: ~145 CRDs)
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aws-s3
+  name: provider-aws-ec2
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-s3:v2.3.0
+  package: xpkg.upbound.io/upbound/provider-aws-ec2:v2.3.0
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
@@ -36,6 +44,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-aws-eks
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-eks:v2.3.0
   runtimeConfigRef:
@@ -48,8 +58,24 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-aws-rds
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-rds:v2.3.0
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-crd-only
+---
+# S3 (object storage) - CRDs only
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws-s3
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  package: xpkg.upbound.io/upbound/provider-aws-s3:v2.3.0
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
@@ -60,6 +86,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-aws-elasticache
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-elasticache:v2.3.0
   runtimeConfigRef:
@@ -72,6 +100,8 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-aws-sqs
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-sqs:v2.3.0
   runtimeConfigRef:
@@ -84,20 +114,10 @@ apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-aws-route53
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-route53:v2.3.0
-  runtimeConfigRef:
-    apiVersion: pkg.crossplane.io/v1beta1
-    kind: DeploymentRuntimeConfig
-    name: aws-crd-only
----
-# EC2 (VPC, Subnets, Security Groups) - CRDs only
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-aws-ec2
-spec:
-  package: xpkg.upbound.io/upbound/provider-aws-ec2:v2.3.0
   runtimeConfigRef:
     apiVersion: pkg.crossplane.io/v1beta1
     kind: DeploymentRuntimeConfig
