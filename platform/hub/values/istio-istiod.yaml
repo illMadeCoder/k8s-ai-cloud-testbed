@@ -1,6 +1,12 @@
 # Istio Control Plane (istiod)
 # Homelab-optimized with Tempo tracing integration
 
+# Webhook configuration
+# Use Ignore so pods can be created during bootstrap before istiod is ready.
+# Pods created while istiod is down won't get sidecars until restarted.
+sidecarInjectorWebhook:
+  failurePolicy: Ignore
+
 pilot:
   # Enable CNI mode (required for Talos - no iptables in init containers)
   cni:
