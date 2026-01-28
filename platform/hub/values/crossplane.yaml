@@ -36,3 +36,9 @@ metrics:
 # Debug logging for local development - remove for production
 # args:
 #   - --debug
+
+# Disable default MRAP that activates all MRDs ('*')
+# We'll create explicit MRAPs to activate only what we need
+# See: https://docs.crossplane.io/latest/managed-resources/managed-resource-activation-policies/
+provider:
+  defaultActivations: {}
