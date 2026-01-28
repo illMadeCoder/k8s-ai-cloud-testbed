@@ -543,6 +543,18 @@ tasks:
           else
             echo "  No Azure credentials found (skipping)"
           fi
+
+          # Tailscale OAuth credentials (ExternalSecret syncs secret/tailscale → operator-oauth secret)
+          if [ -f "{{.SECRETS_DIR}}/tailscale.json" ]; then
+            echo "  Restoring Tailscale OAuth credentials..."
+            TS_CLIENT_ID=$(jq -r '.clientId' "{{.SECRETS_DIR}}/tailscale.json")
+            TS_AUTH_KEY=$(jq -r '.authKey' "{{.SECRETS_DIR}}/tailscale.json")
+            kubectl --context {{.CONTEXT}} exec -n openbao openbao-0 -c openbao -- \
+              sh -c "BAO_TOKEN=$ROOT_TOKEN bao kv put secret/tailscale client_id=$TS_CLIENT_ID client_secret=$TS_AUTH_KEY"
+            echo "  Tailscale credentials restored to secret/tailscale"
+          else
+            echo "  No Tailscale credentials found (skipping)"
+          fi
         else
           echo "  WARNING: No root token available, skipping credential restore"
         fi
