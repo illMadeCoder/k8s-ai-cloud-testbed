@@ -1,0 +1,21 @@
+# ArgoCD Tailscale Ingress
+# Provides secure remote access to ArgoCD UI via Tailscale
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-tailscale
+  namespace: argocd
+  annotations:
+    tailscale.com/funnel: "false"
+spec:
+  ingressClassName: tailscale
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80

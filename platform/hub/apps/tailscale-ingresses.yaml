@@ -1,25 +1,27 @@
+# Tailscale Ingresses for Hub Services
+#
+# Provides secure remote access to hub services via Tailscale.
+# Creates Tailscale proxies for ArgoCD and other services.
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: prometheus-crds
+  name: tailscale-ingresses
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: hub
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "5"  # After services are deployed
 spec:
   project: default
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
     targetRevision: HEAD
-    path: platform/hub/manifests/prometheus-crds
+    path: platform/hub/manifests/tailscale-ingresses
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - ServerSideApply=true
-      - Replace=true

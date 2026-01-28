@@ -24,11 +24,10 @@ initChownData:
 adminUser: admin
 adminPassword: admin
 
-# Serve from /grafana subpath
+# Server configuration
 grafana.ini:
   server:
-    root_url: "%(protocol)s://%(domain)s/grafana"
-    serve_from_sub_path: true
+    root_url: "%(protocol)s://%(domain)s/"
 
 # Data sources for LGTM stack
 datasources:
@@ -78,6 +77,13 @@ datasources:
 service:
   type: ClusterIP
   port: 80
+
+# Tailscale ingress for secure remote access
+ingress:
+  enabled: true
+  ingressClassName: tailscale
+  hosts:
+    - ""  # Tailscale will assign hostname automatically
 
 # Disable test pod
 testFramework:
