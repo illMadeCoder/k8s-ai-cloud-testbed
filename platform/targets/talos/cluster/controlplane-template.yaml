@@ -1,0 +1,133 @@
+# Talos Controlplane Configuration Template
+#
+# This is a TEMPLATE - secrets are redacted and must be generated.
+# Use `talosctl gen config` to generate actual configs with secrets.
+#
+# Key settings for single-node homelab:
+# - allowSchedulingOnControlPlanes: true (no control-plane taint)
+# - install.disk: /dev/nvme0n1
+# - kubePrism enabled on port 7445
+# - hostDNS enabled with CoreDNS forwarding
+#
+version: v1alpha1
+debug: false
+persist: true
+
+machine:
+    type: controlplane
+    token: <GENERATED>  # Machine join token - generate with talosctl
+    ca:
+        crt: <GENERATED>  # Machine CA certificate
+        key: <GENERATED>  # Machine CA key
+    certSANs: []
+
+    kubelet:
+        image: ghcr.io/siderolabs/kubelet:v1.35.0
+        defaultRuntimeSeccompProfileEnabled: true
+        disableManifestsDirectory: true
+
+    network: {}
+
+    install:
+        disk: /dev/nvme0n1  # NVMe SSD - adjust for your hardware
+        image: ghcr.io/siderolabs/installer:v1.12.1
+        wipe: false
+        grubUseUKICmdline: true
+
+    features:
+        diskQuotaSupport: true
+        kubePrism:
+            enabled: true
+            port: 7445
+        hostDNS:
+            enabled: true
+            forwardKubeDNSToHost: true
+
+    nodeLabels:
+        node.kubernetes.io/exclude-from-external-load-balancers: ""
+
+cluster:
+    id: <GENERATED>  # Cluster ID - generate with talosctl
+    secret: <GENERATED>  # Cluster secret
+
+    controlPlane:
+        endpoint: https://192.168.1.178:6443  # Update to your node IP
+
+    clusterName: talos-hub
+
+    network:
+        dnsDomain: cluster.local
+        podSubnets:
+            - 10.244.0.0/16
+        serviceSubnets:
+            - 10.96.0.0/12
+
+    token: <GENERATED>  # Bootstrap token
+    secretboxEncryptionSecret: <GENERATED>  # Secret encryption key
+
+    ca:
+        crt: <GENERATED>  # Kubernetes CA certificate
+        key: <GENERATED>  # Kubernetes CA key
+
+    aggregatorCA:
+        crt: <GENERATED>  # Aggregator CA certificate
+        key: <GENERATED>  # Aggregator CA key
+
+    serviceAccount:
+        key: <GENERATED>  # Service account signing key
+
+    apiServer:
+        image: registry.k8s.io/kube-apiserver:v1.35.0
+        admissionControl:
+            - name: PodSecurity
+              configuration:
+                apiVersion: pod-security.admission.config.k8s.io/v1alpha1
+                kind: PodSecurityConfiguration
+                defaults:
+                    enforce: baseline
+                    enforce-version: latest
+                    audit: restricted
+                    audit-version: latest
+                    warn: restricted
+                    warn-version: latest
+                exemptions:
+                    namespaces:
+                        - kube-system
+                    runtimeClasses: []
+                    usernames: []
+        auditPolicy:
+            apiVersion: audit.k8s.io/v1
+            kind: Policy
+            rules:
+                - level: Metadata
+
+    controllerManager:
+        image: registry.k8s.io/kube-controller-manager:v1.35.0
+
+    proxy:
+        image: registry.k8s.io/kube-proxy:v1.35.0
+
+    scheduler:
+        image: registry.k8s.io/kube-scheduler:v1.35.0
+
+    discovery:
+        enabled: true
+        registries:
+            kubernetes:
+                disabled: true
+            service: {}
+
+    etcd:
+        ca:
+            crt: <GENERATED>  # etcd CA certificate
+            key: <GENERATED>  # etcd CA key
+
+    extraManifests: []
+    inlineManifests: []
+
+    # IMPORTANT: Allow workloads on control-plane for single-node cluster
+    allowSchedulingOnControlPlanes: true
+---
+apiVersion: v1alpha1
+kind: HostnameConfig
+auto: stable
