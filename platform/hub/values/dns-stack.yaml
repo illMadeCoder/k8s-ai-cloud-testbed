@@ -3,9 +3,7 @@
 # Provides DNS resolution for LoadBalancer and Ingress resources.
 # Query: dig @<service-ip> <service>.<namespace>.k8s.local
 #
-# ENVIRONMENT CONFIG: kube-vip pool 192.168.1.240-250
-#   - values/argocd.yaml (loadBalancerIP)
-#   - values/openbao.yaml (loadBalancerIP)
+# When kube-vip is deployed, switch to LoadBalancer with IP 192.168.1.240.
 
 # Domain served by this DNS server
 domain: k8s.local
@@ -15,12 +13,11 @@ watchedResources:
   - Ingress
   - Service
 
-# Expose via LoadBalancer with fixed IP for predictable DNS config
-# kube-vip pool: DNS=.240, ArgoCD=.241, OpenBao=.242
+# ClusterIP until kube-vip is deployed
+# Switch to LoadBalancer with loadBalancerIP: 192.168.1.240 when available
 service:
-  type: LoadBalancer
+  type: ClusterIP
   port: 53
-  loadBalancerIP: 192.168.1.240
 
 # Fallback DNS for non-k8s.local queries
 fallthrough:

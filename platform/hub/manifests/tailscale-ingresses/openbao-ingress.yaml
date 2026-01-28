@@ -1,0 +1,21 @@
+# Tailscale ingress for OpenBao UI
+# Provides secure remote access to OpenBao via Tailscale
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openbao-tailscale
+  namespace: openbao
+  annotations:
+    tailscale.com/funnel: "false"
+spec:
+  ingressClassName: tailscale
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: openbao
+                port:
+                  number: 8200

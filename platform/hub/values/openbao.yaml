@@ -23,11 +23,10 @@ server:
       cpu: 500m
       memory: 256Mi
 
-  # Expose via LoadBalancer (kube-vip)
-  # kube-vip pool: DNS=.240, ArgoCD=.241, OpenBao=.242
+  # ClusterIP until kube-vip is deployed
+  # Switch to LoadBalancer with loadBalancerIP: 192.168.1.242 when available
   service:
-    type: LoadBalancer
-    loadBalancerIP: 192.168.1.242
+    type: ClusterIP
 
   # File storage configuration using local-path-retain (Retain policy)
   # PV survives PVC deletion so secrets persist across cluster resets
