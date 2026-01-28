@@ -12,9 +12,12 @@
 # - OOM at 256Mi caused cluster instability (provider OOM → API server auth errors)
 # - Using 512Mi limit with 256Mi request for headroom
 ---
-# CRD-only configs for individual providers (no controller pods needed)
-# The family provider handles all reconciliation
-# replicas: 0 means no controller pods are created, only CRDs are installed
+# Webhook-only configs for individual providers
+# The family provider handles all reconciliation, but individual providers
+# need 1 replica to serve their conversion webhooks.
+#
+# NOTE: replicas: 0 doesn't work because CRDs register conversion webhooks
+# that point to service endpoints which don't exist without running pods.
 ---
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
@@ -23,17 +26,28 @@ metadata:
 spec:
   deploymentTemplate:
     spec:
-      replicas: 0
+      replicas: 1
       selector:
         matchLabels:
-          pkg.crossplane.io/crd-only: "true"
+          pkg.crossplane.io/webhook-only: "true"
       template:
         metadata:
           labels:
-            pkg.crossplane.io/crd-only: "true"
+            pkg.crossplane.io/webhook-only: "true"
         spec:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
           containers:
             - name: package-runtime
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
 ---
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
@@ -42,17 +56,28 @@ metadata:
 spec:
   deploymentTemplate:
     spec:
-      replicas: 0
+      replicas: 1
       selector:
         matchLabels:
-          pkg.crossplane.io/crd-only: "true"
+          pkg.crossplane.io/webhook-only: "true"
       template:
         metadata:
           labels:
-            pkg.crossplane.io/crd-only: "true"
+            pkg.crossplane.io/webhook-only: "true"
         spec:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
           containers:
             - name: package-runtime
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
 ---
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
@@ -61,17 +86,28 @@ metadata:
 spec:
   deploymentTemplate:
     spec:
-      replicas: 0
+      replicas: 1
       selector:
         matchLabels:
-          pkg.crossplane.io/crd-only: "true"
+          pkg.crossplane.io/webhook-only: "true"
       template:
         metadata:
           labels:
-            pkg.crossplane.io/crd-only: "true"
+            pkg.crossplane.io/webhook-only: "true"
         spec:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
           containers:
             - name: package-runtime
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
 ---
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
