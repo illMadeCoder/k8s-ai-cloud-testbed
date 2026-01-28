@@ -1,0 +1,97 @@
+---
+# Minimal GCP provider for bucket testing
+# Only installs family provider + storage, no other services
+---
+# Runtime config for family provider
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: gcp-family-config
+spec:
+  deploymentTemplate:
+    spec:
+      selector:
+        matchLabels:
+          pkg.crossplane.io/family: provider-family-gcp
+      template:
+        metadata:
+          labels:
+            pkg.crossplane.io/family: provider-family-gcp
+        spec:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          containers:
+            - name: package-runtime
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+---
+# GCP Family Provider - the controller
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-family-gcp
+spec:
+  package: xpkg.upbound.io/upbound/provider-family-gcp:v1.14.1
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-family-config
+---
+# Runtime config for storage provider (CRDs only, minimal resources)
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: gcp-storage-crd-only
+spec:
+  deploymentTemplate:
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          pkg.crossplane.io/provider: provider-gcp-storage
+      template:
+        metadata:
+          labels:
+            pkg.crossplane.io/provider: provider-gcp-storage
+        spec:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          containers:
+            - name: package-runtime
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
+---
+# GCP Storage Provider - installs storage CRDs
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-gcp-storage
+spec:
+  package: xpkg.upbound.io/upbound/provider-gcp-storage:v1.14.1
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-storage-crd-only
+---
+# MRAP to only activate bucket CRDs
+apiVersion: apiextensions.crossplane.io/v1alpha1
+kind: ManagedResourceActivationPolicy
+metadata:
+  name: gcp-storage-only
+spec:
+  activate:
+    - buckets.storage.gcp.upbound.io
