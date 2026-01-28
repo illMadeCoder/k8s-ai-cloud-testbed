@@ -690,9 +690,11 @@ tasks:
         echo ""
 
         # Use --insecure: after STATE wipe the node boots into maintenance mode
-        # with different TLS, so authenticated talosctl calls fail
+        # with different TLS, so authenticated talosctl calls fail.
+        # Note: talosctl version --insecure exits 1 in maintenance mode
+        # ("API is not implemented"), so check output content, not exit code.
         for i in $(seq 1 60); do
-          if talosctl --nodes {{.TALOS_IP}} version --insecure &>/dev/null; then
+          if talosctl --nodes {{.TALOS_IP}} version --insecure 2>&1 | grep -q "Tag:"; then
             echo "  Talos node is back online (maintenance mode)"
             break
           fi
