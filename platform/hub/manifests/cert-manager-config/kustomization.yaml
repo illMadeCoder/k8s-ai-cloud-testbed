@@ -8,7 +8,7 @@ kind: Kustomization
 
 resources:
   - cluster-issuer.yaml
-  - openbao-issuer.yaml
+  # - openbao-issuer.yaml  # Uncomment when OpenBao PKI is configured
 
 # Environment-specific values
 # Change these to match your domain and email

@@ -1,9 +1,11 @@
 ---
-# ProviderConfigs for all cloud providers
-# Wave 6: Applied after all provider CRDs exist
+# ProviderConfigs for installed providers
 #
-# These configs use Secret-based auth for local Kind development.
+# These configs use Secret-based auth for local development.
 # The secrets are synced from OpenBao via ExternalSecrets.
+#
+# NOTE: Only include configs for providers that are actually installed.
+# AWS/Azure configs are commented out until those providers are added.
 ---
 # Helm ProviderConfig (in-cluster)
 apiVersion: helm.crossplane.io/v1beta1
@@ -23,34 +25,6 @@ spec:
   credentials:
     source: InjectedIdentity
 ---
-# Azure ProviderConfig (Secret-based for local dev)
-# Secret synced from OpenBao: secret/cloud/azure
-apiVersion: azure.upbound.io/v1beta1
-kind: ProviderConfig
-metadata:
-  name: default
-spec:
-  credentials:
-    source: Secret
-    secretRef:
-      namespace: crossplane-system
-      name: azure-credentials
-      key: credentials
----
-# AWS ProviderConfig (Secret-based for local dev)
-# Secret synced from OpenBao: secret/cloud/aws
-apiVersion: aws.upbound.io/v1beta1
-kind: ProviderConfig
-metadata:
-  name: default
-spec:
-  credentials:
-    source: Secret
-    secretRef:
-      namespace: crossplane-system
-      name: aws-credentials
-      key: credentials
----
 # GCP ProviderConfig (Secret-based for local dev)
 # Secret synced from OpenBao: secret/cloud/gcp
 apiVersion: gcp.upbound.io/v1beta1
@@ -65,3 +39,29 @@ spec:
       name: gcp-credentials
       key: credentials
   projectID: illm-k8s-ai-lab
+# ---
+# # Azure ProviderConfig - uncomment when provider-family-azure is installed
+# apiVersion: azure.upbound.io/v1beta1
+# kind: ProviderConfig
+# metadata:
+#   name: default
+# spec:
+#   credentials:
+#     source: Secret
+#     secretRef:
+#       namespace: crossplane-system
+#       name: azure-credentials
+#       key: credentials
+# ---
+# # AWS ProviderConfig - uncomment when provider-family-aws is installed
+# apiVersion: aws.upbound.io/v1beta1
+# kind: ProviderConfig
+# metadata:
+#   name: default
+# spec:
+#   credentials:
+#     source: Secret
+#     secretRef:
+#       namespace: crossplane-system
+#       name: aws-credentials
+#       key: credentials
