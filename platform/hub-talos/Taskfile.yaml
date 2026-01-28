@@ -421,6 +421,17 @@ tasks:
         # Step 4: Install ArgoCD via Helm
         echo ""
         echo "Step 4: Installing ArgoCD via Helm..."
+        # Clean up admission webhooks that block Helm operations
+        # After teardown, webhook configs persist but pods aren't ready yet,
+        # causing "failed calling webhook" errors with failurePolicy: Fail
+        for wh in $(kubectl --context {{.CONTEXT}} get validatingwebhookconfigurations -o name 2>/dev/null | grep -E "kyverno|cert-manager|external-secrets|istio|openbao"); do
+          echo "  Deleting stale webhook: $wh"
+          kubectl --context {{.CONTEXT}} delete "$wh" --ignore-not-found 2>/dev/null || true
+        done
+        for wh in $(kubectl --context {{.CONTEXT}} get mutatingwebhookconfigurations -o name 2>/dev/null | grep -E "kyverno|cert-manager|external-secrets|istio|openbao"); do
+          echo "  Deleting stale webhook: $wh"
+          kubectl --context {{.CONTEXT}} delete "$wh" --ignore-not-found 2>/dev/null || true
+        done
         helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
         helm repo update argo 2>/dev/null || true
         # Clear stale Helm release if stuck in pending-install/pending-upgrade
