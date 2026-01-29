@@ -1,7 +1,7 @@
 ---
 # ObjectStorage CompositeResourceDefinition
 # Provides a cloud-agnostic API for object/blob storage
-# Compositions implement Azure Blob Storage and AWS S3
+# Compositions implement AWS S3, Azure Blob Storage, and GCP GCS
 apiVersion: apiextensions.crossplane.io/v1
 kind: CompositeResourceDefinition
 metadata:
