@@ -21,11 +21,6 @@ spec:
       input:
         apiVersion: pt.fn.crossplane.io/v1beta1
         kind: Resources
-        environment:
-          environmentConfigs:
-            - type: Reference
-              ref:
-                name: cluster-info
         resources:
           # GCS Bucket
           - name: gcs-bucket
@@ -47,10 +42,11 @@ spec:
                 toFieldPath: metadata.name
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
-                toFieldPath: spec.forProvider.name
+                toFieldPath: metadata.annotations[crossplane.io/external-name]
                 transforms:
                   - type: string
                     string:
+                      type: Format
                       fmt: "illm-%s"
 
               # Versioning
@@ -63,6 +59,9 @@ spec:
                 fromFieldPath: spec.publicAccess
                 toFieldPath: spec.forProvider.publicAccessPrevention
                 transforms:
+                  - type: convert
+                    convert:
+                      toType: string
                   - type: map
                     map:
                       "true": inherited
@@ -75,6 +74,7 @@ spec:
                 transforms:
                   - type: string
                     string:
+                      type: Format
                       fmt: "%s-storage-conn"
 
               # Status
@@ -84,13 +84,14 @@ spec:
               - type: ToCompositeFieldPath
                 fromFieldPath: status.atProvider.id
                 toFieldPath: status.bucketName
-              - type: FromCompositeFieldPath
+              - type: ToCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: status.cloud
                 transforms:
                   - type: string
                     string:
-                      fmt: gcp
+                      type: Format
+                      fmt: "gcp%.0s"
 
     - step: auto-ready
       functionRef:

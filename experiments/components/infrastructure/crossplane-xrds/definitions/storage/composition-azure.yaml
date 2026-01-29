@@ -21,11 +21,6 @@ spec:
       input:
         apiVersion: pt.fn.crossplane.io/v1beta1
         kind: Resources
-        environment:
-          environmentConfigs:
-            - type: Reference
-              ref:
-                name: cluster-info
         resources:
           # Resource Group
           - name: resource-group
@@ -42,6 +37,7 @@ spec:
                 transforms:
                   - type: string
                     string:
+                      type: Format
                       fmt: "%s-storage-rg"
 
           # Storage Account
@@ -68,6 +64,7 @@ spec:
                 transforms:
                   - type: string
                     string:
+                      type: Format
                       fmt: "%.24s"  # Azure storage account names max 24 chars
               # Remove hyphens (not allowed in storage account names)
               - type: FromCompositeFieldPath
@@ -82,6 +79,7 @@ spec:
                         replace: ""
                   - type: string
                     string:
+                      type: Format
                       fmt: "%.24s"
 
               # Public access
@@ -101,6 +99,7 @@ spec:
                 transforms:
                   - type: string
                     string:
+                      type: Format
                       fmt: "%s-storage-conn"
 
               # Status
@@ -108,13 +107,14 @@ spec:
                 fromFieldPath: status.atProvider.primaryBlobEndpoint
                 toFieldPath: status.endpoint
 
-              - type: FromCompositeFieldPath
+              - type: ToCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: status.cloud
                 transforms:
                   - type: string
                     string:
-                      fmt: azure
+                      type: Format
+                      fmt: "azure%.0s"
 
           # Blob Container
           - name: blob-container
@@ -133,6 +133,7 @@ spec:
                 transforms:
                   - type: string
                     string:
+                      type: Format
                       fmt: "%s-container"
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
@@ -143,6 +144,9 @@ spec:
                 fromFieldPath: spec.publicAccess
                 toFieldPath: spec.forProvider.containerAccessType
                 transforms:
+                  - type: convert
+                    convert:
+                      toType: string
                   - type: map
                     map:
                       "true": blob
