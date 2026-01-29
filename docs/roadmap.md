@@ -108,7 +108,7 @@ Foundation              Stateful + Security        Complexity
 - [G: Container & Runtime Internals](docs/roadmap/appendix-container-internals.md) - Namespaces, cgroups, OCI
 - [H: Performance Engineering](docs/roadmap/appendix-performance-engineering.md) - Profiling, load testing
 - [I: Event-Driven Architecture](docs/roadmap/appendix-event-driven.md) - Event sourcing, CQRS, Saga
-- [J: Database Internals](docs/roadmap/appendix-database-internals.md) - Storage engines, indexing, sharding
+- [J: Database Internals](docs/roadmap/appendix-database-internals.md) - Storage engines, indexing, sharding, distributed databases, sagas, K8s operators, benchmarking
 - [K: SRE Practices & Incident Management](docs/roadmap/appendix-sre-practices.md) - On-call, post-mortems
 - [L: Multi-Cloud & Disaster Recovery](docs/roadmap/appendix-multicloud-dr.md) - DR planning, failover
 - [M: SLSA Framework Deep Dive](docs/roadmap/appendix-slsa.md) - Provenance, attestations, Sigstore
