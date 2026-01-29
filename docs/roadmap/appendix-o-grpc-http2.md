@@ -199,6 +199,78 @@ This appendix covers advanced gRPC and HTTP/2 patterns that go beyond basic traf
 
 ---
 
+## O.8 gRPC Transport Layer Benchmarking
+
+**Goal:** Measure gRPC latency and throughput across four transport layers to quantify the cost of each network hop
+
+**Learning objectives:**
+- Understand how transport layer choice (UDS, CNI, LAN, internet) impacts gRPC latency and throughput
+- Design reproducible transport benchmarks that isolate network overhead from application overhead
+- Produce data-driven guidance on when to use each transport for gRPC services on Kubernetes
+
+**Tasks:**
+- [ ] Create `experiments/scenarios/grpc-transport-benchmark/`
+- [ ] Unix Domain Socket (UDS):
+  - [ ] gRPC over UDS: shared `hostPath` or `emptyDir` volume between containers
+  - [ ] Sidecar pattern: app + gRPC server in same pod sharing socket
+  - [ ] Zero network stack overhead: no TCP, no IP, kernel-only IPC
+  - [ ] Use cases: Envoy ↔ app, OTel collector sidecar, local AI inference
+- [ ] Kubernetes CNI (pod-to-pod, same node and cross-node):
+  - [ ] Same-node pod-to-pod: veth pairs through bridge/eBPF (CNI-dependent)
+  - [ ] Cross-node pod-to-pod: VXLAN encapsulation, WireGuard, or direct routing
+  - [ ] CNI comparison impact: Cilium (eBPF) vs Calico (iptables) vs Flannel (VXLAN)
+  - [ ] Service mesh overhead: measure with and without Istio/Linkerd sidecar proxy
+- [ ] LAN (cross-host, same datacenter/rack):
+  - [ ] Bare-metal or VM-to-VM within same network segment
+  - [ ] Factors: MTU size (1500 vs 9000 jumbo frames), switch hops, NIC offloading
+  - [ ] Kubernetes context: cross-node traffic on Talos home lab or bare-metal cluster
+  - [ ] Comparison: NodePort, LoadBalancer, and headless Service routing
+- [ ] Internet (cross-region, WAN):
+  - [ ] TLS handshake overhead on every connection establishment
+  - [ ] Latency floor: speed-of-light RTT between regions
+  - [ ] Connection multiplexing benefit: HTTP/2 amortizes handshake cost
+  - [ ] Real-world: cloud region-to-region, edge-to-cloud, client-to-API
+- [ ] Benchmark experiment design:
+  - [ ] Test app: simple gRPC service (echo, key-value lookup, small payload, large payload)
+  - [ ] Payload sizes: 64B, 1KB, 64KB, 1MB (measure serialization + transport)
+  - [ ] RPC patterns: unary, server-streaming (1000 messages), bidirectional streaming
+  - [ ] Concurrency levels: 1, 10, 50, 100 concurrent streams
+- [ ] Benchmark tooling:
+  - [ ] ghz for gRPC load generation (supports UDS, TLS, concurrency control)
+  - [ ] Containerized benchmark client as Kubernetes Job
+  - [ ] Prometheus metrics collection during benchmark runs
+  - [ ] Grafana dashboard for latency heatmaps across transport layers
+- [ ] Measurement methodology:
+  - [ ] Warm-up: 10s discard period before recording
+  - [ ] Steady-state: 60s measurement window per configuration
+  - [ ] Report p50, p95, p99, p99.9 latency and throughput (msg/s, MB/s)
+  - [ ] Multiple runs (5+) with coefficient of variation
+- [ ] Isolation and controls:
+  - [ ] Pin benchmark pods to specific nodes (nodeSelector/affinity)
+  - [ ] Dedicated resource requests to prevent CPU throttling artifacts
+  - [ ] Same payload and proto definition across all transport tests
+  - [ ] Disable service mesh sidecars for baseline, then re-enable for comparison
+- [ ] Expected outcome matrix:
+  - [ ] UDS: lowest latency (~10-50μs), highest throughput, single-pod only
+  - [ ] CNI same-node: ~100-300μs, near-UDS throughput, pod-to-pod flexibility
+  - [ ] CNI cross-node: ~200-800μs, CNI and MTU dependent
+  - [ ] LAN: ~0.5-2ms, switch/NIC dependent, jumbo frames help large payloads
+  - [ ] Internet: ~20-200ms+, TLS + RTT dominated, multiplexing essential
+- [ ] Analysis and decision framework:
+  - [ ] Latency budget allocation: what percentage is transport vs application?
+  - [ ] When UDS is worth the coupling (sidecar architectures, <100μs requirement)
+  - [ ] When cross-node CNI is good enough (most microservices)
+  - [ ] When internet latency demands connection pooling, retries, hedged requests
+  - [ ] Cost of service mesh proxy hop per transport layer
+- [ ] Produce benchmark report:
+  - [ ] Latency CDF charts per transport layer and payload size
+  - [ ] Throughput scaling charts (concurrency vs messages/second)
+  - [ ] Resource consumption (CPU, memory) of gRPC server under each transport
+  - [ ] Recommendations table: transport layer × workload pattern → guidance
+- [ ] **ADR:** Document gRPC transport layer selection criteria and benchmark results
+
+---
+
 ## Cross-References
 
 | Topic | Location |
@@ -206,6 +278,8 @@ This appendix covers advanced gRPC and HTTP/2 patterns that go beyond basic traf
 | Traffic routing basics | Phase 4: Traffic Management |
 | Service mesh gRPC | Phase 7: Service Mesh |
 | API design principles | Appendix F: API Design & Contracts |
+| Benchmarking methodology | Appendix J.17: Database Benchmarking Methodology |
+| Web serving & proxy internals | Appendix S: Web Serving Internals |
 
 ---
 
