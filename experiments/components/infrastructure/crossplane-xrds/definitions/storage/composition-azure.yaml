@@ -13,135 +13,146 @@ spec:
     apiVersion: illm.io/v1alpha1
     kind: XObjectStorage
 
-  environment:
-    environmentConfigs:
-      - type: Reference
-        ref:
-          name: cluster-info
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        environment:
+          environmentConfigs:
+            - type: Reference
+              ref:
+                name: cluster-info
+        resources:
+          # Resource Group
+          - name: resource-group
+            base:
+              apiVersion: azure.upbound.io/v1beta1
+              kind: ResourceGroup
+              spec:
+                forProvider:
+                  location: eastus
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      fmt: "%s-storage-rg"
 
-  resources:
-    # Resource Group
-    - name: resource-group
-      base:
-        apiVersion: azure.upbound.io/v1beta1
-        kind: ResourceGroup
-        spec:
-          forProvider:
-            location: eastus
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: metadata.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-storage-rg"
+          # Storage Account
+          - name: storage-account
+            base:
+              apiVersion: storage.azure.upbound.io/v1beta1
+              kind: Account
+              spec:
+                forProvider:
+                  location: eastus
+                  accountTier: Standard
+                  accountReplicationType: LRS
+                  accountKind: StorageV2
+                  minTlsVersion: TLS1_2
+                  enableHttpsTrafficOnly: true
+                  resourceGroupNameSelector:
+                    matchControllerRef: true
+                writeConnectionSecretToRef:
+                  namespace: crossplane-system
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      fmt: "%.24s"  # Azure storage account names max 24 chars
+              # Remove hyphens (not allowed in storage account names)
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.forProvider.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Regexp
+                      regexp:
+                        match: "-"
+                        replace: ""
+                  - type: string
+                    string:
+                      fmt: "%.24s"
 
-    # Storage Account
-    - name: storage-account
-      base:
-        apiVersion: storage.azure.upbound.io/v1beta1
-        kind: Account
-        spec:
-          forProvider:
-            location: eastus
-            accountTier: Standard
-            accountReplicationType: LRS
-            accountKind: StorageV2
-            minTlsVersion: TLS1_2
-            enableHttpsTrafficOnly: true
-            resourceGroupNameSelector:
-              matchControllerRef: true
-          writeConnectionSecretToRef:
-            namespace: crossplane-system
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: metadata.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%.24s"  # Azure storage account names max 24 chars
-        # Remove hyphens (not allowed in storage account names)
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: spec.forProvider.name
-          transforms:
-            - type: string
-              string:
-                type: Regexp
-                regexp:
-                  match: "-"
-                  replace: ""
-            - type: string
-              string:
-                fmt: "%.24s"
+              # Public access
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.publicAccess
+                toFieldPath: spec.forProvider.allowBlobPublicAccess
 
-        # Public access
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.publicAccess
-          toFieldPath: spec.forProvider.allowBlobPublicAccess
+              # Versioning
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.versioning
+                toFieldPath: spec.forProvider.blobProperties[0].versioningEnabled
 
-        # Versioning
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.versioning
-          toFieldPath: spec.forProvider.blobProperties[0].versioningEnabled
+              # Connection secret
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.writeConnectionSecretToRef.name
+                transforms:
+                  - type: string
+                    string:
+                      fmt: "%s-storage-conn"
 
-        # Connection secret
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: spec.writeConnectionSecretToRef.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-storage-conn"
+              # Status
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.primaryBlobEndpoint
+                toFieldPath: status.endpoint
 
-        # Status
-        - type: ToCompositeFieldPath
-          fromFieldPath: status.atProvider.primaryBlobEndpoint
-          toFieldPath: status.endpoint
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: status.cloud
+                transforms:
+                  - type: string
+                    string:
+                      fmt: azure
 
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: status.cloud
-          transforms:
-            - type: string
-              string:
-                fmt: azure
+          # Blob Container
+          - name: blob-container
+            base:
+              apiVersion: storage.azure.upbound.io/v1beta1
+              kind: Container
+              spec:
+                forProvider:
+                  containerAccessType: private
+                  storageAccountNameSelector:
+                    matchControllerRef: true
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      fmt: "%s-container"
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.forProvider.name
 
-    # Blob Container
-    - name: blob-container
-      base:
-        apiVersion: storage.azure.upbound.io/v1beta1
-        kind: Container
-        spec:
-          forProvider:
-            containerAccessType: private
-            storageAccountNameSelector:
-              matchControllerRef: true
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: metadata.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-container"
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: spec.forProvider.name
+              # Public access
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.publicAccess
+                toFieldPath: spec.forProvider.containerAccessType
+                transforms:
+                  - type: map
+                    map:
+                      "true": blob
+                      "false": private
 
-        # Public access
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.publicAccess
-          toFieldPath: spec.forProvider.containerAccessType
-          transforms:
-            - type: map
-              map:
-                "true": blob
-                "false": private
+              # Status
+              - type: ToCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: status.bucketName
 
-        # Status
-        - type: ToCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: status.bucketName
+    - step: auto-ready
+      functionRef:
+        name: function-auto-ready

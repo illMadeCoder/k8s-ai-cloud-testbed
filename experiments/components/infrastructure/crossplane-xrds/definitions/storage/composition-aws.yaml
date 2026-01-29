@@ -13,152 +13,163 @@ spec:
     apiVersion: illm.io/v1alpha1
     kind: XObjectStorage
 
-  environment:
-    environmentConfigs:
-      - type: Reference
-        ref:
-          name: cluster-info
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        environment:
+          environmentConfigs:
+            - type: Reference
+              ref:
+                name: cluster-info
+        resources:
+          # S3 Bucket
+          - name: s3-bucket
+            base:
+              apiVersion: s3.aws.upbound.io/v1beta1
+              kind: Bucket
+              spec:
+                forProvider:
+                  region: us-east-1
+                writeConnectionSecretToRef:
+                  namespace: crossplane-system
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.forProvider.bucket
+                transforms:
+                  - type: string
+                    string:
+                      fmt: "illm-%s"
 
-  resources:
-    # S3 Bucket
-    - name: s3-bucket
-      base:
-        apiVersion: s3.aws.upbound.io/v1beta1
-        kind: Bucket
-        spec:
-          forProvider:
-            region: us-east-1
-          writeConnectionSecretToRef:
-            namespace: crossplane-system
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: metadata.name
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: spec.forProvider.bucket
-          transforms:
-            - type: string
-              string:
-                fmt: "illm-%s"
+              # Connection secret
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.writeConnectionSecretToRef.name
+                transforms:
+                  - type: string
+                    string:
+                      fmt: "%s-storage-conn"
 
-        # Connection secret
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: spec.writeConnectionSecretToRef.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-storage-conn"
+              # Status
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.bucketRegionalDomainName
+                toFieldPath: status.endpoint
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.bucket
+                toFieldPath: status.bucketName
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: status.cloud
+                transforms:
+                  - type: string
+                    string:
+                      fmt: aws
 
-        # Status
-        - type: ToCompositeFieldPath
-          fromFieldPath: status.atProvider.bucketRegionalDomainName
-          toFieldPath: status.endpoint
-        - type: ToCompositeFieldPath
-          fromFieldPath: status.atProvider.bucket
-          toFieldPath: status.bucketName
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: status.cloud
-          transforms:
-            - type: string
-              string:
-                fmt: aws
+          # Bucket Versioning
+          - name: bucket-versioning
+            base:
+              apiVersion: s3.aws.upbound.io/v1beta1
+              kind: BucketVersioning
+              spec:
+                forProvider:
+                  region: us-east-1
+                  bucketSelector:
+                    matchControllerRef: true
+                  versioningConfiguration:
+                    - status: Suspended
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      fmt: "%s-versioning"
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.versioning
+                toFieldPath: spec.forProvider.versioningConfiguration[0].status
+                transforms:
+                  - type: map
+                    map:
+                      "true": Enabled
+                      "false": Suspended
 
-    # Bucket Versioning
-    - name: bucket-versioning
-      base:
-        apiVersion: s3.aws.upbound.io/v1beta1
-        kind: BucketVersioning
-        spec:
-          forProvider:
-            region: us-east-1
-            bucketSelector:
-              matchControllerRef: true
-            versioningConfiguration:
-              - status: Suspended
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: metadata.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-versioning"
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.versioning
-          toFieldPath: spec.forProvider.versioningConfiguration[0].status
-          transforms:
-            - type: map
-              map:
-                "true": Enabled
-                "false": Suspended
+          # Bucket Server-Side Encryption
+          - name: bucket-encryption
+            base:
+              apiVersion: s3.aws.upbound.io/v1beta1
+              kind: BucketServerSideEncryptionConfiguration
+              spec:
+                forProvider:
+                  region: us-east-1
+                  bucketSelector:
+                    matchControllerRef: true
+                  rule:
+                    - applyServerSideEncryptionByDefault:
+                        - sseAlgorithm: AES256
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      fmt: "%s-encryption"
 
-    # Bucket Server-Side Encryption
-    - name: bucket-encryption
-      base:
-        apiVersion: s3.aws.upbound.io/v1beta1
-        kind: BucketServerSideEncryptionConfiguration
-        spec:
-          forProvider:
-            region: us-east-1
-            bucketSelector:
-              matchControllerRef: true
-            rule:
-              - applyServerSideEncryptionByDefault:
-                  - sseAlgorithm: AES256
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: metadata.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-encryption"
+          # Bucket Public Access Block
+          - name: bucket-public-access
+            base:
+              apiVersion: s3.aws.upbound.io/v1beta1
+              kind: BucketPublicAccessBlock
+              spec:
+                forProvider:
+                  region: us-east-1
+                  bucketSelector:
+                    matchControllerRef: true
+                  blockPublicAcls: true
+                  blockPublicPolicy: true
+                  ignorePublicAcls: true
+                  restrictPublicBuckets: true
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      fmt: "%s-public-block"
+              # If publicAccess is true, allow public access
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.publicAccess
+                toFieldPath: spec.forProvider.blockPublicAcls
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: bool
+                  - type: map
+                    map:
+                      "true": false
+                      "false": true
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.publicAccess
+                toFieldPath: spec.forProvider.blockPublicPolicy
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: bool
+                  - type: map
+                    map:
+                      "true": false
+                      "false": true
 
-    # Bucket Public Access Block
-    - name: bucket-public-access
-      base:
-        apiVersion: s3.aws.upbound.io/v1beta1
-        kind: BucketPublicAccessBlock
-        spec:
-          forProvider:
-            region: us-east-1
-            bucketSelector:
-              matchControllerRef: true
-            blockPublicAcls: true
-            blockPublicPolicy: true
-            ignorePublicAcls: true
-            restrictPublicBuckets: true
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: metadata.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-public-block"
-        # If publicAccess is true, allow public access
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.publicAccess
-          toFieldPath: spec.forProvider.blockPublicAcls
-          transforms:
-            - type: convert
-              convert:
-                toType: bool
-            - type: map
-              map:
-                "true": false
-                "false": true
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.publicAccess
-          toFieldPath: spec.forProvider.blockPublicPolicy
-          transforms:
-            - type: convert
-              convert:
-                toType: bool
-            - type: map
-              map:
-                "true": false
-                "false": true
+    - step: auto-ready
+      functionRef:
+        name: function-auto-ready
