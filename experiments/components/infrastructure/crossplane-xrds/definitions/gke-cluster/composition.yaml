@@ -1,0 +1,209 @@
+---
+# GCP Composition for GKECluster XRD
+# Creates: VPC Network, Subnetwork, GKE Cluster, Node Pool
+# Outputs kubeconfig for ArgoCD cluster registration
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xgkeclusters.gcp.illm.io
+  labels:
+    provider: gcp
+    crossplane.io/xrd: xgkeclusters.illm.io
+spec:
+  compositeTypeRef:
+    apiVersion: illm.io/v1alpha1
+    kind: XGKECluster
+
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          # VPC Network
+          - name: vpc-network
+            base:
+              apiVersion: compute.gcp.upbound.io/v1beta1
+              kind: Network
+              spec:
+                forProvider:
+                  autoCreateSubnetworks: false
+                  routingMode: REGIONAL
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-network"
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.annotations[crossplane.io/external-name]
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-network"
+
+          # Subnetwork for nodes
+          - name: subnet
+            base:
+              apiVersion: compute.gcp.upbound.io/v1beta1
+              kind: Subnetwork
+              spec:
+                forProvider:
+                  ipCidrRange: "10.0.0.0/20"
+                  networkSelector:
+                    matchControllerRef: true
+                  privateIpGoogleAccess: true
+                  # Secondary ranges for pods and services (VPC-native)
+                  secondaryIpRange:
+                    - ipCidrRange: "10.1.0.0/16"
+                      rangeName: pods
+                    - ipCidrRange: "10.2.0.0/20"
+                      rangeName: services
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-subnet"
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.annotations[crossplane.io/external-name]
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-subnet"
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.region
+                toFieldPath: spec.forProvider.region
+
+          # GKE Cluster (control plane)
+          - name: gke-cluster
+            base:
+              apiVersion: container.gcp.upbound.io/v1beta2
+              kind: Cluster
+              spec:
+                forProvider:
+                  # Start with no default node pool (we create our own)
+                  initialNodeCount: 1
+                  removeDefaultNodePool: true
+                  # VPC-native cluster (uses alias IPs)
+                  networkingMode: VPC_NATIVE
+                  networkSelector:
+                    matchControllerRef: true
+                  subnetworkSelector:
+                    matchControllerRef: true
+                  ipAllocationPolicy:
+                    - clusterSecondaryRangeName: pods
+                      servicesSecondaryRangeName: services
+                  # Workload Identity for secure pod auth
+                  workloadIdentityConfig:
+                    - workloadPool: ""  # Will be patched
+                  # Minimal logging/monitoring for cost savings
+                  loggingService: none
+                  monitoringService: none
+                  # Release channel for auto-upgrades
+                  releaseChannel:
+                    - channel: REGULAR
+                writeConnectionSecretToRef:
+                  namespace: crossplane-system
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.annotations[crossplane.io/external-name]
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "illm-%s"
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.region
+                toFieldPath: spec.forProvider.location
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.writeConnectionSecretToRef.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-cluster-conn"
+              # Status outputs
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.endpoint
+                toFieldPath: status.endpoint
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.status
+                toFieldPath: status.status
+              - type: ToCompositeFieldPath
+                fromFieldPath: metadata.annotations[crossplane.io/external-name]
+                toFieldPath: status.clusterName
+
+          # Node Pool (worker nodes)
+          - name: node-pool
+            base:
+              apiVersion: container.gcp.upbound.io/v1beta2
+              kind: NodePool
+              spec:
+                forProvider:
+                  clusterSelector:
+                    matchControllerRef: true
+                  nodeConfig:
+                    - oauthScopes:
+                        - https://www.googleapis.com/auth/cloud-platform
+                      # Secure defaults
+                      shieldedInstanceConfig:
+                        - enableIntegrityMonitoring: true
+                          enableSecureBoot: true
+                  management:
+                    - autoRepair: true
+                      autoUpgrade: true
+                  upgradeSettings:
+                    - maxSurge: 1
+                      maxUnavailable: 0
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-nodes"
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.annotations[crossplane.io/external-name]
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-nodes"
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.nodeCount
+                toFieldPath: spec.forProvider.nodeCount
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.machineType
+                toFieldPath: spec.forProvider.nodeConfig[0].machineType
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.diskSizeGb
+                toFieldPath: spec.forProvider.nodeConfig[0].diskSizeGb
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.preemptible
+                toFieldPath: spec.forProvider.nodeConfig[0].preemptible
+
+    - step: auto-ready
+      functionRef:
+        name: function-auto-ready

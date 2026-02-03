@@ -25,3 +25,17 @@ metadata:
 spec:
   activate:
     - buckets.storage.gcp.upbound.io
+---
+# GKE cluster provisioning (Phase 4)
+apiVersion: apiextensions.crossplane.io/v1alpha1
+kind: ManagedResourceActivationPolicy
+metadata:
+  name: gcp-gke-cluster
+spec:
+  activate:
+    # compute.gcp.upbound.io - VPC networking
+    - networks.compute.gcp.upbound.io
+    - subnetworks.compute.gcp.upbound.io
+    # container.gcp.upbound.io - GKE
+    - clusters.container.gcp.upbound.io
+    - nodepools.container.gcp.upbound.io

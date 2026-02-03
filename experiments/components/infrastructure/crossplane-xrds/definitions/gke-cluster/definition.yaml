@@ -1,0 +1,88 @@
+---
+# GKECluster CompositeResourceDefinition
+# Provides a simplified API for provisioning GKE clusters
+# Used for Phase 4 traffic management experiments
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xgkeclusters.illm.io
+spec:
+  group: illm.io
+  names:
+    kind: XGKECluster
+    plural: xgkeclusters
+  claimNames:
+    kind: GKECluster
+    plural: gkeclusters
+  connectionSecretKeys:
+    - kubeconfig
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - region
+              properties:
+                region:
+                  type: string
+                  description: GCP region (e.g., us-central1)
+                  default: us-central1
+                nodeCount:
+                  type: integer
+                  description: Number of nodes per zone
+                  default: 1
+                  minimum: 1
+                  maximum: 10
+                machineType:
+                  type: string
+                  description: GCE machine type for nodes
+                  default: e2-medium
+                diskSizeGb:
+                  type: integer
+                  description: Boot disk size in GB
+                  default: 50
+                kubernetesVersion:
+                  type: string
+                  description: Kubernetes version (e.g., 1.30, 1.31, or latest)
+                  default: "1.30"
+                preemptible:
+                  type: boolean
+                  description: Use preemptible (spot) VMs for cost savings
+                  default: true
+            status:
+              type: object
+              properties:
+                clusterName:
+                  type: string
+                  description: GKE cluster name
+                endpoint:
+                  type: string
+                  description: Kubernetes API server endpoint
+                status:
+                  type: string
+                  description: Cluster status (PROVISIONING, RUNNING, etc.)
+      additionalPrinterColumns:
+        - name: Region
+          type: string
+          jsonPath: .spec.region
+        - name: Nodes
+          type: integer
+          jsonPath: .spec.nodeCount
+        - name: Machine
+          type: string
+          jsonPath: .spec.machineType
+        - name: Status
+          type: string
+          jsonPath: .status.status
+        - name: Endpoint
+          type: string
+          jsonPath: .status.endpoint
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

@@ -45,8 +45,8 @@ A **benchmarking-focused** Kubernetes experiment lab for **Cloud Architect**, **
 |-------|-------|--------|---------|
 | 1 | [Platform Bootstrap & GitOps](docs/roadmap/phase-01-platform-bootstrap.md) | Complete | Hub, orchestrator, Argo Workflows, Crossplane |
 | 2 | [CI/CD & Supply Chain](docs/roadmap/phase-02-cicd-supply-chain.md) | Complete | Image building, scanning, SBOM, signing |
-| 3 | [Observability](docs/roadmap/phase-03-observability.md) | In Progress | Prometheus, Loki, Tempo, Grafana, SLOs |
-| 4 | [Traffic Management](docs/roadmap/phase-04-traffic-management.md) | Not Started | Gateway API, ingress comparison |
+| 3 | [Observability](docs/roadmap/phase-03-observability.md) | Complete | Prometheus, Loki, Tempo, Grafana, SLOs |
+| 4 | [Traffic Management](docs/roadmap/phase-04-traffic-management.md) | In Progress | Gateway API, ingress comparison, GKE target cluster |
 | 5 | [Data & Persistence](docs/roadmap/phase-05-data-persistence.md) | Not Started | PostgreSQL, Redis, backup, benchmark |
 | 6 | [Security & Policy](docs/roadmap/phase-06-security-policy.md) | Not Started | TLS, secrets (ESO), RBAC, Kyverno, NetworkPolicy |
 | 7 | [Service Mesh](docs/roadmap/phase-07-service-mesh.md) | Not Started | Istio vs Linkerd vs Cilium, overhead benchmark |
@@ -117,6 +117,15 @@ Foundation              Stateful + Security        Complexity
 
 ## Current Focus
 
+**Phase 4: Traffic Management** — Provision GKE cluster, deploy Envoy Gateway, run gateway experiments.
+
+---
+
+## Completed Phases
+
+<details>
+<summary>Phase 1: Platform Bootstrap (click to expand)</summary>
+
 **Phase 1: Platform Bootstrap**
 - [x] Create `platform/hub/` directory structure
 - [x] Create ArgoCD bootstrap values with app-of-apps reference
@@ -135,7 +144,10 @@ Foundation              Stateful + Security        Complexity
 
 See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 
----
+</details>
+
+<details>
+<summary>Phase 2: CI/CD & Supply Chain (click to expand)</summary>
 
 ## Recent Progress (2025-12-30)
 
@@ -218,55 +230,80 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 
 **Phase 2 Complete** - CI/CD pipeline with supply chain security, auto-detection builds, continuous deployment via Image Updater, Renovate for dependency updates.
 
+</details>
+
 ---
 
-## Phase 3: Observability (In Progress)
+## Phase 3: Observability (Complete)
 
 **Architecture:** See [ADR-011: Observability Architecture](docs/adrs/ADR-011-observability-architecture.md) for the holistic view of how metrics, logs, traces, and storage integrate.
 
+**Phase 3 Complete** - Full observability stack deployed: Prometheus/Mimir (metrics), Loki (logs), Tempo (traces), Grafana (dashboards), Pyrra (SLOs). Tutorial scenarios created for each component.
+
+<details>
+<summary>Phase 3 Details (click to expand)</summary>
+
 ### Phase 3.1: Prometheus & Grafana
 
-### Observability Foundation
-
-- [x] Fix prometheus-stack component path references
 - [x] Create `metrics-app` with custom Prometheus metrics (Counter, Gauge, Histogram, Summary)
 - [x] Create ServiceMonitor for scrape discovery
 - [x] Create `prometheus-tutorial` experiment scenario
-- [x] Document PromQL patterns in experiment README
-- [x] Test experiment end-to-end with `task kind:conduct -- prometheus-tutorial`
 - [x] Build Grafana RED dashboard for metrics-app
 
-### TSDB Comparison (Phase 3.1 addition)
+### Phase 3.2: SeaweedFS Object Storage
 
-- [x] Create TSDB comparison tutorial (Prometheus vs Victoria Metrics)
-- [x] Create cardinality-generator app
-- [x] Deploy and test comparison end-to-end
-- [x] Document in ADR-009
+- [x] Deploy SeaweedFS for S3-compatible storage (Mimir/Loki/Tempo backends)
 
-### Next Steps
+### Phase 3.3: Logging (Loki vs ELK)
 
-- [x] Re-enable Let's Encrypt after rate limit reset (issuers ready)
-- [x] Set up Talos home lab cluster
-- [x] Phase 3.2: SeaweedFS Object Storage
-- [x] Phase 3.3: Logging Comparison (Loki vs ELK)
-  - [x] Create `loki-tutorial` experiment (Loki + Promtail + Grafana)
-  - [x] Create `elk-tutorial` experiment (Elasticsearch + Kibana + Fluent Bit)
-  - [x] Create `logging-comparison` tutorial experiment
-  - [ ] **BACKLOG**: Play through loki-tutorial, elk-tutorial, logging-comparison
-- [x] Phase 3.4: OpenTelemetry & Distributed Tracing
-  - [x] Create Tempo component (ArgoCD app + Helm values)
-  - [x] Create Jaeger component (ArgoCD app + Helm values)
-  - [x] Create `otel-demo` multi-service app (user → order → payment)
-  - [x] Create `otel-tutorial` experiment (OTel Collector + Tempo + Grafana)
-  - [x] Create `tracing-comparison` experiment (Tempo vs Jaeger)
-  - [ ] **BACKLOG**: Play through otel-tutorial, tracing-comparison
-- [x] Phase 3.5: SLOs & Error Budgets (Pyrra)
-  - [x] Create Pyrra component (ArgoCD app + Helm values)
-  - [x] Create `slo-tutorial` experiment (Pyrra + error budgets + multi-burn-rate alerts)
-  - [ ] **BACKLOG**: Play through slo-tutorial
-- [x] Phase 3.6: Observability Cost Management
-  - [x] Create `observability-cost-tutorial` experiment (cardinality, log volume, retention)
-  - [ ] **BACKLOG**: Play through observability-cost-tutorial
+- [x] Create `loki-tutorial`, `elk-tutorial`, `logging-comparison` experiments
+
+### Phase 3.4: Distributed Tracing (Tempo vs Jaeger)
+
+- [x] Create `otel-demo` multi-service app, `otel-tutorial`, `tracing-comparison` experiments
+
+### Phase 3.5: SLOs & Error Budgets
+
+- [x] Deploy Pyrra, create `slo-tutorial` experiment
+
+### Phase 3.6: Observability Cost Management
+
+- [x] Create `observability-cost-tutorial` experiment
+
+</details>
+
+**Optional Tutorials** (for refreshers):
+- `loki-tutorial`, `elk-tutorial`, `logging-comparison`
+- `otel-tutorial`, `tracing-comparison`
+- `slo-tutorial`, `observability-cost-tutorial`
+
+---
+
+## Phase 4: Traffic Management (In Progress)
+
+### Current Focus
+
+- [ ] Provision GKE target cluster via Crossplane
+- [ ] Deploy Envoy Gateway on GKE
+- [ ] Run gateway-tutorial scenarios
+
+### Infrastructure Setup
+
+- [x] Create `gateway-tutorial` experiment scenario (Parts 1-5 including gRPC)
+- [x] Create `gateway-comparison` experiment (nginx vs Traefik vs Envoy Gateway)
+- [ ] Add `provider-gcp-container` for GKE provisioning
+- [ ] Create GKE XRD and composition (Pipeline mode)
+- [ ] Deploy Envoy Gateway on remote cluster
+
+### Gateway Tutorial Parts
+
+- [ ] Part 1: Ingress Basics (nginx-ingress)
+- [ ] Part 2: Hitting Ingress Limitations
+- [ ] Part 3: Migrate to Gateway API
+- [ ] Part 4: Gateway API Deep Dive (HTTPRoute patterns)
+- [ ] Part 5: gRPC Traffic Management (GRPCRoute)
+
+See [Phase 4](docs/roadmap/phase-04-traffic-management.md) for full details
 
 ---
 

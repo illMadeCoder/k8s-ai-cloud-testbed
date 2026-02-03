@@ -1,0 +1,56 @@
+---
+# GCP Providers for Crossplane
+#
+# Architecture (Upbound provider families):
+# - provider-family-gcp runs controllers for all GCP resources
+# - Individual providers (provider-gcp-*) only install CRDs
+# - MRAP controls which CRDs are activated to reduce memory
+#
+# Installed providers:
+# - provider-gcp-storage: GCS buckets (ObjectStorage XRD)
+# - provider-gcp-container: GKE clusters (GKECluster XRD)
+# - provider-gcp-compute: VPC networking (GKE prerequisite)
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-family-gcp
+spec:
+  package: xpkg.upbound.io/upbound/provider-family-gcp:v1.14.1
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-family-config
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-gcp-storage
+spec:
+  package: xpkg.upbound.io/upbound/provider-gcp-storage:v1.14.1
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-storage-crd-only
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-gcp-container
+spec:
+  package: xpkg.upbound.io/upbound/provider-gcp-container:v1.14.1
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-container-crd-only
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-gcp-compute
+spec:
+  package: xpkg.upbound.io/upbound/provider-gcp-compute:v1.14.1
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: gcp-compute-crd-only
