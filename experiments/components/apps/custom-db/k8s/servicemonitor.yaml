@@ -1,0 +1,16 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: custom-db
+  labels:
+    app: custom-db
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: custom-db
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics
