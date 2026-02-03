@@ -1,84 +1,16 @@
 ---
-# DeploymentRuntimeConfigs for all providers
-# These must exist BEFORE providers reference them
+# DeploymentRuntimeConfigs for installed providers
 #
 # Architecture (Upbound provider families):
-# - Family providers (provider-family-{cloud}) run controllers that reconcile ALL resources
+# - Family providers (provider-family-{cloud}) run controllers
 # - Individual providers (provider-{cloud}-{service}) only install CRDs
-# - Use *-crd-only configs (replicas: 0) for individual providers to save resources
+# - CRD-only providers need 1 replica for conversion webhooks
 #
 # Memory notes:
-# - Providers with many CRDs need 300-500MB at startup
 # - OOM at 256Mi caused cluster instability (provider OOM → API server auth errors)
 # - Using 512Mi limit with 256Mi request for headroom
 ---
-# Webhook-only configs for individual providers
-# The family provider handles all reconciliation, but individual providers
-# need 1 replica to serve their conversion webhooks.
-#
-# NOTE: replicas: 0 doesn't work because CRDs register conversion webhooks
-# that point to service endpoints which don't exist without running pods.
----
-apiVersion: pkg.crossplane.io/v1beta1
-kind: DeploymentRuntimeConfig
-metadata:
-  name: azure-crd-only
-spec:
-  deploymentTemplate:
-    spec:
-      replicas: 1
-      selector:
-        matchLabels:
-          pkg.crossplane.io/webhook-only: "true"
-      template:
-        metadata:
-          labels:
-            pkg.crossplane.io/webhook-only: "true"
-        spec:
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
-          containers:
-            - name: package-runtime
-              resources:
-                requests:
-                  cpu: 10m
-                  memory: 64Mi
-                limits:
-                  cpu: 100m
-                  memory: 128Mi
----
-apiVersion: pkg.crossplane.io/v1beta1
-kind: DeploymentRuntimeConfig
-metadata:
-  name: aws-crd-only
-spec:
-  deploymentTemplate:
-    spec:
-      replicas: 1
-      selector:
-        matchLabels:
-          pkg.crossplane.io/webhook-only: "true"
-      template:
-        metadata:
-          labels:
-            pkg.crossplane.io/webhook-only: "true"
-        spec:
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
-          containers:
-            - name: package-runtime
-              resources:
-                requests:
-                  cpu: 10m
-                  memory: 64Mi
-                limits:
-                  cpu: 100m
-                  memory: 128Mi
----
+# GCP CRD-only (used by provider-gcp-storage)
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
@@ -109,6 +41,7 @@ spec:
                   cpu: 100m
                   memory: 128Mi
 ---
+# Helm provider
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
@@ -138,6 +71,7 @@ spec:
                   cpu: 500m
                   memory: 384Mi
 ---
+# Kubernetes provider
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
@@ -167,69 +101,7 @@ spec:
                   cpu: 500m
                   memory: 384Mi
 ---
-apiVersion: pkg.crossplane.io/v1beta1
-kind: DeploymentRuntimeConfig
-metadata:
-  name: azure-runtime-config
-spec:
-  deploymentTemplate:
-    spec:
-      selector:
-        matchLabels:
-          pkg.crossplane.io/family: provider-family-azure
-      template:
-        metadata:
-          labels:
-            pkg.crossplane.io/family: provider-family-azure
-            azure.workload.identity/use: "true"
-        spec:
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
-          securityContext:
-            fsGroup: 65532
-          containers:
-            - name: package-runtime
-              resources:
-                requests:
-                  cpu: 50m
-                  memory: 256Mi
-                limits:
-                  cpu: 500m
-                  memory: 512Mi
----
-apiVersion: pkg.crossplane.io/v1beta1
-kind: DeploymentRuntimeConfig
-metadata:
-  name: aws-runtime-config
-spec:
-  deploymentTemplate:
-    spec:
-      selector:
-        matchLabels:
-          pkg.crossplane.io/family: provider-family-aws
-      template:
-        metadata:
-          labels:
-            pkg.crossplane.io/family: provider-family-aws
-        spec:
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
-          securityContext:
-            fsGroup: 2000
-          containers:
-            - name: package-runtime
-              resources:
-                requests:
-                  cpu: 50m
-                  memory: 256Mi
-                limits:
-                  cpu: 500m
-                  memory: 512Mi
----
+# GCP family provider (controller for all GCP resources)
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:

@@ -1,14 +1,8 @@
 ---
-# ManagedResourceActivationPolicy (MRAP) for base providers
+# ManagedResourceActivationPolicies (MRAP)
 #
-# This controls which ManagedResourceDefinitions (MRDs) become active CRDs.
+# Controls which ManagedResourceDefinitions (MRDs) become active CRDs.
 # Without this, the default MRAP activates ALL MRDs ('*') causing CRD bloat.
-#
-# Note: Crossplane Helm chart creates a default MRAP with activate: ['*']
-# unless provider.defaultActivations is set to {} in values.yaml
-#
-# We only activate resources for base providers (helm, kubernetes).
-# Cloud provider resources will have their own MRAPs when enabled.
 #
 # See: https://docs.crossplane.io/latest/managed-resources/managed-resource-activation-policies/
 ---
@@ -18,8 +12,16 @@ metadata:
   name: base-providers
 spec:
   activate:
-    # provider-kubernetes resources
+    # provider-kubernetes
     - objects.kubernetes.crossplane.io
     - observedobjectcollections.kubernetes.crossplane.io
-    # provider-helm resources
+    # provider-helm
     - releases.helm.crossplane.io
+---
+apiVersion: apiextensions.crossplane.io/v1alpha1
+kind: ManagedResourceActivationPolicy
+metadata:
+  name: gcp-storage-only
+spec:
+  activate:
+    - buckets.storage.gcp.upbound.io

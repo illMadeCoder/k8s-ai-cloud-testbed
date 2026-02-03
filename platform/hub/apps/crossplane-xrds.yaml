@@ -1,12 +1,7 @@
 # Crossplane XRDs for Hub
 #
-# Installs the cloud abstraction layer - XRDs provide unified APIs
-# for Database, Cache, ObjectStorage, Queue, and ExperimentCluster.
-#
-# NOTE: Automatic sync disabled until compositions are updated to use
-# Crossplane Pipeline mode (required for environment configs). The current
-# compositions use the older Patch & Transform format with environment
-# section which is not supported.
+# Cloud abstraction layer — XRDs provide a unified ObjectStorage API
+# backed by AWS S3, Azure Blob, or GCP GCS compositions.
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -15,7 +10,6 @@ metadata:
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: hub
-    environment: kind
   annotations:
     argocd.argoproj.io/sync-wave: "2"
   finalizers:
@@ -41,10 +35,9 @@ spec:
       jqPathExpressions:
         - .status
   syncPolicy:
-    # Disabled until compositions are updated to Pipeline mode
-    # automated:
-    #   prune: true
-    #   selfHeal: true
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
       - RespectIgnoreDifferences=true
