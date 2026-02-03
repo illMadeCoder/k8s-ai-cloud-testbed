@@ -165,6 +165,7 @@ spec:
                   memory: 128Mi
 ---
 # GCP compute provider (CRD-only for VPC/networking)
+# Note: Compute provider has many CRDs and needs more memory than storage/container
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
@@ -189,8 +190,8 @@ spec:
             - name: package-runtime
               resources:
                 requests:
-                  cpu: 10m
-                  memory: 64Mi
+                  cpu: 50m
+                  memory: 256Mi
                 limits:
-                  cpu: 100m
-                  memory: 128Mi
+                  cpu: 200m
+                  memory: 512Mi
