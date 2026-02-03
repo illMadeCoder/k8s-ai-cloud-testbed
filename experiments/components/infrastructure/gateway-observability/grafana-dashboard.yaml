@@ -20,7 +20,7 @@ data:
           "title": "Request Rate",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [{
             "expr": "sum(rate(envoy_http_downstream_rq_total{job=\"prometheus.scrape.envoy_proxy\"}[5m]))",
             "legendFormat": "req/s"
@@ -43,7 +43,7 @@ data:
           "title": "Active Connections",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [{
             "expr": "sum(envoy_http_downstream_cx_active{job=\"prometheus.scrape.envoy_proxy\"})",
             "legendFormat": "connections"
@@ -65,7 +65,7 @@ data:
           "title": "Error Rate (5xx)",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [{
             "expr": "sum(rate(envoy_http_downstream_rq_xx{envoy_response_code_class=\"5\",job=\"prometheus.scrape.envoy_proxy\"}[5m])) / sum(rate(envoy_http_downstream_rq_total{job=\"prometheus.scrape.envoy_proxy\"}[5m])) * 100 or vector(0)",
             "legendFormat": "error %"
@@ -88,7 +88,7 @@ data:
           "title": "Upstream Clusters",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [{
             "expr": "count(count by (envoy_cluster_name) (envoy_cluster_upstream_cx_total{job=\"prometheus.scrape.envoy_proxy\"}))",
             "legendFormat": "clusters"
@@ -108,7 +108,7 @@ data:
           "title": "Request Rate by Response Code",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [{
             "expr": "sum by (envoy_response_code_class) (rate(envoy_http_downstream_rq_xx{job=\"prometheus.scrape.envoy_proxy\"}[5m]))",
             "legendFormat": "{{envoy_response_code_class}}xx"
@@ -127,7 +127,7 @@ data:
           "title": "Downstream Connections",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
               "expr": "sum(envoy_http_downstream_cx_active{job=\"prometheus.scrape.envoy_proxy\"})",
@@ -146,7 +146,7 @@ data:
           "title": "Upstream Request Rate by Cluster",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [{
             "expr": "sum by (envoy_cluster_name) (rate(envoy_cluster_upstream_rq_total{job=\"prometheus.scrape.envoy_proxy\"}[5m]))",
             "legendFormat": "{{envoy_cluster_name}}"
@@ -159,7 +159,7 @@ data:
           "title": "Upstream Latency (P50 / P99)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
               "expr": "histogram_quantile(0.50, sum by (le) (rate(envoy_cluster_upstream_rq_time_bucket{job=\"prometheus.scrape.envoy_proxy\"}[5m])))",
@@ -178,7 +178,7 @@ data:
           "title": "Gateway Controller Reconciles",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
               "expr": "sum by (controller) (rate(controller_runtime_reconcile_total{job=\"prometheus.scrape.envoy_gateway\"}[5m]))",
@@ -193,7 +193,7 @@ data:
           "title": "Gateway Controller Errors",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
               "expr": "sum by (controller) (rate(controller_runtime_reconcile_errors_total{job=\"prometheus.scrape.envoy_gateway\"}[5m]))",
