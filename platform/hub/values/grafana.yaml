@@ -44,6 +44,17 @@ datasources:
           manageAlerts: true
           prometheusType: Mimir
 
+      - name: Mimir (Gateway Lab)
+        type: prometheus
+        url: http://mimir-distributor.observability.svc.cluster.local:8080/prometheus
+        access: proxy
+        jsonData:
+          httpMethod: POST
+          prometheusType: Mimir
+          httpHeaderName1: X-Scope-OrgID
+        secureJsonData:
+          httpHeaderValue1: gateway-lab
+
       - name: Loki
         type: loki
         url: http://loki-gateway.observability.svc.cluster.local
@@ -72,6 +83,16 @@ datasources:
             datasourceUid: mimir
           lokiSearch:
             datasourceUid: loki
+
+# Dashboard sidecar - auto-discovers dashboards from ConfigMaps
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    folderAnnotation: grafana_folder
+    provider:
+      foldersFromFilesStructure: false
 
 # Service configuration
 service:
