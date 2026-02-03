@@ -10,22 +10,22 @@
 # - OOM at 256Mi caused cluster instability (provider OOM → API server auth errors)
 # - Using 512Mi limit with 256Mi request for headroom
 ---
-# GCP CRD-only (used by provider-gcp-storage)
+# GCP storage provider (CRD-only, 1 replica for conversion webhooks)
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
-  name: gcp-crd-only
+  name: gcp-storage-crd-only
 spec:
   deploymentTemplate:
     spec:
       replicas: 1
       selector:
         matchLabels:
-          pkg.crossplane.io/webhook-only: "true"
+          pkg.crossplane.io/provider: provider-gcp-storage
       template:
         metadata:
           labels:
-            pkg.crossplane.io/webhook-only: "true"
+            pkg.crossplane.io/provider: provider-gcp-storage
         spec:
           tolerations:
             - key: node-role.kubernetes.io/control-plane
@@ -105,7 +105,7 @@ spec:
 apiVersion: pkg.crossplane.io/v1beta1
 kind: DeploymentRuntimeConfig
 metadata:
-  name: gcp-runtime-config
+  name: gcp-family-config
 spec:
   deploymentTemplate:
     spec:
