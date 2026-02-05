@@ -10,3 +10,4 @@ vault-keys.json
 
 # Credential auto-restore directory
 .secrets/
+.plans/

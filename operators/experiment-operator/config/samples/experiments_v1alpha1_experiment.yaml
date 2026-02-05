@@ -1,0 +1,45 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Experiment
+metadata:
+  name: gateway-tutorial
+  namespace: experiments
+spec:
+  description: "Gateway API tutorial: Ingress to GRPCRoute"
+
+  targets:
+    - name: app
+      cluster:
+        type: gke
+        zone: us-central1-a
+        nodeCount: 2
+        machineType: e2-medium
+        preemptible: true
+
+      components:
+        - app: envoy-gateway
+        - app: nginx-ingress
+        - app: demo-services
+
+      observability:
+        enabled: true
+        transport: tailscale
+        tenant: gateway-lab
+
+    - name: loadgen
+      cluster:
+        type: hub
+
+      components:
+        - workflow: k6-http-loadgen
+          params:
+            targetUrl: "http://34.71.112.81/api"
+            users: "10"
+            duration: "300s"
+
+      depends:
+        - app
+
+  workflow:
+    template: gateway-validation
+    completion:
+      mode: workflow
