@@ -112,9 +112,9 @@ type Target struct {
 
 // ClusterSpec defines cluster configuration
 type ClusterSpec struct {
-	// Type: gke, vcluster, hub (existing hub cluster)
+	// Type: gke, hub (existing hub cluster)
 	// +required
-	// +kubebuilder:validation:Enum=gke;vcluster;hub
+	// +kubebuilder:validation:Enum=gke;hub
 	Type string `json:"type"`
 
 	// Zone (GCP)
@@ -127,6 +127,9 @@ type ClusterSpec struct {
 
 	// +optional
 	MachineType string `json:"machineType,omitempty"`
+
+	// +optional
+	DiskSizeGb int `json:"diskSizeGb,omitempty"`
 
 	// +optional
 	Preemptible bool `json:"preemptible,omitempty"`

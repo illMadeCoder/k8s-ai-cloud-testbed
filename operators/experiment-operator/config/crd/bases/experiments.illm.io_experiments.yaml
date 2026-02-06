@@ -63,6 +63,8 @@ spec:
                     cluster:
                       description: Cluster configuration
                       properties:
+                        diskSizeGb:
+                          type: integer
                         machineType:
                           type: string
                         nodeCount:
@@ -71,10 +73,9 @@ spec:
                         preemptible:
                           type: boolean
                         type:
-                          description: 'Type: gke, vcluster, hub (existing hub cluster)'
+                          description: 'Type: gke, hub (existing hub cluster)'
                           enum:
                           - gke
-                          - vcluster
                           - hub
                           type: string
                         zone:

@@ -115,6 +115,10 @@ spec:
                   ipAllocationPolicy:
                     clusterSecondaryRangeName: pods
                     servicesSecondaryRangeName: services
+                  # Enable client certificate auth for programmatic access
+                  masterAuth:
+                    clientCertificateConfig:
+                      issueClientCertificate: true
                   # Lab cluster settings
                   deletionProtection: false  # Allow easy cleanup
                   loggingService: none       # Use own observability stack

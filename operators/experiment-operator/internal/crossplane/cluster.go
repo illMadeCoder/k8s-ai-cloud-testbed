@@ -2,6 +2,7 @@ package crossplane
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -11,6 +12,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	experimentsv1alpha1 "github.com/illmadecoder/experiment-operator/api/v1alpha1"
+)
+
+var gkeClusterGVK = schema.GroupVersionKind{
+	Group:   "illm.io",
+	Version: "v1alpha1",
+	Kind:    "GKECluster",
+}
+
+const (
+	claimNamespace       = "experiments"
+	connectionSecretNS   = "crossplane-system"
+	connectionSecretFmt  = "%s-cluster-conn"
+	managedByLabel       = "app.kubernetes.io/managed-by"
+	managedByValue       = "experiment-operator"
+	experimentClusterLbl = "experiments.illm.io/cluster"
 )
 
 // ClusterManager manages Crossplane cluster resources
@@ -23,78 +39,87 @@ func NewClusterManager(c client.Client) *ClusterManager {
 	return &ClusterManager{Client: c}
 }
 
-// CreateCluster creates a Crossplane cluster resource based on the spec
+// CreateCluster creates a Crossplane GKECluster claim based on the spec
 func (m *ClusterManager) CreateCluster(ctx context.Context, experimentName string, target experimentsv1alpha1.Target) (string, error) {
 	log := log.FromContext(ctx)
 
 	clusterName := fmt.Sprintf("%s-%s", experimentName, target.Name)
 
-	var cluster *unstructured.Unstructured
-	var err error
-
-	switch target.Cluster.Type {
-	case "gke":
-		cluster, err = m.createGKECluster(ctx, clusterName, target.Cluster)
-	case "vcluster":
-		cluster, err = m.createVCluster(ctx, clusterName, target.Cluster)
-	case "hub":
-		// Hub cluster already exists, just return the name
+	if target.Cluster.Type == "hub" {
 		log.Info("Using existing hub cluster", "target", target.Name)
 		return "hub", nil
-	default:
-		return "", fmt.Errorf("unsupported cluster type: %s", target.Cluster.Type)
 	}
 
-	if err != nil {
-		return "", fmt.Errorf("failed to create cluster spec: %w", err)
+	claim := buildGKEClusterClaim(clusterName, target.Cluster)
+
+	if err := m.Create(ctx, claim); err != nil {
+		return "", fmt.Errorf("failed to create GKECluster claim: %w", err)
 	}
 
-	// Create the cluster resource
-	if err := m.Create(ctx, cluster); err != nil {
-		return "", fmt.Errorf("failed to create cluster resource: %w", err)
-	}
-
-	log.Info("Created cluster resource", "name", clusterName, "type", target.Cluster.Type)
+	log.Info("Created GKECluster claim", "name", clusterName, "namespace", claimNamespace)
 	return clusterName, nil
+}
+
+// buildGKEClusterClaim constructs a GKECluster claim from ClusterSpec
+func buildGKEClusterClaim(name string, spec experimentsv1alpha1.ClusterSpec) *unstructured.Unstructured {
+	claim := &unstructured.Unstructured{}
+	claim.SetGroupVersionKind(gkeClusterGVK)
+	claim.SetName(name)
+	claim.SetNamespace(claimNamespace)
+	claim.SetLabels(map[string]string{
+		managedByLabel:       managedByValue,
+		experimentClusterLbl: name,
+	})
+
+	// Apply defaults
+	zone := spec.Zone
+	if zone == "" {
+		zone = "us-central1-a"
+	}
+	nodeCount := spec.NodeCount
+	if nodeCount == 0 {
+		nodeCount = 1
+	}
+	machineType := spec.MachineType
+	if machineType == "" {
+		machineType = "e2-medium"
+	}
+	diskSizeGb := spec.DiskSizeGb
+	if diskSizeGb == 0 {
+		diskSizeGb = 50
+	}
+
+	claimSpec := map[string]interface{}{
+		"zone":        zone,
+		"nodeCount":   int64(nodeCount),
+		"machineType": machineType,
+		"diskSizeGb":  int64(diskSizeGb),
+		"preemptible": spec.Preemptible,
+	}
+
+	// Safe to ignore error — values are all primitives
+	_ = unstructured.SetNestedMap(claim.Object, claimSpec, "spec")
+
+	return claim
 }
 
 // IsClusterReady checks if a cluster is ready
 func (m *ClusterManager) IsClusterReady(ctx context.Context, clusterName string, clusterType string) (bool, error) {
 	if clusterType == "hub" {
-		// Hub cluster is always ready
 		return true, nil
 	}
 
-	var gvk schema.GroupVersionKind
-	switch clusterType {
-	case "gke":
-		gvk = schema.GroupVersionKind{
-			Group:   "container.gcp.upbound.io",
-			Version: "v1beta1",
-			Kind:    "Cluster",
-		}
-	case "vcluster":
-		gvk = schema.GroupVersionKind{
-			Group:   "infrastructure.cluster.x-k8s.io",
-			Version: "v1alpha1",
-			Kind:    "VCluster",
-		}
-	default:
-		return false, fmt.Errorf("unsupported cluster type: %s", clusterType)
-	}
-
-	cluster := &unstructured.Unstructured{}
-	cluster.SetGroupVersionKind(gvk)
+	claim := &unstructured.Unstructured{}
+	claim.SetGroupVersionKind(gkeClusterGVK)
 
 	if err := m.Get(ctx, client.ObjectKey{
 		Name:      clusterName,
-		Namespace: "crossplane-system",
-	}, cluster); err != nil {
-		return false, fmt.Errorf("failed to get cluster: %w", err)
+		Namespace: claimNamespace,
+	}, claim); err != nil {
+		return false, fmt.Errorf("failed to get GKECluster claim: %w", err)
 	}
 
-	// Check status conditions
-	conditions, found, err := unstructured.NestedSlice(cluster.Object, "status", "conditions")
+	conditions, found, err := unstructured.NestedSlice(claim.Object, "status", "conditions")
 	if err != nil || !found {
 		return false, nil
 	}
@@ -104,10 +129,8 @@ func (m *ClusterManager) IsClusterReady(ctx context.Context, clusterName string,
 		if !ok {
 			continue
 		}
-
 		condType, _, _ := unstructured.NestedString(condition, "type")
 		status, _, _ := unstructured.NestedString(condition, "status")
-
 		if condType == "Ready" && status == "True" {
 			return true, nil
 		}
@@ -116,14 +139,31 @@ func (m *ClusterManager) IsClusterReady(ctx context.Context, clusterName string,
 	return false, nil
 }
 
-// GetClusterKubeconfig retrieves the kubeconfig for a cluster
+// GetClusterKubeconfig retrieves the kubeconfig for a cluster.
+// The composition writes the connection secret to crossplane-system/{xr-name}-cluster-conn.
+// We look up the XR name from the claim's spec.resourceRef.name.
 func (m *ClusterManager) GetClusterKubeconfig(ctx context.Context, clusterName string, clusterType string) ([]byte, error) {
 	if clusterType == "hub" {
 		return nil, fmt.Errorf("hub cluster does not have a separate kubeconfig")
 	}
 
-	// Kubeconfig is typically stored in a Secret named {clusterName}-kubeconfig
-	secretName := fmt.Sprintf("%s-kubeconfig", clusterName)
+	// Read the claim to get the XR name
+	claim := &unstructured.Unstructured{}
+	claim.SetGroupVersionKind(gkeClusterGVK)
+	if err := m.Get(ctx, client.ObjectKey{
+		Name:      clusterName,
+		Namespace: claimNamespace,
+	}, claim); err != nil {
+		return nil, fmt.Errorf("failed to get GKECluster claim: %w", err)
+	}
+
+	xrName, found, err := unstructured.NestedString(claim.Object, "spec", "resourceRef", "name")
+	if err != nil || !found || xrName == "" {
+		return nil, fmt.Errorf("claim has no resourceRef.name yet (XR not bound)")
+	}
+
+	// Composition writes to crossplane-system/{xr-name}-cluster-conn
+	secretName := fmt.Sprintf(connectionSecretFmt, xrName)
 
 	secret := &unstructured.Unstructured{}
 	secret.SetGroupVersionKind(schema.GroupVersionKind{
@@ -134,24 +174,28 @@ func (m *ClusterManager) GetClusterKubeconfig(ctx context.Context, clusterName s
 
 	if err := m.Get(ctx, client.ObjectKey{
 		Name:      secretName,
-		Namespace: "crossplane-system",
+		Namespace: connectionSecretNS,
 	}, secret); err != nil {
-		return nil, fmt.Errorf("failed to get kubeconfig secret: %w", err)
+		return nil, fmt.Errorf("failed to get connection secret %s: %w", secretName, err)
 	}
 
 	data, found, err := unstructured.NestedMap(secret.Object, "data")
 	if err != nil || !found {
-		return nil, fmt.Errorf("kubeconfig secret has no data")
+		return nil, fmt.Errorf("connection secret has no data")
 	}
 
-	kubeconfigBase64, ok := data["kubeconfig"].(string)
+	kubeconfigB64, ok := data["kubeconfig"].(string)
 	if !ok {
-		return nil, fmt.Errorf("kubeconfig not found in secret")
+		return nil, fmt.Errorf("kubeconfig not found in connection secret")
 	}
 
-	// Data in secrets is already base64 encoded in the API, but unstructured
-	// gives us the decoded value, so we can return it directly
-	return []byte(kubeconfigBase64), nil
+	// Secret data from unstructured API is base64-encoded
+	kubeconfig, err := base64.StdEncoding.DecodeString(kubeconfigB64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode kubeconfig: %w", err)
+	}
+
+	return kubeconfig, nil
 }
 
 // DeleteCluster deletes a cluster resource
@@ -159,87 +203,43 @@ func (m *ClusterManager) DeleteCluster(ctx context.Context, clusterName string, 
 	log := log.FromContext(ctx)
 
 	if clusterType == "hub" {
-		// Don't delete the hub cluster
 		log.Info("Skipping deletion of hub cluster")
 		return nil
 	}
 
-	var gvk schema.GroupVersionKind
-	switch clusterType {
-	case "gke":
-		gvk = schema.GroupVersionKind{
-			Group:   "container.gcp.upbound.io",
-			Version: "v1beta1",
-			Kind:    "Cluster",
-		}
-	case "vcluster":
-		gvk = schema.GroupVersionKind{
-			Group:   "infrastructure.cluster.x-k8s.io",
-			Version: "v1alpha1",
-			Kind:    "VCluster",
-		}
-	default:
-		return fmt.Errorf("unsupported cluster type: %s", clusterType)
+	claim := &unstructured.Unstructured{}
+	claim.SetGroupVersionKind(gkeClusterGVK)
+	claim.SetName(clusterName)
+	claim.SetNamespace(claimNamespace)
+
+	if err := m.Delete(ctx, claim); err != nil {
+		return fmt.Errorf("failed to delete GKECluster claim: %w", err)
 	}
 
-	cluster := &unstructured.Unstructured{}
-	cluster.SetGroupVersionKind(gvk)
-	cluster.SetName(clusterName)
-	cluster.SetNamespace("crossplane-system")
-
-	if err := m.Delete(ctx, cluster); err != nil {
-		return fmt.Errorf("failed to delete cluster: %w", err)
-	}
-
-	log.Info("Deleted cluster resource", "name", clusterName, "type", clusterType)
+	log.Info("Deleted GKECluster claim", "name", clusterName)
 	return nil
 }
 
 // GetClusterEndpoint returns the external endpoint for a cluster
 func (m *ClusterManager) GetClusterEndpoint(ctx context.Context, clusterName string, clusterType string) (string, error) {
 	if clusterType == "hub" {
-		return "", nil // Hub cluster endpoint is not exposed
+		return "", nil
 	}
 
-	var gvk schema.GroupVersionKind
-	switch clusterType {
-	case "gke":
-		gvk = schema.GroupVersionKind{
-			Group:   "container.gcp.upbound.io",
-			Version: "v1beta1",
-			Kind:    "Cluster",
-		}
-	case "vcluster":
-		gvk = schema.GroupVersionKind{
-			Group:   "infrastructure.cluster.x-k8s.io",
-			Version: "v1alpha1",
-			Kind:    "VCluster",
-		}
-	default:
-		return "", fmt.Errorf("unsupported cluster type: %s", clusterType)
-	}
-
-	cluster := &unstructured.Unstructured{}
-	cluster.SetGroupVersionKind(gvk)
+	claim := &unstructured.Unstructured{}
+	claim.SetGroupVersionKind(gkeClusterGVK)
 
 	if err := m.Get(ctx, client.ObjectKey{
 		Name:      clusterName,
-		Namespace: "crossplane-system",
-	}, cluster); err != nil {
-		return "", fmt.Errorf("failed to get cluster: %w", err)
+		Namespace: claimNamespace,
+	}, claim); err != nil {
+		return "", fmt.Errorf("failed to get GKECluster claim: %w", err)
 	}
 
-	// For GKE, endpoint is in status.endpoint
-	if clusterType == "gke" {
-		endpoint, found, err := unstructured.NestedString(cluster.Object, "status", "endpoint")
-		if err != nil || !found {
-			return "", nil // Not ready yet
-		}
-		return endpoint, nil
+	endpoint, found, err := unstructured.NestedString(claim.Object, "status", "endpoint")
+	if err != nil || !found {
+		return "", nil // Not ready yet
 	}
-
-	// For other cluster types, might be in different locations
-	endpoint, _, _ := unstructured.NestedString(cluster.Object, "status", "controlPlaneEndpoint")
 	return endpoint, nil
 }
 

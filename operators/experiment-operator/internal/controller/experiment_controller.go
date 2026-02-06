@@ -18,18 +18,26 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	"golang.org/x/oauth2/google"
 
 	experimentsv1alpha1 "github.com/illmadecoder/experiment-operator/api/v1alpha1"
 	"github.com/illmadecoder/experiment-operator/internal/argocd"
@@ -56,9 +64,7 @@ type ExperimentReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=argoproj.io,resources=workflows,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=container.gcp.upbound.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=vclusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=illm.io,resources=gkeclusters,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -312,11 +318,11 @@ func (r *ExperimentReconciler) reconcileProvisioning(ctx context.Context, exp *e
 		clusterName := exp.Status.Targets[i].ClusterName
 		endpoint := exp.Status.Targets[i].Endpoint
 
-		// For hub cluster, use in-cluster server
-		server := endpoint
+		// For hub cluster, use in-cluster server; for GKE, prefix with https://
+		var server string
 		if target.Cluster.Type == "hub" {
 			server = "https://kubernetes.default.svc"
-		} else if server == "" {
+		} else {
 			server = "https://" + endpoint
 		}
 
@@ -339,6 +345,13 @@ func (r *ExperimentReconciler) reconcileProvisioning(ctx context.Context, exp *e
 			}
 			log.Info("Created ArgoCD Application for hub target (no cluster registration needed)", "target", target.Name)
 			continue
+		}
+
+		// Bootstrap RBAC on the target cluster (grant client cert user cluster-admin)
+		gcpKey := r.getGCPProviderKey(ctx)
+		if err := bootstrapClusterRBAC(ctx, kubeconfig, gcpKey); err != nil {
+			log.Error(err, "Failed to bootstrap RBAC on target cluster", "cluster", clusterName)
+			// Continue anyway — the cluster may already have RBAC configured
 		}
 
 		// Register cluster and create applications
@@ -527,16 +540,12 @@ func (r *ExperimentReconciler) copyKubeconfigSecrets(ctx context.Context, exp *e
 		}
 
 		clusterName := exp.Status.Targets[i].ClusterName
-		srcSecretName := fmt.Sprintf("%s-kubeconfig", clusterName)
 		dstSecretName := fmt.Sprintf("%s-%s-kubeconfig", exp.Name, target.Name)
 
-		// Read source secret from crossplane-system
-		srcSecret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{
-			Name:      srcSecretName,
-			Namespace: "crossplane-system",
-		}, srcSecret); err != nil {
-			log.Error(err, "Failed to read kubeconfig secret", "secret", srcSecretName)
+		// Get kubeconfig via ClusterManager (handles XR name resolution)
+		kubeconfigBytes, err := r.ClusterManager.GetClusterKubeconfig(ctx, clusterName, target.Cluster.Type)
+		if err != nil {
+			log.Error(err, "Failed to get kubeconfig for tutorial", "cluster", clusterName)
 			continue
 		}
 
@@ -550,7 +559,9 @@ func (r *ExperimentReconciler) copyKubeconfigSecrets(ctx context.Context, exp *e
 					"target":     target.Name,
 				},
 			},
-			Data: srcSecret.Data,
+			Data: map[string][]byte{
+				"kubeconfig": kubeconfigBytes,
+			},
 		}
 
 		// Set owner reference for garbage collection
@@ -575,7 +586,7 @@ func (r *ExperimentReconciler) copyKubeconfigSecrets(ctx context.Context, exp *e
 				continue
 			}
 		} else {
-			existing.Data = srcSecret.Data
+			existing.Data = dstSecret.Data
 			if err := r.Update(ctx, existing); err != nil {
 				log.Error(err, "Failed to update kubeconfig secret", "secret", dstSecretName)
 				continue
@@ -584,7 +595,7 @@ func (r *ExperimentReconciler) copyKubeconfigSecrets(ctx context.Context, exp *e
 
 		exp.Status.Targets[i].KubeconfigSecret = dstSecretName
 		exp.Status.TutorialStatus.KubeconfigSecrets[target.Name] = dstSecretName
-		log.Info("Copied kubeconfig secret", "src", srcSecretName, "dst", dstSecretName)
+		log.Info("Copied kubeconfig secret", "cluster", clusterName, "dst", dstSecretName)
 	}
 
 	return nil
@@ -687,6 +698,97 @@ func resolveServiceEndpoint(svc *corev1.Service, port int) string {
 		return fmt.Sprintf("http://%s:%d", host, port)
 	}
 	return fmt.Sprintf("http://%s", host)
+}
+
+// getGCPProviderKey reads the GCP service account key from the Crossplane provider secret.
+func (r *ExperimentReconciler) getGCPProviderKey(ctx context.Context) []byte {
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, client.ObjectKey{
+		Name:      "gcp-credentials",
+		Namespace: "crossplane-system",
+	}, secret); err != nil {
+		return nil
+	}
+	return secret.Data["credentials"]
+}
+
+// bootstrapClusterRBAC connects to a target GKE cluster using GCP Application
+// Default Credentials and creates a ClusterRoleBinding granting the "client"
+// user (from the GKE client certificate) cluster-admin permissions.
+// GCP IAM identity has automatic cluster-admin on GKE, so we use that to
+// bootstrap RBAC for the client cert user.
+func bootstrapClusterRBAC(ctx context.Context, kubeconfig []byte, gcpServiceAccountKey []byte) error {
+	log := logf.FromContext(ctx)
+
+	// Parse kubeconfig to get server URL and CA data
+	cfg, err := clientcmd.RESTConfigFromKubeConfig(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to parse kubeconfig: %w", err)
+	}
+
+	// Get GCP access token — try ADC first, fall back to Crossplane provider secret
+	tokenSource, err := google.DefaultTokenSource(ctx, "https://www.googleapis.com/auth/cloud-platform")
+	if err != nil {
+		// Fall back to Crossplane GCP provider credentials
+		log.Info("ADC not available, trying Crossplane provider credentials")
+		creds, credErr := google.CredentialsFromJSON(ctx, gcpServiceAccountKey, "https://www.googleapis.com/auth/cloud-platform")
+		if credErr != nil {
+			return fmt.Errorf("failed to get GCP credentials: ADC: %v, Crossplane SA: %v", err, credErr)
+		}
+		tokenSource = creds.TokenSource
+	}
+	token, err := tokenSource.Token()
+	if err != nil {
+		return fmt.Errorf("failed to get GCP access token: %w", err)
+	}
+
+	// Build a REST config using GCP token instead of client cert
+	gcpCfg := &restclient.Config{
+		Host:        cfg.Host,
+		BearerToken: token.AccessToken,
+		TLSClientConfig: restclient.TLSClientConfig{
+			CAData: cfg.TLSClientConfig.CAData,
+		},
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: cfg.TLSClientConfig.Insecure,
+			},
+		},
+	}
+
+	clientset, err := kubernetes.NewForConfig(gcpCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create clientset: %w", err)
+	}
+
+	binding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "experiment-client-admin",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: "User",
+				Name: "client",
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "cluster-admin",
+		},
+	}
+
+	_, err = clientset.RbacV1().ClusterRoleBindings().Create(ctx, binding, metav1.CreateOptions{})
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			log.Info("ClusterRoleBinding already exists on target cluster")
+			return nil
+		}
+		return fmt.Errorf("failed to create ClusterRoleBinding: %w", err)
+	}
+
+	log.Info("Created ClusterRoleBinding for client user on target cluster")
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

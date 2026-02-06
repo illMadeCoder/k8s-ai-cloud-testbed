@@ -10,7 +10,8 @@ spec:
   targets:
     - name: app
       cluster:
-        type: vcluster
+        type: gke
+        preemptible: true
       components:
         - app: loki
         - app: promtail
