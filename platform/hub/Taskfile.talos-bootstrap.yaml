@@ -1,20 +1,20 @@
 version: '3'
 
-# Talos Platform - Persistent target cluster on GMKtec mini PC
+# Talos Hub Bootstrap - kube-vip, storage, and cluster management
 #
 # Usage:
 #   task talos:bootstrap             # Install kube-vip + local-path-provisioner
 #   task talos:status                # Show cluster status
-#   task talos:reset                 # Reset cluster for new experiment
-#   task talos:up -- <name>          # Deploy experiment to Talos target
+#   task talos:reset                 # Reset cluster (delete non-system namespaces)
+#   task talos:up -- <name>          # Deploy experiment
+#   task talos:down -- <name>        # Remove experiment
 
 silent: true
 
 vars:
   TALOS_CONTEXT: talos-hub
-  TALOS_TARGET_NAME: talos-target
   TALOS_IP: 192.168.1.178
-  HUB_CONTEXT: kind-hub
+  HUB_CONTEXT: talos-hub
   ARGOCD_NAMESPACE: argocd
   # Namespaces to preserve during reset (system + infrastructure)
   PRESERVED_NS: "kube-system kube-public kube-node-lease default local-path-storage"
@@ -31,7 +31,7 @@ tasks:
 
         # Step 1: Install kube-vip for LoadBalancer support
         echo "=== Step 1: Installing kube-vip ==="
-        kubectl --context {{.TALOS_CONTEXT}} apply -f platform/targets/talos/cluster/manifests/kube-vip.yaml
+        kubectl --context {{.TALOS_CONTEXT}} apply -f platform/hub/bootstrap/kube-vip.yaml
 
         echo "Waiting for kube-vip pods..."
         kubectl --context {{.TALOS_CONTEXT}} -n kube-system wait --for=condition=ready pod -l app=kube-vip --timeout=60s
@@ -42,7 +42,7 @@ tasks:
 
         # Step 2: Install local-path-provisioner for PVC support
         echo "=== Step 2: Installing local-path-provisioner ==="
-        kubectl --context {{.TALOS_CONTEXT}} apply -f platform/targets/talos/cluster/manifests/local-path-provisioner.yaml
+        kubectl --context {{.TALOS_CONTEXT}} apply -f platform/hub/bootstrap/local-path-provisioner.yaml
 
         echo "Waiting for local-path-provisioner..."
         kubectl --context {{.TALOS_CONTEXT}} -n local-path-storage wait --for=condition=ready pod -l app=local-path-provisioner --timeout=60s

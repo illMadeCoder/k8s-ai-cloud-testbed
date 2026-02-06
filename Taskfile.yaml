@@ -4,9 +4,8 @@ silent: true
 
 includes:
   hub: ./platform/hub/cluster/Taskfile.yaml
-  talos: ./platform/targets/talos/cluster/Taskfile.yaml
-  talos-hub: ./platform/hub-talos/Taskfile.yaml
-  # cloud: ./platform/targets/cloud/cluster/Taskfile.yaml  # future
+  talos: ./platform/hub/Taskfile.talos-bootstrap.yaml
+  talos-hub: ./platform/hub/Taskfile.talos-hub.yaml
 
 tasks:
   default:
