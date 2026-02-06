@@ -1,0 +1,95 @@
+# Logging Comparison - Validation Workflow
+# Verifies Loki, ELK, and log generator are healthy
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: logging-comparison-validation-
+  namespace: argo-workflows
+spec:
+  entrypoint: validate-logging-comparison
+  serviceAccountName: argo-workflow
+  templates:
+    - name: validate-logging-comparison
+      steps:
+        - - name: check-loki
+            template: check-deployment
+            arguments:
+              parameters:
+                - name: deployment
+                  value: loki
+                - name: namespace
+                  value: logging-comparison
+          - name: check-promtail
+            template: check-daemonset
+            arguments:
+              parameters:
+                - name: daemonset
+                  value: promtail
+                - name: namespace
+                  value: logging-comparison
+        - - name: check-elasticsearch
+            template: check-statefulset
+            arguments:
+              parameters:
+                - name: statefulset
+                  value: elasticsearch
+                - name: namespace
+                  value: logging-comparison
+        - - name: check-kibana
+            template: check-deployment
+            arguments:
+              parameters:
+                - name: deployment
+                  value: kibana
+                - name: namespace
+                  value: logging-comparison
+        - - name: check-log-generator
+            template: check-deployment
+            arguments:
+              parameters:
+                - name: deployment
+                  value: log-generator
+                - name: namespace
+                  value: logging-comparison
+
+    - name: check-deployment
+      inputs:
+        parameters:
+          - name: deployment
+          - name: namespace
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Checking deployment {{inputs.parameters.deployment}}..."
+            kubectl rollout status deployment/{{inputs.parameters.deployment}} \
+              -n {{inputs.parameters.namespace}} --timeout=120s
+
+    - name: check-statefulset
+      inputs:
+        parameters:
+          - name: statefulset
+          - name: namespace
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Checking statefulset {{inputs.parameters.statefulset}}..."
+            kubectl rollout status statefulset/{{inputs.parameters.statefulset}} \
+              -n {{inputs.parameters.namespace}} --timeout=120s
+
+    - name: check-daemonset
+      inputs:
+        parameters:
+          - name: daemonset
+          - name: namespace
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Checking daemonset {{inputs.parameters.daemonset}}..."
+            kubectl rollout status daemonset/{{inputs.parameters.daemonset}} \
+              -n {{inputs.parameters.namespace}} --timeout=120s

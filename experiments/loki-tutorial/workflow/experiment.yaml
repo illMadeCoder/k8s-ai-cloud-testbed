@@ -4,7 +4,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: loki-tutorial-
-  namespace: argo
+  namespace: argo-workflows
 spec:
   entrypoint: loki-tutorial
   serviceAccountName: argo-workflow

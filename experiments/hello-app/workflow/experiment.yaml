@@ -114,4 +114,4 @@ spec:
             echo "Deleting cluster secret..."
             kubectl delete secret cluster-target -n argocd --ignore-not-found=true
 
-            echo "Cleanup complete. Kind cluster deletion handled by Taskfile."
+            echo "Cleanup complete."

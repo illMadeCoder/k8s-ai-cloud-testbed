@@ -3,7 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: tracing-comparison-validation-
-  namespace: argo
+  namespace: argo-workflows
 spec:
   entrypoint: validate-tracing-comparison
   templates:

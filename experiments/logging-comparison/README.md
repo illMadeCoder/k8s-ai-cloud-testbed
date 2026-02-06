@@ -44,7 +44,7 @@ By the end of this tutorial, you will:
 
 ## Prerequisites
 
-- Completed: Kind cluster basics
+- Completed: Platform bootstrap (Phase 1)
 - **Recommended**: [loki-tutorial](../loki-tutorial/) - Learn LogQL basics first
 - **Recommended**: [elk-tutorial](../elk-tutorial/) - Learn KQL/Lucene basics first
 - ~6GB RAM available (Elasticsearch needs 2GB+)
@@ -57,10 +57,10 @@ By the end of this tutorial, you will:
 ### 1.1 Start the Cluster
 
 ```bash
-task kind:up -- logging-comparison
+task hub:up -- logging-comparison
 ```
 
-This creates a medium-sized Kind cluster and deploys:
+This provisions a target cluster and deploys:
 - Loki (single binary mode) + Promtail
 - Elasticsearch (single node) + Fluent Bit + Kibana
 - Grafana with both datasources
@@ -302,7 +302,7 @@ curl -X POST "http://${GENERATOR_IP}:8080/config?rate=low"
 ### 7.2 Destroy the Cluster
 
 ```bash
-task kind:down -- logging-comparison
+task hub:down -- logging-comparison
 ```
 
 ## Summary

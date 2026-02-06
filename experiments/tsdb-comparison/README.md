@@ -59,7 +59,7 @@ By the end of this tutorial, you will:
 
 ```bash
 # Deploy the TSDB comparison tutorial
-task kind:up -- tsdb-comparison
+task hub:up -- tsdb-comparison
 
 # Wait for all components to be ready (3-5 minutes)
 kubectl get pods -A -w
@@ -262,7 +262,7 @@ Resource usage translates directly to cloud costs:
 
 ```bash
 # Tear down the tutorial
-task kind:down -- tsdb-comparison
+task hub:down -- tsdb-comparison
 ```
 
 ## Summary

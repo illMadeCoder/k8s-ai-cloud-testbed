@@ -1,0 +1,67 @@
+# TSDB Comparison - Validation Workflow
+# Verifies Prometheus, VictoriaMetrics, Mimir, and cardinality generator
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: tsdb-comparison-validation-
+  namespace: argo-workflows
+spec:
+  entrypoint: validate-tsdb-comparison
+  serviceAccountName: argo-workflow
+  templates:
+    - name: validate-tsdb-comparison
+      steps:
+        - - name: check-prometheus
+            template: check-deployment
+            arguments:
+              parameters:
+                - name: deployment
+                  value: prometheus-kube-prometheus-operator
+                - name: namespace
+                  value: monitoring
+        - - name: check-victoria-metrics
+            template: check-deployment
+            arguments:
+              parameters:
+                - name: deployment
+                  value: victoria-metrics-victoria-metrics-single-server
+                - name: namespace
+                  value: victoria-metrics
+        - - name: check-mimir
+            template: check-deployment
+            arguments:
+              parameters:
+                - name: deployment
+                  value: mimir-distributor
+                - name: namespace
+                  value: mimir
+        - - name: check-cardinality-generator
+            template: check-deployment
+            arguments:
+              parameters:
+                - name: deployment
+                  value: cardinality-generator
+                - name: namespace
+                  value: tsdb-comparison
+        - - name: check-grafana
+            template: check-deployment
+            arguments:
+              parameters:
+                - name: deployment
+                  value: prometheus-grafana
+                - name: namespace
+                  value: monitoring
+
+    - name: check-deployment
+      inputs:
+        parameters:
+          - name: deployment
+          - name: namespace
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Checking deployment {{inputs.parameters.deployment}}..."
+            kubectl rollout status deployment/{{inputs.parameters.deployment}} \
+              -n {{inputs.parameters.namespace}} --timeout=120s

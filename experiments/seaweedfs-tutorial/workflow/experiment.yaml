@@ -1,0 +1,71 @@
+# SeaweedFS Tutorial - Validation Workflow
+# Verifies SeaweedFS master, volume, and filer are healthy
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: seaweedfs-tutorial-validation-
+  namespace: argo-workflows
+spec:
+  entrypoint: validate-seaweedfs
+  serviceAccountName: argo-workflow
+  templates:
+    - name: validate-seaweedfs
+      steps:
+        - - name: check-master
+            template: check-statefulset
+            arguments:
+              parameters:
+                - name: statefulset
+                  value: seaweedfs-master
+                - name: namespace
+                  value: seaweedfs
+        - - name: check-volume
+            template: check-statefulset
+            arguments:
+              parameters:
+                - name: statefulset
+                  value: seaweedfs-volume
+                - name: namespace
+                  value: seaweedfs
+        - - name: check-filer
+            template: check-statefulset
+            arguments:
+              parameters:
+                - name: statefulset
+                  value: seaweedfs-filer
+                - name: namespace
+                  value: seaweedfs
+        - - name: validate-s3
+            template: validate-s3-api
+
+    - name: check-statefulset
+      inputs:
+        parameters:
+          - name: statefulset
+          - name: namespace
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Checking statefulset {{inputs.parameters.statefulset}}..."
+            kubectl rollout status statefulset/{{inputs.parameters.statefulset}} \
+              -n {{inputs.parameters.namespace}} --timeout=120s
+
+    - name: validate-s3-api
+      container:
+        image: curlimages/curl:8.5.0
+        command: [sh, -c]
+        args:
+          - |
+            echo "Validating SeaweedFS S3 API..."
+            for i in $(seq 1 30); do
+              if curl -sf http://seaweedfs-s3.seaweedfs.svc:8333/ 2>/dev/null; then
+                echo "SeaweedFS S3 API is reachable"
+                exit 0
+              fi
+              echo "Attempt $i/30 - S3 API not ready yet..."
+              sleep 5
+            done
+            echo "ERROR: SeaweedFS S3 API not reachable"
+            exit 1

@@ -14,18 +14,6 @@ spec:
       components:
         - app: hello-app
 
-    - name: loadgen
-      cluster:
-        type: hub
-      components:
-        - workflow: k6-http-loadgen
-          params:
-            targetUrl: "http://hello-app.hello-app.svc:8080"
-            users: "5"
-            duration: "60s"
-      depends:
-        - app
-
   workflow:
     template: hello-app-validation
     completion:

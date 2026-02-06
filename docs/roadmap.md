@@ -253,6 +253,7 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 ### Phase 3.2: SeaweedFS Object Storage
 
 - [x] Deploy SeaweedFS for S3-compatible storage (Mimir/Loki/Tempo backends)
+- [ ] Create `seaweedfs-tutorial` experiment (tutorial content written, needs experiment.yaml)
 
 ### Phase 3.3: Logging (Loki vs ELK)
 
@@ -278,13 +279,20 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 - [ ] Create `cardinality-generator` component
 - [ ] Create `observability-cost-tutorial` experiment
 
+### Phase 3.7: TSDB Comparison (Prometheus vs VictoriaMetrics vs Mimir)
+
+- [ ] Deploy VictoriaMetrics, Mimir components
+- [ ] Create `tsdb-comparison` experiment (tutorial content written, needs components)
+
 </details>
 
 **Tutorial content written** (in `experiments/*/tutorial.yaml`, not yet deployable):
+- `seaweedfs-tutorial` (needs experiment.yaml, SeaweedFS already deployed)
 - `elk-tutorial`, `logging-comparison` (need ELK components)
 - `otel-tutorial`, `tracing-comparison` (need Tempo/Jaeger/OTel components)
 - `slo-tutorial` (needs Pyrra component)
 - `observability-cost-tutorial` (needs cardinality-generator component)
+- `tsdb-comparison` (needs VictoriaMetrics/Mimir components)
 
 **Deployable tutorials:**
 - `prometheus-tutorial`, `loki-tutorial` (all components exist)
