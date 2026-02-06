@@ -336,7 +336,7 @@ tasks:
 - [vcluster Documentation](https://www.vcluster.com/docs/)
 - [ArgoCD Cluster Registration](https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#clusters)
 - [Crossplane Composition Functions](https://docs.crossplane.io/latest/concepts/composition-functions/)
-- [Existing XRDs: Database, Cache, Queue](../components/infrastructure/crossplane-xrds/)
+- [Existing XRDs: Database, Cache, Queue](../../components/infrastructure/crossplane-xrds/)
 
 ## Decision Date
 

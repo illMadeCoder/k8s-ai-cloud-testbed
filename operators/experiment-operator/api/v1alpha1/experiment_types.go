@@ -112,9 +112,9 @@ type Target struct {
 
 // ClusterSpec defines cluster configuration
 type ClusterSpec struct {
-	// Type: gke, talos, vcluster, hub (existing)
+	// Type: gke, vcluster, hub (existing hub cluster)
 	// +required
-	// +kubebuilder:validation:Enum=gke;talos;vcluster;hub
+	// +kubebuilder:validation:Enum=gke;vcluster;hub
 	Type string `json:"type"`
 
 	// Zone (GCP)

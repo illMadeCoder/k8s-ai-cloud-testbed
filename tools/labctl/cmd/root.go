@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
@@ -25,9 +22,4 @@ func init() {
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(kubeconfigCmd)
-}
-
-func exitError(msg string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, "Error: "+msg+"\n", args...)
-	os.Exit(1)
 }

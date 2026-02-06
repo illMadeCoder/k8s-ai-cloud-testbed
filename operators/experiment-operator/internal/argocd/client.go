@@ -37,20 +37,6 @@ func (c *Client) RegisterClusterAndCreateApps(ctx context.Context, experimentNam
 	return nil
 }
 
-// AreAllAppsHealthy checks if all applications for an experiment are healthy
-func (c *Client) AreAllAppsHealthy(ctx context.Context, experimentName string, targets []experimentsv1alpha1.Target) (bool, error) {
-	for _, target := range targets {
-		healthy, err := c.AppManager.IsApplicationHealthy(ctx, experimentName, target.Name)
-		if err != nil {
-			return false, err
-		}
-		if !healthy {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
 // DeleteClusterAndApps unregisters a cluster and deletes all its applications
 func (c *Client) DeleteClusterAndApps(ctx context.Context, experimentName string, targets []experimentsv1alpha1.Target, clusterNames []string) error {
 	// Delete all applications

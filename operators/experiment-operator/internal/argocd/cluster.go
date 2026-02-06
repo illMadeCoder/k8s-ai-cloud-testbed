@@ -2,7 +2,6 @@ package argocd
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -81,27 +80,3 @@ func UnregisterCluster(ctx context.Context, c client.Client, clusterName string)
 	return nil
 }
 
-// BuildKubeconfigForServer creates a kubeconfig for a cluster server endpoint
-// This is a simplified version - in production you'd use actual cluster credentials
-func BuildKubeconfigForServer(server string, caCert []byte, token string) string {
-	caCertBase64 := base64.StdEncoding.EncodeToString(caCert)
-
-	return fmt.Sprintf(`apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    certificate-authority-data: %s
-    server: %s
-  name: cluster
-contexts:
-- context:
-    cluster: cluster
-    user: admin
-  name: default
-current-context: default
-users:
-- name: admin
-  user:
-    token: %s
-`, caCertBase64, server, token)
-}

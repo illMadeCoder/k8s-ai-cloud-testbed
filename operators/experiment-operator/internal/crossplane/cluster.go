@@ -35,8 +35,6 @@ func (m *ClusterManager) CreateCluster(ctx context.Context, experimentName strin
 	switch target.Cluster.Type {
 	case "gke":
 		cluster, err = m.createGKECluster(ctx, clusterName, target.Cluster)
-	case "talos":
-		cluster, err = m.createTalosCluster(ctx, clusterName, target.Cluster)
 	case "vcluster":
 		cluster, err = m.createVCluster(ctx, clusterName, target.Cluster)
 	case "hub":
@@ -74,12 +72,6 @@ func (m *ClusterManager) IsClusterReady(ctx context.Context, clusterName string,
 			Group:   "container.gcp.upbound.io",
 			Version: "v1beta1",
 			Kind:    "Cluster",
-		}
-	case "talos":
-		gvk = schema.GroupVersionKind{
-			Group:   "cluster.x-k8s.io",
-			Version: "v1beta1",
-			Kind:    "TalosCluster",
 		}
 	case "vcluster":
 		gvk = schema.GroupVersionKind{
@@ -180,12 +172,6 @@ func (m *ClusterManager) DeleteCluster(ctx context.Context, clusterName string, 
 			Version: "v1beta1",
 			Kind:    "Cluster",
 		}
-	case "talos":
-		gvk = schema.GroupVersionKind{
-			Group:   "cluster.x-k8s.io",
-			Version: "v1beta1",
-			Kind:    "TalosCluster",
-		}
 	case "vcluster":
 		gvk = schema.GroupVersionKind{
 			Group:   "infrastructure.cluster.x-k8s.io",
@@ -222,12 +208,6 @@ func (m *ClusterManager) GetClusterEndpoint(ctx context.Context, clusterName str
 			Group:   "container.gcp.upbound.io",
 			Version: "v1beta1",
 			Kind:    "Cluster",
-		}
-	case "talos":
-		gvk = schema.GroupVersionKind{
-			Group:   "cluster.x-k8s.io",
-			Version: "v1beta1",
-			Kind:    "TalosCluster",
 		}
 	case "vcluster":
 		gvk = schema.GroupVersionKind{
