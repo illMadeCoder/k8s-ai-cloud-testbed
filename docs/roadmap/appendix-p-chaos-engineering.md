@@ -7,7 +7,7 @@
 **Goal:** Measure application resilience to pod failures
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/chaos-pod-failure/`
+- [ ] Create `experiments/chaos-pod-failure/`
 - [ ] Deploy Chaos Mesh
 - [ ] Test scenarios:
   - [ ] Single pod kill
@@ -23,7 +23,7 @@
 **Goal:** Test application behavior under network issues
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/chaos-network/`
+- [ ] Create `experiments/chaos-network/`
 - [ ] Test with Chaos Mesh NetworkChaos:
   - [ ] Latency injection (50ms, 200ms, 500ms)
   - [ ] Packet loss (1%, 5%, 20%)
@@ -41,7 +41,7 @@
 **Goal:** Test infrastructure-level failures
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/chaos-infrastructure/`
+- [ ] Create `experiments/chaos-infrastructure/`
 - [ ] Test scenarios:
   - [ ] Graceful node drain
   - [ ] Sudden node failure
@@ -66,7 +66,7 @@
 - Make data-driven reliability investments
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/chaos-slo-impact/`
+- [ ] Create `experiments/chaos-slo-impact/`
 - [ ] Pre-chaos baseline:
   - [ ] Record current error budget remaining
   - [ ] Document SLI baselines (error rate, latency)
@@ -106,7 +106,7 @@
 - Validate incident response procedures
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/gameday/`
+- [ ] Create `experiments/gameday/`
 - [ ] Gameday planning:
   - [ ] Define failure scenarios
   - [ ] Set SLO impact expectations

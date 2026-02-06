@@ -14,7 +14,7 @@
 - Make data-driven database selection
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/database-benchmark/`
+- [ ] Create `experiments/database-benchmark/`
 - [ ] Deploy databases via Crossplane/operators:
   - [ ] PostgreSQL (CloudNativePG)
   - [ ] MySQL (via operator)
@@ -43,7 +43,7 @@
 - Inform technology selection
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/messaging-benchmark/`
+- [ ] Create `experiments/messaging-benchmark/`
 - [ ] Deploy all three brokers (from Phase 7)
 - [ ] Build benchmarking clients
 - [ ] Test scenarios:
@@ -70,7 +70,7 @@
 - Inform mesh selection
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/mesh-benchmark/`
+- [ ] Create `experiments/mesh-benchmark/`
 - [ ] Deploy baseline app (no mesh)
 - [ ] Deploy same app with:
   - [ ] Istio
@@ -98,7 +98,7 @@
 - Portfolio piece for runtime expertise
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/runtime-benchmark/`
+- [ ] Create `experiments/runtime-benchmark/`
 - [ ] Build identical API in:
   - [ ] Go (net/http)
   - [ ] Rust (Axum)
@@ -170,7 +170,7 @@
 - Integrate cost data with benchmarking
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cost-tooling/`
+- [ ] Create `experiments/cost-tooling/`
 - [ ] Deploy OpenCost (CNCF):
   - [ ] Helm deployment
   - [ ] Cloud provider pricing integration
@@ -206,7 +206,7 @@
 - Make holistic optimization decisions
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/full-stack-benchmark/`
+- [ ] Create `experiments/full-stack-benchmark/`
 - [ ] Deploy full stack:
   ```
   Client → Gateway → Mesh → App → Database → Messaging

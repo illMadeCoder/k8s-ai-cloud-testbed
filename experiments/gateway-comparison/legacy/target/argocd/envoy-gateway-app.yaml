@@ -1,0 +1,48 @@
+# Envoy Gateway ArgoCD Application for Gateway Comparison
+#
+# WORKAROUND: Using GitHub-hosted helm chart instead of OCI registry
+# ArgoCD has issues pulling OCI helm charts (oci://docker.io/envoyproxy/gateway-helm).
+# The workaround is to use the chart from the GitHub repo directly.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-comparison-envoy-gateway
+  namespace: argocd
+  labels:
+    experiment: gateway-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Use GitHub repo with helm chart
+    - repoURL: https://github.com/envoyproxy/gateway
+      targetRevision: v1.2.4
+      path: charts/gateway-helm
+      helm:
+        releaseName: envoy-gateway
+        valueFiles:
+          - $values/experiments/gateway-comparison/values/envoy-gateway-values.yaml
+    # Values reference from main repo
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    name: target
+    namespace: envoy-gateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

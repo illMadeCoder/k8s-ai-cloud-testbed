@@ -12,7 +12,7 @@
 - Know the components of X.509 certificates
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/pki-fundamentals/`
+- [ ] Create `experiments/pki-fundamentals/`
 - [ ] Asymmetric cryptography review:
   - [ ] Public/private key pairs
   - [ ] RSA key generation and sizes (2048, 4096)
@@ -66,7 +66,7 @@
 - Troubleshoot TLS connection issues
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/tls-deep-dive/`
+- [ ] Create `experiments/tls-deep-dive/`
 - [ ] TLS 1.2 handshake:
   - [ ] ClientHello / ServerHello
   - [ ] Certificate exchange
@@ -121,7 +121,7 @@
 - Integrate with Kubernetes workloads
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/private-ca/`
+- [ ] Create `experiments/private-ca/`
 - [ ] step-ca architecture:
   - [ ] Smallstep ecosystem (step CLI, step-ca)
   - [ ] Provisioners (ACME, JWK, OIDC, X5C)
@@ -176,7 +176,7 @@
 - Automate certificate rotation
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cert-manager/`
+- [ ] Create `experiments/cert-manager/`
 - [ ] cert-manager architecture:
   - [ ] Custom Resource Definitions (Certificate, Issuer, etc.)
   - [ ] Controller architecture
@@ -240,7 +240,7 @@
 - Integrate mTLS with service mesh and ingress
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/mtls/`
+- [ ] Create `experiments/mtls/`
 - [ ] mTLS fundamentals:
   - [ ] Server authentication (standard TLS)
   - [ ] Client authentication (mTLS addition)
@@ -296,7 +296,7 @@
 - Monitor for certificate misuse
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cert-transparency/`
+- [ ] Create `experiments/cert-transparency/`
 - [ ] Certificate Transparency (CT):
   - [ ] Why CT exists (DigiNotar, etc.)
   - [ ] CT log structure (Merkle tree)
@@ -346,7 +346,7 @@
 - Manage certificate secrets securely
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/pki-secrets-integration/`
+- [ ] Create `experiments/pki-secrets-integration/`
 - [ ] Vault PKI secrets engine:
   - [ ] Root CA generation in Vault
   - [ ] Intermediate CA setup
@@ -390,7 +390,7 @@
 - Handle certificate emergencies
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cert-operations/`
+- [ ] Create `experiments/cert-operations/`
 - [ ] Certificate inventory:
   - [ ] Discovering certificates in cluster
   - [ ] External certificate scanning
@@ -441,7 +441,7 @@
 - Avoid common TLS misconfigurations
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/app-tls-config/`
+- [ ] Create `experiments/app-tls-config/`
 - [ ] TLS termination patterns:
   - [ ] Edge termination (load balancer/ingress)
   - [ ] Passthrough (end-to-end)

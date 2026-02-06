@@ -12,7 +12,7 @@
 - Establish SRE culture
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/sre-fundamentals/`
+- [ ] Create `experiments/sre-fundamentals/`
 - [ ] SRE principles:
   - [ ] Embrace risk (not eliminate)
   - [ ] SLOs as contract
@@ -59,7 +59,7 @@
 - Implement SLO monitoring
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/slo-implementation/`
+- [ ] Create `experiments/slo-implementation/`
 - [ ] SLI/SLO/SLA hierarchy:
   - [ ] SLI: Service Level Indicator (metric)
   - [ ] SLO: Service Level Objective (target)
@@ -120,7 +120,7 @@
 - Prevent alert fatigue
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/oncall-alerting/`
+- [ ] Create `experiments/oncall-alerting/`
 - [ ] Alerting philosophy:
   - [ ] Alert on symptoms, not causes
   - [ ] Actionable alerts only
@@ -184,7 +184,7 @@
 - Communicate effectively
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/incident-response/`
+- [ ] Create `experiments/incident-response/`
 - [ ] Incident definition:
   - [ ] What constitutes an incident
   - [ ] Severity levels
@@ -249,7 +249,7 @@
 - Drive meaningful improvements
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/post-mortems/`
+- [ ] Create `experiments/post-mortems/`
 - [ ] Blameless culture:
   - [ ] Focus on systems, not people
   - [ ] Assume good intentions
@@ -314,7 +314,7 @@
 - Enable self-service operations
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/runbooks/`
+- [ ] Create `experiments/runbooks/`
 - [ ] Runbook purpose:
   - [ ] Enable anyone to respond
   - [ ] Reduce mean time to recovery
@@ -376,7 +376,7 @@
 - Automate repetitive tasks
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/toil-reduction/`
+- [ ] Create `experiments/toil-reduction/`
 - [ ] Toil definition:
   - [ ] Manual work
   - [ ] Repetitive
@@ -437,7 +437,7 @@
 - Handle capacity emergencies
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/capacity-management/`
+- [ ] Create `experiments/capacity-management/`
 - [ ] Capacity planning cycle:
   - [ ] Current state assessment
   - [ ] Demand forecasting
@@ -498,7 +498,7 @@
 - Build confidence in systems
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/reliability-testing/`
+- [ ] Create `experiments/reliability-testing/`
 - [ ] Testing types:
   - [ ] Load testing
   - [ ] Chaos engineering (Phase 12)

@@ -1,0 +1,60 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jqPathExpressions:
+        - .metadata.annotations
+        - .metadata.managedFields
+        - .spec.validation
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .metadata.managedFields
+        - .webhooks[].clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .metadata.managedFields
+        - .webhooks[].clientConfig.caBundle
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 79.9.0
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          - $values/components/observability/prometheus-stack/values.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: components/observability/prometheus-stack
+      directory:
+        include: '*-httproute.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

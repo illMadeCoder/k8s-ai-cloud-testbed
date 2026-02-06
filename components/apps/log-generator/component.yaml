@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
-      path: experiments/components/apps/log-generator/k8s
+      path: components/apps/log-generator/k8s
   parameters:
     - name: replicas
       type: int

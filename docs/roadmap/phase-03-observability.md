@@ -17,7 +17,7 @@
 - Configure alerting pipelines
 
 **Tasks:**
-- [x] Create `experiments/scenarios/prometheus-tutorial/`
+- [x] Create `experiments/prometheus-tutorial/`
 - [x] Deploy kube-prometheus-stack via ArgoCD
 - [x] Build sample app with custom metrics:
   - [x] Counter (http_requests_total)
@@ -40,7 +40,7 @@
   - [ ] Alertmanager routing and silences
   - [ ] Alert grouping and inhibition
 - [ ] Document PromQL patterns and anti-patterns
-- [x] **Explore TSDB alternatives:** (see ADR-009, `experiments/scenarios/tsdb-comparison/`)
+- [x] **Explore TSDB alternatives:** (see ADR-009, `experiments/tsdb-comparison/`)
   - [x] Victoria Metrics (drop-in replacement, better compression)
   - [x] Compare resource usage (Prometheus vs Victoria Metrics vs Mimir)
   - [x] Mimir architecture overview (Grafana's distributed TSDB)
@@ -67,7 +67,7 @@
 - Lower resource usage
 
 **Tasks:**
-- [x] Create `experiments/scenarios/seaweedfs-tutorial/`
+- [x] Create `experiments/seaweedfs-tutorial/`
 - [x] Deploy SeaweedFS (master + volume servers)
 - [x] Understand the architecture:
   - [x] Master server (metadata, volume allocation)
@@ -104,7 +104,7 @@
 - Correlate logs with metrics in Grafana
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/loki-tutorial/`
+- [ ] Create `experiments/loki-tutorial/`
 - [ ] Deploy Loki stack (Loki + Promtail)
 - [ ] Configure Loki storage:
   - [ ] Point to SeaweedFS bucket from Section 3.2
@@ -158,7 +158,7 @@
 - Cost-sensitive deployments
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/elk-tutorial/`
+- [ ] Create `experiments/elk-tutorial/`
 - [ ] Deploy ELK stack via ECK (Elastic Cloud on Kubernetes):
   - [ ] Elasticsearch cluster (single node dev, 3-node prod)
   - [ ] Kibana for visualization
@@ -187,7 +187,7 @@
   - [ ] JVM heap sizing
   - [ ] Bulk indexing optimization
   - [ ] Query performance analysis
-- [x] Compare with Loki: (see `experiments/scenarios/logging-comparison/`)
+- [x] Compare with Loki: (see `experiments/logging-comparison/`)
   - [x] Resource usage comparison dashboard
   - [x] Query performance benchmark scripts
   - [ ] Operational complexity comparison
@@ -214,7 +214,7 @@
 - Correlate traces ↔ metrics ↔ logs
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/opentelemetry-tutorial/`
+- [ ] Create `experiments/opentelemetry-tutorial/`
 - [ ] Deploy OpenTelemetry Collector
 - [ ] Deploy Tempo (using MinIO for storage) or Jaeger as trace backend
 - [ ] Build multi-service demo app (3+ services):
@@ -253,7 +253,7 @@
 - Use SLOs to drive architectural decisions
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/slo-tutorial/`
+- [ ] Create `experiments/slo-tutorial/`
 - [ ] Deploy SLO tooling:
   - [ ] Sloth (SLO generator for Prometheus)
   - [ ] Pyrra (SLO dashboards and alerts)

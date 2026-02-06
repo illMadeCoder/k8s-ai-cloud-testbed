@@ -12,7 +12,7 @@
 - Handle artifacts and parameters
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/argo-workflows-tutorial/`
+- [ ] Create `experiments/argo-workflows-tutorial/`
 - [ ] Workflow patterns:
   - [ ] Sequential steps
   - [ ] Parallel execution
@@ -51,7 +51,7 @@
 - Integrate with Argo Workflows
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/argo-events-tutorial/`
+- [ ] Create `experiments/argo-events-tutorial/`
 - [ ] Deploy Argo Events
 - [ ] Configure EventSources:
   - [ ] Webhook (HTTP triggers)
@@ -87,7 +87,7 @@
 - Design hybrid CI/CD architectures
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/advanced-cicd/`
+- [ ] Create `experiments/advanced-cicd/`
 - [ ] Argo Workflows for CI:
   - [ ] Build pipelines as workflows
   - [ ] Parallel test execution

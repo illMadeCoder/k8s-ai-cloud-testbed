@@ -12,7 +12,7 @@
 - Experience the migration path from Ingress to Gateway API
 - Implement advanced routing and traffic manipulation patterns
 
-**Scenario:** `experiments/scenarios/gateway-tutorial/`
+**Scenario:** `experiments/gateway-tutorial/`
 
 **Part 1: Ingress Basics**
 - [ ] Deploy nginx-ingress controller
@@ -254,7 +254,7 @@
 - Compare configuration patterns and complexity
 - Evaluate feature availability and resource consumption
 
-**Scenario:** `experiments/scenarios/gateway-comparison/`
+**Scenario:** `experiments/gateway-comparison/`
 
 **Implementations to compare:**
 - [ ] nginx-ingress (most widely deployed)
@@ -299,7 +299,7 @@
 - Evaluate cost, performance, and operational trade-offs
 - Make informed decisions for production architectures
 
-**Scenario:** `experiments/scenarios/cloud-gateway-comparison/`
+**Scenario:** `experiments/cloud-gateway-comparison/`
 
 **Implementations to compare:**
 - [ ] AWS ALB Ingress Controller (provisions AWS ALBs)

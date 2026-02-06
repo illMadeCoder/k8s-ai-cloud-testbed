@@ -1,0 +1,30 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Experiment
+metadata:
+  name: loki-tutorial
+  namespace: experiments
+spec:
+  description: "Loki log aggregation tutorial with LogQL learning"
+  ttlDays: 1
+
+  targets:
+    - name: app
+      cluster:
+        type: vcluster
+      components:
+        - app: loki
+        - app: promtail
+        - app: kube-prometheus-stack
+          params:
+            prometheus.enabled: "false"
+            alertmanager.enabled: "false"
+            grafana.enabled: "true"
+        - app: log-generator
+      observability:
+        enabled: true
+        transport: direct
+
+  workflow:
+    template: loki-validation
+    completion:
+      mode: workflow

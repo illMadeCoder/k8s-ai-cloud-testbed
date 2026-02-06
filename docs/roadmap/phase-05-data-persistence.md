@@ -12,7 +12,7 @@
 - Implement backup and recovery
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/postgres-tutorial/`
+- [ ] Create `experiments/postgres-tutorial/`
 - [ ] Deploy CloudNativePG operator
 - [ ] Create PostgreSQL cluster:
   - [ ] Primary + replicas
@@ -46,7 +46,7 @@
 - Implement caching patterns
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/redis-tutorial/`
+- [ ] Create `experiments/redis-tutorial/`
 - [ ] Deploy Redis operator (Spotahome or similar)
 - [ ] Create Redis deployments:
   - [ ] Standalone (development)
@@ -80,7 +80,7 @@
 - Design RTO/RPO strategies
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/backup-dr-tutorial/`
+- [ ] Create `experiments/backup-dr-tutorial/`
 - [ ] Deploy Velero:
   - [ ] Configure backup storage (S3/Azure Blob)
   - [ ] Install plugins (AWS, Azure, CSI)
@@ -116,7 +116,7 @@
 - Integrate with GitOps workflows
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/schema-migration-tutorial/`
+- [ ] Create `experiments/schema-migration-tutorial/`
 - [ ] Deploy migration tool:
   - [ ] Flyway OR Liquibase
 - [ ] Implement migration patterns:

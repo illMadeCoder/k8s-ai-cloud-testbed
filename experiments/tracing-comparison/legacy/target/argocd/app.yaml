@@ -1,0 +1,82 @@
+# Tracing Comparison - Deploy Tempo, Jaeger, and demo app
+# Dual-write traces to both backends for comparison
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tracing-comparison-target
+  namespace: argocd
+  labels:
+    experiment: tracing-comparison
+    cluster: target
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # OpenTelemetry Collector (dual-write to Tempo and Jaeger)
+    - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+      chart: opentelemetry-collector
+      targetRevision: 0.108.0
+      helm:
+        releaseName: otel-collector
+        valueFiles:
+          - $values/experiments/tracing-comparison/values/otel-collector-values.yaml
+    # Tempo
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: tempo
+      targetRevision: 1.10.3
+      helm:
+        releaseName: tempo
+        valueFiles:
+          - $values/experiments/tracing-comparison/values/tempo-values.yaml
+    # Jaeger
+    - repoURL: https://jaegertracing.github.io/helm-charts
+      chart: jaeger
+      targetRevision: 3.3.1
+      helm:
+        releaseName: jaeger
+        valueFiles:
+          - $values/experiments/tracing-comparison/values/jaeger-values.yaml
+    # kube-prometheus-stack (Grafana for Tempo)
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 79.9.0
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          - $values/experiments/tracing-comparison/values/grafana-values.yaml
+    # Values reference
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+    # Demo app and comparison dashboards
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/tracing-comparison/manifests
+
+  destination:
+    name: target
+    namespace: tracing-comparison
+  # Ignore status fields that Kubernetes 1.32+ adds but ArgoCD schema doesn't know
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: ReplicaSet
+      jsonPointers:
+        - /status/terminatingReplicas
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

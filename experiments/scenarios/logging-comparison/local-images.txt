@@ -1,3 +1,0 @@
-# Local images required for this experiment
-# Build with: docker build -t log-generator:latest experiments/components/apps/log-generator/
-log-generator:latest

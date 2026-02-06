@@ -1,0 +1,234 @@
+# Tutorial configuration
+# When this file exists, `task hub:conduct` runs in interactive mode
+
+title: "GATEWAY SHOWDOWN - Three Controllers, One Ring"
+description: |
+  Gateway Comparison: nginx-ingress vs Traefik vs Envoy Gateway
+  Compare routing approaches, features, and performance side-by-side.
+
+instructions: |
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  GATEWAY SHOWDOWN       ║  COMPARATIVE ANALYSIS TERMINAL             ║
+  ╠══════════════════════════════════════════════════════════════════════╣
+  ║  Welcome, Traffic Architect. Three gateways await your judgment.     ║
+  ║  Mission: Compare nginx-ingress, Traefik, and Envoy Gateway          ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  CONTENDERS                                                          │
+  │                                                                      │
+  │  [nginx-ingress] The veteran. Annotation-driven. Battle-tested.     │
+  │  [Traefik]       The middleware master. Kubernetes-native.          │
+  │  [Envoy Gateway] The newcomer. Gateway API reference implementation.│
+  └─────────────────────────────────────────────────────────────────────┘
+
+  ═══════════════════════════════════════════════════════════════════════
+  STEP 1: GET GATEWAY IPs
+  ═══════════════════════════════════════════════════════════════════════
+
+  ```bash
+  # nginx-ingress
+  NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  echo "nginx: $NGINX_IP"
+
+  # Traefik
+  TRAEFIK_IP=$(kubectl get svc traefik -n traefik-system \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  echo "Traefik: $TRAEFIK_IP"
+
+  # Envoy Gateway
+  ENVOY_IP=$(kubectl get gateway envoy-gateway -n gateway-comparison \
+    -o jsonpath='{.status.addresses[0].value}')
+  echo "Envoy: $ENVOY_IP"
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  ROUND 1: PATH-BASED ROUTING
+  ═══════════════════════════════════════════════════════════════════════
+
+  Test /echo on all three:
+  ```bash
+  echo "=== nginx ===" && curl -s http://$NGINX_IP/echo
+  echo "=== Traefik ===" && curl -s http://$TRAEFIK_IP/echo
+  echo "=== Envoy ===" && curl -s http://$ENVOY_IP/echo
+  ```
+
+  Compare the configurations:
+  ```bash
+  # nginx: Ingress resource
+  kubectl get ingress nginx-path-routing -n gateway-comparison -o yaml | head -30
+
+  # Traefik: HTTPRoute
+  kubectl get httproute traefik-path-routing -n gateway-comparison -o yaml | head -30
+
+  # Envoy: HTTPRoute
+  kubectl get httproute envoy-path-routing -n gateway-comparison -o yaml | head -30
+  ```
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  Notice: Traefik and Envoy use the SAME HTTPRoute format!            ║
+  ║  nginx uses the older Ingress resource with different syntax.        ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ═══════════════════════════════════════════════════════════════════════
+  ROUND 2: HOST-BASED ROUTING
+  ═══════════════════════════════════════════════════════════════════════
+
+  Each gateway has its own virtual hosts:
+  ```bash
+  # nginx
+  curl -s -H "Host: api.nginx.local" http://$NGINX_IP/ | jq -r '.url // .'
+
+  # Traefik
+  curl -s -H "Host: api.traefik.local" http://$TRAEFIK_IP/ | jq -r '.url // .'
+
+  # Envoy
+  curl -s -H "Host: api.envoy.local" http://$ENVOY_IP/ | jq -r '.url // .'
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  ROUND 3: HEADER MANIPULATION
+  ═══════════════════════════════════════════════════════════════════════
+
+  Each gateway adds an X-Gateway header. Check the differences:
+  ```bash
+  echo "=== nginx ===" && \
+    curl -s -H "Host: headers.nginx.local" http://$NGINX_IP/headers | grep -i gateway
+
+  echo "=== Traefik ===" && \
+    curl -s -H "Host: headers.traefik.local" http://$TRAEFIK_IP/headers | grep -i gateway
+
+  echo "=== Envoy ===" && \
+    curl -s -H "Host: headers.envoy.local" http://$ENVOY_IP/headers | grep -i gateway
+  ```
+
+  Compare configuration approaches:
+  - nginx: `configuration-snippet` annotation (nginx.conf injection)
+  - Traefik: HTTPRoute `RequestHeaderModifier` filter
+  - Envoy: HTTPRoute `RequestHeaderModifier` filter
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  nginx: Requires controller-specific annotation + nginx syntax       ║
+  ║  Traefik/Envoy: Standard Gateway API filter syntax                   ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ═══════════════════════════════════════════════════════════════════════
+  ROUND 4: TRAFFIC SPLITTING (CANARY)
+  ═══════════════════════════════════════════════════════════════════════
+
+  All three are configured for 80/20 split. Test 20 requests each:
+  ```bash
+  echo "=== nginx ===" && \
+    for i in {1..20}; do curl -s -H "Host: canary.nginx.local" http://$NGINX_IP/; done | sort | uniq -c
+
+  echo "=== Traefik ===" && \
+    for i in {1..20}; do curl -s -H "Host: canary.traefik.local" http://$TRAEFIK_IP/; done | sort | uniq -c
+
+  echo "=== Envoy ===" && \
+    for i in {1..20}; do curl -s -H "Host: canary.envoy.local" http://$ENVOY_IP/; done | sort | uniq -c
+  ```
+
+  Compare implementation complexity:
+  ```bash
+  # nginx: Requires TWO Ingress resources
+  kubectl get ingress -n gateway-comparison | grep canary
+
+  # Traefik & Envoy: Single HTTPRoute with weights
+  kubectl get httproute -n gateway-comparison | grep canary
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  ROUND 5: RATE LIMITING
+  ═══════════════════════════════════════════════════════════════════════
+
+  Each gateway uses a different rate limiting mechanism:
+  ```bash
+  # nginx: Annotation
+  kubectl get ingress nginx-rate-limited -n gateway-comparison -o yaml | grep -A2 limit
+
+  # Traefik: Middleware CRD
+  kubectl get middleware rate-limit -n gateway-comparison -o yaml
+
+  # Envoy: BackendTrafficPolicy
+  kubectl get backendtrafficpolicy envoy-rate-limit -n gateway-comparison -o yaml
+  ```
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  Rate limiting approaches:                                           ║
+  ║  - nginx: Simple annotation, limited config                          ║
+  ║  - Traefik: Flexible middleware, Traefik-specific                    ║
+  ║  - Envoy: Policy CRD, extensible, Envoy-specific                    ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ═══════════════════════════════════════════════════════════════════════
+  ROUND 6: gRPC SUPPORT
+  ═══════════════════════════════════════════════════════════════════════
+
+  gRPC support varies significantly:
+  ```bash
+  # Test internal gRPC service
+  kubectl exec -n gateway-comparison grpcurl-test -- \
+    grpcurl -plaintext grpc-echo.gateway-comparison.svc.cluster.local:50051 list
+
+  # Envoy Gateway (best gRPC support via GRPCRoute)
+  kubectl get grpcroute -n gateway-comparison
+  ```
+
+  Configuration comparison:
+  ```bash
+  # nginx: Ingress with annotation
+  kubectl get ingress nginx-grpc -n gateway-comparison -o yaml | head -20
+
+  # Traefik: GRPCRoute (experimental)
+  kubectl get grpcroute traefik-grpc -n gateway-comparison -o yaml
+
+  # Envoy: GRPCRoute (full support)
+  kubectl get grpcroute envoy-grpc -n gateway-comparison -o yaml
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  AUTOMATED BENCHMARK
+  ═══════════════════════════════════════════════════════════════════════
+
+  Run the comprehensive benchmark from the runner pod:
+  ```bash
+  kubectl exec -n gateway-comparison deploy/benchmark-runner -- /scripts/benchmark.sh
+  ```
+
+  View feature comparison matrix:
+  ```bash
+  kubectl exec -n gateway-comparison deploy/benchmark-runner -- /scripts/feature-matrix.sh
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  FINAL VERDICT
+  ═══════════════════════════════════════════════════════════════════════
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  CHOOSE YOUR GATEWAY                                                 │
+  │                                                                      │
+  │  nginx-ingress:   Legacy apps, wide ecosystem, mature tooling       │
+  │  Traefik:         Middleware-heavy, Kubernetes-native, good docs    │
+  │  Envoy Gateway:   Gateway API, gRPC-first, modern policies         │
+  │                                                                      │
+  │  For NEW projects: Start with Envoy Gateway (Gateway API native)    │
+  │  For MIGRATION:    Traefik (supports both Ingress and Gateway API) │
+  │  For LEGACY:       nginx-ingress (proven, well-understood)          │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  You have learned:
+  [x] Routing differences (Ingress vs Gateway API)
+  [x] Feature implementation approaches
+  [x] Configuration portability
+  [x] gRPC support levels
+  [x] Rate limiting mechanisms
+
+  Full documentation:
+  ```bash
+  less experiments/gateway-comparison/README.md
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  Press ENTER to complete the comparison.
+  ═══════════════════════════════════════════════════════════════════════

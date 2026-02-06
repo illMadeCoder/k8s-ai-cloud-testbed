@@ -1,0 +1,41 @@
+# Jaeger - Distributed tracing backend (alternative to Tempo)
+# CNCF graduated project, all-in-one deployment for tutorials
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jaeger
+  namespace: argocd
+  labels:
+    component: observability
+    app: jaeger
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://jaegertracing.github.io/helm-charts
+      chart: jaeger
+      targetRevision: 3.3.1
+      helm:
+        releaseName: jaeger
+        valueFiles:
+          - $values/components/observability/jaeger/values.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: jaeger
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

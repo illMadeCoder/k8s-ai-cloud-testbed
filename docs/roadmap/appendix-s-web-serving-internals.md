@@ -72,7 +72,7 @@ At 1000 req/s with p99 = 500ms:
 | **Universal Scalability Law** | Contention + coherence costs | Why systems don't scale linearly |
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/perf-fundamentals/`
+- [ ] Create `experiments/perf-fundamentals/`
 - [ ] SLI selection exercise:
   - [ ] Define SLIs for a typical web API
   - [ ] Choose appropriate percentiles for SLOs
@@ -108,7 +108,7 @@ At 1000 req/s with p99 = 500ms:
 - Measure how concurrency models behave under various load patterns
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/concurrency-models/`
+- [ ] Create `experiments/concurrency-models/`
 - [ ] Build equivalent servers demonstrating:
   - [ ] **Thread-per-request** (Java servlet, Go goroutines)
   - [ ] **Event loop** (Node.js, Nginx)
@@ -142,7 +142,7 @@ At 1000 req/s with p99 = 500ms:
 - Measure real-world performance differences
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/http-protocols/`
+- [ ] Create `experiments/http-protocols/`
 - [ ] Deploy identical apps with different protocols:
   - [ ] HTTP/1.1 (baseline)
   - [ ] HTTP/2 (multiplexing, header compression)
@@ -176,7 +176,7 @@ At 1000 req/s with p99 = 500ms:
 - Measure streaming and bidirectional communication
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/api-protocols/`
+- [ ] Create `experiments/api-protocols/`
 - [ ] Build equivalent APIs:
   - [ ] REST/JSON (OpenAPI spec)
   - [ ] GraphQL (with DataLoader batching)
@@ -210,7 +210,7 @@ At 1000 req/s with p99 = 500ms:
 - Measure proxy overhead in the request path
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/proxy-benchmark/`
+- [ ] Create `experiments/proxy-benchmark/`
 - [ ] Deploy and benchmark:
   - [ ] **NGINX** (C, event-driven, battle-tested)
   - [ ] **HAProxy** (C, purpose-built LB)
@@ -248,7 +248,7 @@ At 1000 req/s with p99 = 500ms:
 - Measure serving efficiency for different content types
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/static-serving/`
+- [ ] Create `experiments/static-serving/`
 - [ ] Deploy and compare:
   - [ ] NGINX (static serving config)
   - [ ] Caddy
@@ -284,7 +284,7 @@ At 1000 req/s with p99 = 500ms:
 - Measure under sustained load (not just peak)
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/runtime-deepdive/`
+- [ ] Create `experiments/runtime-deepdive/`
 - [ ] Build identical HTTP servers in:
   - [ ] **Go** - goroutines, GC, fast compile
   - [ ] **Rust** - zero-cost abstractions, no GC
@@ -322,7 +322,7 @@ At 1000 req/s with p99 = 500ms:
 - Measure broadcast and pub/sub patterns
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/realtime-benchmark/`
+- [ ] Create `experiments/realtime-benchmark/`
 - [ ] Implement servers supporting:
   - [ ] WebSocket
   - [ ] Server-Sent Events (SSE)
@@ -356,7 +356,7 @@ At 1000 req/s with p99 = 500ms:
 - Make informed architecture decisions
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/complete-stack/`
+- [ ] Create `experiments/complete-stack/`
 - [ ] Build reference architectures:
   - [ ] **Stack A:** NGINX → Go → PostgreSQL
   - [ ] **Stack B:** Envoy → Rust → PostgreSQL

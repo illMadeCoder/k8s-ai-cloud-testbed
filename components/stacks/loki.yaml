@@ -1,0 +1,40 @@
+# Loki Logging Stack
+# Deploys: Loki + Promtail (log shipper)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: stack-loki
+  namespace: argocd
+  labels:
+    layer: stack
+    stack: loki
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Logs - Loki
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: components/observability/loki
+      directory:
+        recurse: false
+        include: 'loki.yaml'
+
+    # Logs - Promtail (log shipper for Loki)
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: components/observability/promtail
+      directory:
+        recurse: false
+        include: 'promtail.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,30 @@
+# HTTP Baseline - Loadgen k6 Scripts
+# Deploys k6 scripts ConfigMap to orchestrator (where workflows run)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: http-baseline-loadgen
+  namespace: argocd
+  labels:
+    experiment: http-baseline
+    cluster: loadgen
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # k6 scripts configmap (experiment-specific test scenarios)
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/http-baseline/legacy/loadgen/argocd
+      directory:
+        recurse: false
+        include: 'k6-scripts.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc  # Orchestrator (in-cluster)
+    namespace: argo-workflows
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

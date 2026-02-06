@@ -376,7 +376,7 @@ tasks:
   list:
     desc: List available experiments
     cmds:
-      - tree experiments/scenarios -L 1 -d --noreport 2>/dev/null || ls -d experiments/scenarios/*/
+      - tree experiments -L 1 -d --noreport 2>/dev/null || ls -d experiments/*/
 
   up:
     desc: "Deploy experiment: task hub:up -- <name>"
@@ -392,7 +392,7 @@ tasks:
         fi
 
         EXP_NAME="{{.CLI_ARGS}}"
-        EXP_PATH="experiments/scenarios/$EXP_NAME"
+        EXP_PATH="experiments/$EXP_NAME"
 
         if [ ! -d "$EXP_PATH" ]; then
           echo "ERROR: Experiment not found at $EXP_PATH"
@@ -407,7 +407,7 @@ tasks:
         # Step 1: Discover clusters
         echo "=== Step 1/4: Discovering clusters ==="
         CLUSTERS=""
-        for cluster_dir in "$EXP_PATH"/*/; do
+        for cluster_dir in "$EXP_PATH"/legacy/*/; do
           if [ -f "$cluster_dir/cluster.yaml" ]; then
             cluster_name=$(basename "$cluster_dir")
             CLUSTERS="$CLUSTERS $cluster_name"
@@ -542,7 +542,7 @@ tasks:
         echo ""
         echo "=== Step 4/4: Deploying apps via ArgoCD ==="
         for cluster in $CLUSTERS; do
-          cluster_dir="$EXP_PATH/$cluster"
+          cluster_dir="$EXP_PATH/legacy/$cluster"
           argocd_dir="$cluster_dir/argocd"
 
           if [ -d "$argocd_dir" ] && [ -f "$argocd_dir/app.yaml" ]; then
@@ -556,7 +556,7 @@ tasks:
         sleep 30
       - |
         EXP_NAME="{{.CLI_ARGS}}"
-        EXP_PATH="experiments/scenarios/$EXP_NAME"
+        EXP_PATH="experiments/$EXP_NAME"
 
         echo ""
         echo "=============================================="
@@ -564,7 +564,7 @@ tasks:
         echo "=============================================="
 
         # Show access information
-        for cluster_dir in "$EXP_PATH"/*/; do
+        for cluster_dir in "$EXP_PATH"/legacy/*/; do
           if [ -f "$cluster_dir/cluster.yaml" ]; then
             cluster=$(basename "$cluster_dir")
             full_name="${EXP_NAME}-${cluster}"
@@ -622,7 +622,7 @@ tasks:
         fi
 
         EXP_NAME="{{.CLI_ARGS}}"
-        EXP_PATH="experiments/scenarios/$EXP_NAME"
+        EXP_PATH="experiments/$EXP_NAME"
         WORKFLOW_FILE="$EXP_PATH/workflow/experiment.yaml"
 
         if [ ! -d "$EXP_PATH" ]; then
@@ -651,7 +651,7 @@ tasks:
         echo "=== Step 1/6: Discovering clusters ==="
         CLUSTERS=""
         HAS_ORCHESTRATOR=false
-        for cluster_dir in "$EXP_PATH"/*/; do
+        for cluster_dir in "$EXP_PATH"/legacy/*/; do
           if [ -f "$cluster_dir/cluster.yaml" ]; then
             cluster_name=$(basename "$cluster_dir")
             CLUSTERS="$CLUSTERS $cluster_name"
@@ -823,7 +823,7 @@ tasks:
           fi
 
           full_name="${EXP_NAME}-${cluster}"
-          cluster_dir="$EXP_PATH/$cluster"
+          cluster_dir="$EXP_PATH/legacy/$cluster"
           argocd_dir="$cluster_dir/argocd"
 
           if [ -d "$argocd_dir" ] && [ -f "$argocd_dir/app.yaml" ]; then
@@ -860,7 +860,7 @@ tasks:
         done
       - |
         EXP_NAME="{{.CLI_ARGS}}"
-        EXP_PATH="experiments/scenarios/$EXP_NAME"
+        EXP_PATH="experiments/$EXP_NAME"
         TUTORIAL_FILE="$EXP_PATH/tutorial.yaml"
         WORKFLOW_FILE="$EXP_PATH/workflow/experiment.yaml"
 
@@ -938,7 +938,7 @@ tasks:
           # Cleanup
           echo ""
           echo "=== Cleaning up ArgoCD resources ==="
-          for cluster_dir in "$EXP_PATH"/*/; do
+          for cluster_dir in "$EXP_PATH"/legacy/*/; do
             if [ -f "$cluster_dir/cluster.yaml" ]; then
               cluster=$(basename "$cluster_dir")
               full_name="${EXP_NAME}-${cluster}"
@@ -953,7 +953,7 @@ tasks:
           done
 
           echo "=== Cleaning up experiment clusters ==="
-          for cluster_dir in "$EXP_PATH"/*/; do
+          for cluster_dir in "$EXP_PATH"/legacy/*/; do
             if [ -f "$cluster_dir/cluster.yaml" ]; then
               cluster=$(basename "$cluster_dir")
               full_name="${EXP_NAME}-${cluster}"
@@ -974,7 +974,7 @@ tasks:
 
           # Determine orchestrator mode
           HAS_ORCHESTRATOR=false
-          if [ -d "$EXP_PATH/orchestrator" ] && [ -f "$EXP_PATH/orchestrator/cluster.yaml" ]; then
+          if [ -d "$EXP_PATH/legacy/orchestrator" ] && [ -f "$EXP_PATH/legacy/orchestrator/cluster.yaml" ]; then
             HAS_ORCHESTRATOR=true
           fi
 
@@ -1017,7 +1017,7 @@ tasks:
           # Cleanup
           echo ""
           echo "=== Cleaning up ArgoCD resources ==="
-          for cluster_dir in "$EXP_PATH"/*/; do
+          for cluster_dir in "$EXP_PATH"/legacy/*/; do
             if [ -f "$cluster_dir/cluster.yaml" ]; then
               cluster=$(basename "$cluster_dir")
               full_name="${EXP_NAME}-${cluster}"
@@ -1032,7 +1032,7 @@ tasks:
           done
 
           echo "=== Cleaning up experiment clusters ==="
-          for cluster_dir in "$EXP_PATH"/*/; do
+          for cluster_dir in "$EXP_PATH"/legacy/*/; do
             if [ -f "$cluster_dir/cluster.yaml" ]; then
               cluster=$(basename "$cluster_dir")
               full_name="${EXP_NAME}-${cluster}"
@@ -1059,7 +1059,7 @@ tasks:
         fi
 
         EXP_NAME="{{.CLI_ARGS}}"
-        EXP_PATH="experiments/scenarios/$EXP_NAME"
+        EXP_PATH="experiments/$EXP_NAME"
 
         if [ ! -d "$EXP_PATH" ]; then
           echo "ERROR: Experiment not found at $EXP_PATH"
@@ -1070,7 +1070,7 @@ tasks:
 
         # Step 1: Clean up ArgoCD resources on hub (prevents stale apps blocking future deployments)
         echo "=== Cleaning up ArgoCD resources ==="
-        for cluster_dir in "$EXP_PATH"/*/; do
+        for cluster_dir in "$EXP_PATH"/legacy/*/; do
           if [ -f "$cluster_dir/cluster.yaml" ]; then
             cluster_name=$(basename "$cluster_dir")
             full_name="${EXP_NAME}-${cluster_name}"
@@ -1092,7 +1092,7 @@ tasks:
 
         # Step 2: Delete Kind clusters
         echo "=== Deleting Kind clusters ==="
-        for cluster_dir in "$EXP_PATH"/*/; do
+        for cluster_dir in "$EXP_PATH"/legacy/*/; do
           if [ -f "$cluster_dir/cluster.yaml" ]; then
             cluster_name=$(basename "$cluster_dir")
             full_name="${EXP_NAME}-${cluster_name}"

@@ -27,7 +27,7 @@ This appendix covers advanced gRPC and HTTP/2 patterns that go beyond basic traf
 - Code generation workflow
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/grpc-fundamentals/`
+- [ ] Create `experiments/grpc-fundamentals/`
 - [ ] Protocol Buffers:
   - [ ] Define `.proto` schema
   - [ ] Compile with `protoc`
@@ -56,7 +56,7 @@ This appendix covers advanced gRPC and HTTP/2 patterns that go beyond basic traf
 - HTTP/2 vs HTTP/1.1 performance
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/http2-analysis/`
+- [ ] Create `experiments/http2-analysis/`
 - [ ] Protocol analysis:
   - [ ] Frame types (DATA, HEADERS, SETTINGS)
   - [ ] Stream multiplexing
@@ -82,7 +82,7 @@ This appendix covers advanced gRPC and HTTP/2 patterns that go beyond basic traf
 - Browser client implementation
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/grpc-web/`
+- [ ] Create `experiments/grpc-web/`
 - [ ] Deploy gRPC-Web proxy:
   - [ ] Envoy gRPC-Web filter
   - [ ] grpc-web standalone proxy
@@ -111,7 +111,7 @@ This appendix covers advanced gRPC and HTTP/2 patterns that go beyond basic traf
 - Need L7 awareness for proper distribution
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/grpc-loadbalancing/`
+- [ ] Create `experiments/grpc-loadbalancing/`
 - [ ] L7 load balancing:
   - [ ] Envoy gRPC routing
   - [ ] NGINX with grpc_pass
@@ -138,7 +138,7 @@ This appendix covers advanced gRPC and HTTP/2 patterns that go beyond basic traf
 - gRPC logging patterns
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/grpc-observability/`
+- [ ] Create `experiments/grpc-observability/`
 - [ ] Metrics:
   - [ ] Request count by method/status
   - [ ] Latency histograms
@@ -209,7 +209,7 @@ This appendix covers advanced gRPC and HTTP/2 patterns that go beyond basic traf
 - Produce data-driven guidance on when to use each transport for gRPC services on Kubernetes
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/grpc-transport-benchmark/`
+- [ ] Create `experiments/grpc-transport-benchmark/`
 - [ ] Unix Domain Socket (UDS):
   - [ ] gRPC over UDS: shared `hostPath` or `emptyDir` volume between containers
   - [ ] Sidecar pattern: app + gRPC server in same pod sharing socket

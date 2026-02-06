@@ -12,7 +12,7 @@
 - Know when event-driven architecture fits
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/event-driven-fundamentals/`
+- [ ] Create `experiments/event-driven-fundamentals/`
 - [ ] Event types:
   - [ ] Domain events (business occurrences)
   - [ ] Integration events (cross-service)
@@ -66,7 +66,7 @@
 - Handle event sourcing challenges
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/event-sourcing/`
+- [ ] Create `experiments/event-sourcing/`
 - [ ] Event sourcing fundamentals:
   - [ ] State from event history
   - [ ] Append-only event log
@@ -122,7 +122,7 @@
 - Combine CQRS with event sourcing
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cqrs/`
+- [ ] Create `experiments/cqrs/`
 - [ ] CQRS fundamentals:
   - [ ] Separate read and write models
   - [ ] Command side (writes)
@@ -182,7 +182,7 @@
 - Choose orchestration vs choreography
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/saga-pattern/`
+- [ ] Create `experiments/saga-pattern/`
 - [ ] Saga fundamentals:
   - [ ] Sequence of local transactions
   - [ ] Compensation for rollback
@@ -243,7 +243,7 @@
 - Handle publisher failures gracefully
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/outbox-pattern/`
+- [ ] Create `experiments/outbox-pattern/`
 - [ ] The problem:
   - [ ] Database write + message publish
   - [ ] Dual write problem
@@ -302,7 +302,7 @@
 - Implement schema registry
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/event-schema-evolution/`
+- [ ] Create `experiments/event-schema-evolution/`
 - [ ] Schema evolution challenges:
   - [ ] Multiple consumers
   - [ ] Different deployment times
@@ -359,7 +359,7 @@
 - Implement exactly-once processing
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/event-ordering/`
+- [ ] Create `experiments/event-ordering/`
 - [ ] Ordering levels:
   - [ ] Total ordering (all events)
   - [ ] Partition ordering (within partition)
@@ -417,7 +417,7 @@
 - Enable cross-cluster eventing
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/event-mesh/`
+- [ ] Create `experiments/event-mesh/`
 - [ ] CloudEvents specification:
   - [ ] Standard event format
   - [ ] Required attributes (id, source, type, specversion)

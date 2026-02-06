@@ -202,7 +202,7 @@ Similar to TSDB comparison, a hands-on tutorial could demonstrate:
 - Query performance differences (label vs full-text)
 - When label-based wins vs when full-text wins
 
-**Potential:** See `experiments/scenarios/logging-comparison/` (future)
+**Potential:** See `experiments/logging-comparison/` (future)
 
 ### Environment Strategy
 

@@ -5,7 +5,7 @@ A **benchmarking-focused** Kubernetes experiment lab for **Cloud Architect**, **
 ## How to Use This Roadmap
 
 - **Sequential but flexible** - Phases build on each other, but skip ahead if you have experience
-- **Each phase has experiments** - Found in `experiments/scenarios/<topic>/`
+- **Each phase has experiments** - Found in `experiments/<topic>/`
 - **ADRs are continuous** - Document decisions as you make them (49+ ADRs throughout)
 - **FinOps in every phase** - Cost considerations integrated, not bolted on
 - **Appendices are optional** - Deep dives for specialized needs
@@ -180,7 +180,7 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 
 ### Directory Refactoring
 
-- [x] Flatten `experiments/components/components/` to `experiments/components/`
+- [x] Flatten `components/components/` to `components/`
 - [x] Update 30 path references across YAML files and docs
 
 ### CI/CD Pipeline
@@ -190,7 +190,7 @@ See [Phase 1](docs/roadmap/phase-01-platform-bootstrap.md) for full details.
 - [x] Trivy vulnerability scanning → GitHub Security tab
 - [x] Auto-update K8s manifest with new image SHA
 - [x] Document in [ADR-006](docs/adrs/ADR-006-cicd-pipeline.md)
-- [x] Create [cicd-fundamentals experiment](experiments/scenarios/cicd-fundamentals/)
+- [x] Create [cicd-fundamentals experiment](experiments/cicd-fundamentals/)
 
 ---
 

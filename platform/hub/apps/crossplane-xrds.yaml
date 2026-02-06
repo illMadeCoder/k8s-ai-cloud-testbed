@@ -19,7 +19,7 @@ spec:
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
     targetRevision: HEAD
-    path: experiments/components/infrastructure/crossplane-xrds/definitions
+    path: components/infrastructure/crossplane-xrds/definitions
     directory:
       recurse: true
   destination:

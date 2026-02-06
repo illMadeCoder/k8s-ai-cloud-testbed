@@ -3,7 +3,7 @@
 # This pipeline is used for cloud infrastructure deployments (AKS, EKS, etc.)
 # Currently dormant - will be activated when experiments need cloud resources.
 #
-# To use: Create terraform config in experiments/scenarios/<name>/terraform/ and update TF_ROOT below.
+# To use: Create terraform config in experiments/<name>/terraform/ and update TF_ROOT below.
 # See docs/adrs/ADR-001-gitlab-ci-for-iac.md for rationale.
 
 stages:
@@ -13,7 +13,7 @@ stages:
 
 variables:
   # Update these when deploying cloud infrastructure for an experiment
-  # TF_ROOT: experiments/scenarios/<experiment-name>/terraform
+  # TF_ROOT: experiments/<experiment-name>/terraform
   # TF_STATE_NAME: <experiment-name>
   TF_ROOT: ""
   TF_STATE_NAME: ""

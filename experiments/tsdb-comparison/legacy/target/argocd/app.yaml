@@ -1,0 +1,230 @@
+# TSDB Comparison Tutorial - ArgoCD Application
+# Deploys: MinIO, Prometheus, Victoria Metrics, Mimir, cardinality-generator
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tsdb-comparison-infra
+  namespace: argocd
+  labels:
+    experiment: tsdb-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  sources:
+    # MinIO for Mimir S3 backend
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/tsdb-comparison/manifests
+      directory:
+        include: "minio.yaml"
+  destination:
+    name: target
+    namespace: minio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tsdb-comparison-prometheus
+  namespace: argocd
+  labels:
+    experiment: tsdb-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  sources:
+    # kube-prometheus-stack Helm chart
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 67.4.0
+      helm:
+        releaseName: prometheus
+        valueFiles:
+          - $values/experiments/tsdb-comparison/values/prometheus-values.yaml
+    # Values from git repo
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    name: target
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: ReplicaSet
+      jsonPointers:
+        - /status/terminatingReplicas
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tsdb-comparison-victoria-metrics
+  namespace: argocd
+  labels:
+    experiment: tsdb-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  sources:
+    # Victoria Metrics Single Helm chart
+    - repoURL: https://victoriametrics.github.io/helm-charts/
+      chart: victoria-metrics-single
+      targetRevision: 0.12.2
+      helm:
+        releaseName: victoria-metrics
+        valueFiles:
+          - $values/experiments/tsdb-comparison/values/victoria-metrics-values.yaml
+    # Values from git repo
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+    # Scrape config
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/tsdb-comparison/manifests
+      directory:
+        include: "victoria-metrics-scrape-config.yaml"
+  destination:
+    name: target
+    namespace: victoria-metrics
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tsdb-comparison-mimir
+  namespace: argocd
+  labels:
+    experiment: tsdb-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  sources:
+    # Grafana Mimir Helm chart
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: mimir-distributed
+      targetRevision: 5.6.0
+      helm:
+        releaseName: mimir
+        valueFiles:
+          - $values/experiments/tsdb-comparison/values/mimir-values.yaml
+    # Values from git repo
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    name: target
+    namespace: mimir
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: ReplicaSet
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /status/terminatingReplicas
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tsdb-comparison-workload
+  namespace: argocd
+  labels:
+    experiment: tsdb-comparison
+    cluster: target
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: default
+  sources:
+    # Cardinality generator app
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: components/apps/cardinality-generator/k8s
+    # Grafana datasources and dashboard
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: experiments/tsdb-comparison/manifests
+      directory:
+        include: "{grafana-datasources.yaml,comparison-dashboard.yaml,benchmark-scripts.yaml}"
+  destination:
+    name: target
+    namespace: tsdb-comparison
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status/terminatingReplicas
+    - group: apps
+      kind: ReplicaSet
+      jsonPointers:
+        - /status/terminatingReplicas

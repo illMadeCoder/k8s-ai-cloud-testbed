@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'experiments/components/**/Dockerfile'
-      - 'experiments/components/**/src/**'
-      - 'experiments/components/**/go.mod'
-      - 'experiments/components/**/go.sum'
-      - 'experiments/components/**/package.json'
-      - 'experiments/components/**/Cargo.toml'
-      - 'experiments/components/**/requirements.txt'
+      - 'components/**/Dockerfile'
+      - 'components/**/src/**'
+      - 'components/**/go.mod'
+      - 'components/**/go.sum'
+      - 'components/**/package.json'
+      - 'components/**/Cargo.toml'
+      - 'components/**/requirements.txt'
   workflow_dispatch:
     inputs:
       app:
@@ -47,11 +47,11 @@ jobs:
 
           # Extract unique app directories that have Dockerfiles
           APPS=$(echo "$CHANGED" | \
-            grep -E '^experiments/components/' | \
-            sed -E 's|^experiments/components/([^/]+/[^/]+)/.*|\1|' | \
+            grep -E '^components/' | \
+            sed -E 's|^components/([^/]+/[^/]+)/.*|\1|' | \
             sort -u | \
             while read dir; do
-              if [ -f "experiments/components/$dir/Dockerfile" ]; then
+              if [ -f "components/$dir/Dockerfile" ]; then
                 # Get just the app name (last component)
                 basename "$dir"
               fi
@@ -92,7 +92,7 @@ jobs:
         id: path
         run: |
           # Find the directory containing this app's Dockerfile
-          APP_PATH=$(find experiments/components -type f -name Dockerfile -path "*/${{ matrix.app }}/*" | head -1 | xargs dirname)
+          APP_PATH=$(find components -type f -name Dockerfile -path "*/${{ matrix.app }}/*" | head -1 | xargs dirname)
           if [ -z "$APP_PATH" ]; then
             echo "Error: Could not find Dockerfile for ${{ matrix.app }}"
             exit 1

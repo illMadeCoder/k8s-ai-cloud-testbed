@@ -31,7 +31,7 @@ The platform needs a CI/CD pipeline to build, test, and deploy containerized app
 │                     CI/CD ARCHITECTURE                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
-│  1. Developer pushes code to experiments/components/         │
+│  1. Developer pushes code to components/         │
 │                     │                                         │
 │                     ▼                                         │
 │  2. GitHub Actions (build-components.yaml)                   │
@@ -139,9 +139,9 @@ The workflow automatically detects which apps changed and builds them in paralle
 on:
   push:
     paths:
-      - 'experiments/components/**/Dockerfile'
-      - 'experiments/components/**/src/**'
-      - 'experiments/components/**/go.mod'
+      - 'components/**/Dockerfile'
+      - 'components/**/src/**'
+      - 'components/**/go.mod'
       # ... other dependency files
 
 jobs:
@@ -210,7 +210,7 @@ Application exposes `/version` endpoint returning build metadata.
 ├── build-components.yaml     # Auto-detection build workflow
 └── auto-merge.yaml           # Auto-merge dependency PRs
 
-experiments/components/apps/
+components/apps/
 ├── _template/                 # Template for new apps
 │   ├── Dockerfile
 │   └── k8s/

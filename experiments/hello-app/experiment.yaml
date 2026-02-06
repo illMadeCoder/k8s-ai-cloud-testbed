@@ -1,0 +1,32 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Experiment
+metadata:
+  name: hello-app
+  namespace: experiments
+spec:
+  description: "Simple hello world app with k6 load generation"
+  ttlDays: 1
+
+  targets:
+    - name: app
+      cluster:
+        type: vcluster
+      components:
+        - app: hello-app
+
+    - name: loadgen
+      cluster:
+        type: hub
+      components:
+        - workflow: k6-http-loadgen
+          params:
+            targetUrl: "http://hello-app.hello-app.svc:8080"
+            users: "5"
+            duration: "60s"
+      depends:
+        - app
+
+  workflow:
+    template: hello-app-validation
+    completion:
+      mode: workflow

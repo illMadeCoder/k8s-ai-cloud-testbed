@@ -7,7 +7,7 @@
 
 **Experiment Structure:**
 ```
-experiments/scenarios/<name>/
+experiments/<name>/
 ├── experiment.yaml              # Metadata (cluster providers, overlays)
 ├── orchestrator/
 │   ├── cluster.yaml            # Orchestrator cluster config

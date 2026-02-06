@@ -12,7 +12,7 @@
 - Integrate with existing platform components
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/backstage-tutorial/`
+- [ ] Create `experiments/backstage-tutorial/`
 - [ ] Deploy Backstage:
   - [ ] Helm chart or ArgoCD Application
   - [ ] PostgreSQL backend (via CloudNativePG from Phase 10)
@@ -50,7 +50,7 @@
 - Measure developer productivity
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/self-service-infra/`
+- [ ] Create `experiments/self-service-infra/`
 - [ ] Golden paths:
   - [ ] New service creation (Backstage template → repo → CI/CD → deployed)
   - [ ] Database provisioning (Backstage → Crossplane claim → ready)

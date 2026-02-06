@@ -55,7 +55,7 @@
 - Implement common messaging patterns
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/kafka-tutorial/`
+- [ ] Create `experiments/kafka-tutorial/`
 - [ ] Deploy Strimzi operator via ArgoCD
 - [ ] Create Kafka cluster (KafkaCluster CRD)
 - [ ] Configure:
@@ -91,7 +91,7 @@
 - Compare with Kafka use cases
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/rabbitmq-tutorial/`
+- [ ] Create `experiments/rabbitmq-tutorial/`
 - [ ] Deploy RabbitMQ Cluster Operator
 - [ ] Create RabbitMQ cluster (RabbitmqCluster CRD)
 - [ ] Configure:
@@ -127,7 +127,7 @@
 - Compare with Kafka and RabbitMQ
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/nats-tutorial/`
+- [ ] Create `experiments/nats-tutorial/`
 - [ ] Deploy NATS with JetStream enabled
 - [ ] Core NATS patterns:
   - [ ] Pub/sub (fire and forget)
@@ -159,7 +159,7 @@
 - Compare managed vs self-hosted
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cloud-messaging/`
+- [ ] Create `experiments/cloud-messaging/`
 - [ ] Create XRD: SimpleQueue
   - [ ] Abstracts AWS SQS and Azure Service Bus
   - [ ] Common interface for both clouds
@@ -184,7 +184,7 @@
 - Implement common coordination patterns
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/distributed-coordination/`
+- [ ] Create `experiments/distributed-coordination/`
 - [ ] ZooKeeper deep dive:
   - [ ] Deploy ZooKeeper ensemble (3+ nodes)
   - [ ] Understand znodes, watches, ephemeral nodes

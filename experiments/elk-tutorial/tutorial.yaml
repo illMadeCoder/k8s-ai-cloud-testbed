@@ -1,0 +1,249 @@
+# Tutorial configuration
+# When this file exists, `task kind:conduct` runs in interactive mode
+
+title: "ELASTIC ARCHIVE - Search & Analytics Division"
+description: |
+  KQL/Lucene orientation for Search Analysts.
+  Weyland-Ishimura Corp. Log Analytics Training Protocol. See README.md for full orientation.
+
+instructions: |
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  ELASTIC ARCHIVE                ║  SEARCH & ANALYTICS TERMINAL       ║
+  ╠══════════════════════════════════════════════════════════════════════╣
+  ║  Welcome, Analyst. Your search training begins now.                  ║
+  ║  Index status: ACTIVE                                                ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  RECOMMENDED SETUP: Split your screen                               │
+  │                                                                     │
+  │  ┌─────────────────────┐  ┌─────────────────────┐                   │
+  │  │                     │  │                     │                   │
+  │  │     TERMINAL        │  │     BROWSER         │                   │
+  │  │  (this window)      │  │  (Kibana)           │                   │
+  │  │                     │  │                     │                   │
+  │  └─────────────────────┘  └─────────────────────┘                   │
+  │                                                                     │
+  │  Run queries in Kibana. Watch search results.                       │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  ## Step 1: Set Your Environment Variables
+
+  Copy the IPs shown above into these exports:
+  ```bash
+  export ES_IP=<elasticsearch-ip>
+  export KIBANA_IP=<kibana-ip>
+  export APP_IP=<logging-app-ip>
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 1: VERIFY SYSTEMS ONLINE
+  ═══════════════════════════════════════════════════════════════════════
+
+  Quick smoke test - all should return data:
+  ```bash
+  # Check Elasticsearch cluster health
+  curl -s "http://$ES_IP:9200/_cluster/health" | jq '.status'
+
+  # Check indices exist
+  curl -s "http://$ES_IP:9200/_cat/indices?v"
+
+  # Check log generator is running
+  curl -s "http://$APP_IP:8080/health"
+  ```
+
+  Expected: "green" or "yellow", indices starting with "logs-", healthy status.
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║                                                                      ║
+  ║   >>> OPEN KIBANA IN YOUR BROWSER NOW <<<                            ║
+  ║                                                                      ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 2: CONFIGURE KIBANA DATA VIEW
+  ═══════════════════════════════════════════════════════════════════════
+
+  1. Open your browser to: http://<kibana-ip>:5601
+
+  2. Wait for Kibana to fully load (may take 30-60 seconds)
+
+  3. Navigate to Stack Management:
+     - Click hamburger menu (three lines, top-left)
+     - Scroll down to "Stack Management"
+     - Click "Data Views" under Kibana section
+
+  4. Create a Data View:
+     - Click "Create data view"
+     - Name: logs
+     - Index pattern: logs-*
+     - Timestamp field: @timestamp
+     - Click "Save data view to Kibana"
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 3: DISCOVER - EXPLORE YOUR LOGS
+  ═══════════════════════════════════════════════════════════════════════
+
+  1. Navigate to Discover:
+     - Click hamburger menu
+     - Click "Discover" under Analytics
+
+  2. Ensure "logs" data view is selected (top-left dropdown)
+
+  3. Set time range to "Last 15 minutes" (top-right)
+
+  4. You should see logs streaming in!
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 4: KQL BASICS
+  ═══════════════════════════════════════════════════════════════════════
+
+  Kibana Query Language (KQL) is the default search syntax.
+
+  In the search bar, try these queries:
+
+  Field search:
+  ```
+  level:error
+  ```
+
+  Wildcard:
+  ```
+  service:service-*
+  ```
+
+  Numeric range:
+  ```
+  status >= 500
+  ```
+
+  Multiple conditions (AND is implicit):
+  ```
+  level:error service:service-1
+  ```
+
+  OR condition:
+  ```
+  level:error OR level:warn
+  ```
+
+  NOT condition:
+  ```
+  level:error AND NOT service:service-1
+  ```
+
+  TRY EACH ONE and watch the results filter!
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 5: LUCENE SYNTAX
+  ═══════════════════════════════════════════════════════════════════════
+
+  Switch to Lucene syntax for more power (click KQL button, toggle off).
+
+  Phrase search:
+  ```
+  message:"connection failed"
+  ```
+
+  Wildcard:
+  ```
+  trace_id:abc*
+  ```
+
+  Range queries:
+  ```
+  duration_ms:[1000 TO 5000]
+  ```
+
+  Fuzzy search:
+  ```
+  message:databse~
+  ```
+  (finds "database" even with typo)
+
+  Boolean with parentheses:
+  ```
+  (level:error OR level:warn) AND service:service-1
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 6: FIELD STATISTICS
+  ═══════════════════════════════════════════════════════════════════════
+
+  In Discover, look at the left sidebar showing available fields.
+
+  1. Click on "level" field
+     - See breakdown: debug, info, warn, error with counts
+
+  2. Click on "service" field
+     - See distribution across services
+
+  3. Click on "status" field
+     - See HTTP status code distribution
+
+  4. Add columns to the table:
+     - Click "+" next to level, service, message
+     - Now you have a structured view
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 7: VISUALIZATIONS
+  ═══════════════════════════════════════════════════════════════════════
+
+  Create a simple visualization:
+
+  1. Click hamburger menu → Visualize Library
+
+  2. Click "Create new visualization"
+
+  3. Choose "Lens" (recommended)
+
+  4. Drag fields to create charts:
+     - Drag "@timestamp" to X-axis
+     - Drag "Records" to Y-axis
+     - Break down by "level" field
+
+  5. You now have a log volume chart by level!
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 8: INDEX LIFECYCLE MANAGEMENT (ILM)
+  ═══════════════════════════════════════════════════════════════════════
+
+  Check the ILM policy that manages log retention:
+
+  ```bash
+  # View ILM policy
+  curl -s "http://$ES_IP:9200/_ilm/policy/logs-policy" | jq
+
+  # Check index ILM status
+  curl -s "http://$ES_IP:9200/logs-*/_ilm/explain" | jq '.indices | keys'
+  ```
+
+  In Kibana:
+  1. Stack Management → Index Lifecycle Policies
+  2. Click "logs-policy"
+  3. See the phases: Hot → Delete
+
+  ═══════════════════════════════════════════════════════════════════════
+  FULL TRAINING MATERIALS
+  ═══════════════════════════════════════════════════════════════════════
+
+  This quick-start covered KQL/Lucene basics. The full training includes:
+  - Part 1: Full-Text Search (analyzers, tokenizers)
+  - Part 2: Aggregations (terms, date histogram, percentiles)
+  - Part 3: Index Templates & Mappings
+  - Part 4: ILM Policies (hot, warm, cold, delete)
+  - Part 5: Alerting with Kibana Rules
+
+  Access full orientation:
+  ```bash
+  less experiments/elk-tutorial/README.md
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  END SESSION
+  ═══════════════════════════════════════════════════════════════════════
+
+  Press ENTER when your shift is complete.
+
+  Next: Try the loki-tutorial to compare with Grafana Loki,
+        then logging-comparison to see them side-by-side!

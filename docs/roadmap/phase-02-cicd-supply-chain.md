@@ -34,7 +34,7 @@
 - Implement GitOps image update patterns
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cicd-fundamentals/`
+- [ ] Create `experiments/cicd-fundamentals/`
 - [ ] GitHub Actions pipeline:
   - [ ] Build multi-arch container images
   - [ ] Push to GitHub Container Registry (GHCR)
@@ -63,7 +63,7 @@
 - Generate and verify SBOMs
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/image-security/`
+- [ ] Create `experiments/image-security/`
 - [ ] Image scanning with Trivy:
   - [ ] Integrate into CI pipeline
   - [ ] Vulnerability severity thresholds (block on critical/high)
@@ -92,7 +92,7 @@
 - Verify signatures at admission
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/image-signing/`
+- [ ] Create `experiments/image-signing/`
 - [ ] Image signing with Cosign:
   - [ ] Keyless signing (OIDC/Fulcio)
   - [ ] Key-based signing (for air-gapped)
@@ -126,7 +126,7 @@
 - Manage Helm charts as OCI artifacts
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/registry-management/`
+- [ ] Create `experiments/registry-management/`
 - [ ] Registry options:
   - [ ] GHCR configuration and access
   - [ ] Harbor deployment (self-hosted option)
@@ -157,7 +157,7 @@
 - Test Kubernetes manifests and configurations
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/testing-strategies/`
+- [ ] Create `experiments/testing-strategies/`
 - [ ] Unit and integration testing:
   - [ ] Application unit tests in CI
   - [ ] Integration tests with testcontainers

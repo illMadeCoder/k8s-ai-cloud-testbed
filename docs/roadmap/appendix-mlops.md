@@ -14,7 +14,7 @@
 - Implement model versioning and serving
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/kubeflow-tutorial/`
+- [ ] Create `experiments/kubeflow-tutorial/`
 - [ ] Deploy Kubeflow components:
   - [ ] Kubeflow Pipelines
   - [ ] Katib (hyperparameter tuning)
@@ -48,7 +48,7 @@
 - Configure model monitoring
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/kserve-tutorial/`
+- [ ] Create `experiments/kserve-tutorial/`
 - [ ] Deploy KServe:
   - [ ] Serverless inference
   - [ ] RawDeployment mode comparison
@@ -82,7 +82,7 @@
 - Evaluate different vector DB options
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/vector-db-tutorial/`
+- [ ] Create `experiments/vector-db-tutorial/`
 - [ ] Deploy vector databases:
   - [ ] Qdrant (Kubernetes-native)
   - [ ] Weaviate OR Milvus (comparison)
@@ -118,7 +118,7 @@
 - Optimize GPU utilization
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/gpu-scheduling/`
+- [ ] Create `experiments/gpu-scheduling/`
 - [ ] GPU fundamentals:
   - [ ] NVIDIA device plugin
   - [ ] GPU resource requests/limits

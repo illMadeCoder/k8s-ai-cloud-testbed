@@ -105,7 +105,7 @@ git push → GitHub webhook → Cloudflare Tunnel → ArgoCD → sync
 ```
 - GitHub webhook configured to `https://hub.yourdomain.com/api/webhook`
 - Cloudflare Tunnel routes webhook to ArgoCD (no inbound firewall needed)
-- ArgoCD ApplicationSet auto-discovers experiments in `experiments/scenarios/` directory
+- ArgoCD ApplicationSet auto-discovers experiments in `experiments/` directory
 - Fallback: ArgoCD polls Git every 3 min if webhook unavailable
 
 **Hub Environments:**
@@ -137,7 +137,7 @@ platform/
     └── talos/                         # Home lab (N100 hardware)
         └── cluster/                   # Talos provisioning
 
-experiments/scenarios/<experiment-name>/
+experiments/<experiment-name>/
 ├── orchestrator/                      # Orchestrator cluster config
 │   ├── cluster.yaml                   # Cluster definition
 │   └── argocd/                        # Apps for orchestrator
@@ -194,7 +194,7 @@ task talos:bootstrap
 - [ ] Ethernet cable
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/talos-home-lab/`
+- [ ] Create `experiments/talos-home-lab/`
 - [ ] Ansible for initial setup:
   - [ ] Inventory file for home lab nodes
   - [ ] Playbook to prepare USB/PXE boot media
@@ -286,7 +286,7 @@ task talos:bootstrap
 - Establish cost attribution foundations
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/finops-foundation/`
+- [ ] Create `experiments/finops-foundation/`
 - [ ] Define tagging strategy:
   - [ ] Required labels: `team`, `project`, `environment`, `cost-center`
   - [ ] Document label standards

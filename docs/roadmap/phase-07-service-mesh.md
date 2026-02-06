@@ -55,7 +55,7 @@
 - Implement security with mTLS
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/istio-tutorial/`
+- [ ] Create `experiments/istio-tutorial/`
 - [ ] Install Istio (istioctl or Helm)
 - [ ] Enable sidecar injection (namespace label)
 - [ ] Deploy sample microservices app
@@ -91,7 +91,7 @@
 - Evaluate for different use cases
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/linkerd-tutorial/`
+- [ ] Create `experiments/linkerd-tutorial/`
 - [ ] Install Linkerd (CLI + control plane)
 - [ ] Inject proxies into workloads
 - [ ] Deploy same sample app as Istio experiment
@@ -122,7 +122,7 @@
 - Evaluate Cilium for CNI + service mesh
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cilium-tutorial/`
+- [ ] Create `experiments/cilium-tutorial/`
 - [ ] Install Cilium as CNI with service mesh features
 - [ ] Deploy sample app (no sidecars needed)
 - [ ] Configure:
@@ -153,7 +153,7 @@
 - Design for geographic distribution
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cross-cluster-networking/`
+- [ ] Create `experiments/cross-cluster-networking/`
 - [ ] Evaluate and implement option:
   - [ ] **Cilium ClusterMesh** (if using Cilium CNI) OR
   - [ ] **Submariner** (CNI-agnostic)
@@ -194,7 +194,7 @@
 - Design for multi-cluster GitOps
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/multi-cluster-federation/`
+- [ ] Create `experiments/multi-cluster-federation/`
 - [ ] Federation approaches:
   - [ ] **Liqo** - Virtual node approach, transparent offloading
   - [ ] **Admiralty** - Multi-cluster scheduling

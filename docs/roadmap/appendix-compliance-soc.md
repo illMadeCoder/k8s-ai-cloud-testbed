@@ -14,7 +14,7 @@
 - Build incident response workflows
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/soc-setup/`
+- [ ] Create `experiments/soc-setup/`
 - [ ] SIEM deployment:
   - [ ] Wazuh (open source, Kubernetes-native)
   - [ ] Elastic Security (ELK-based)
@@ -70,7 +70,7 @@
 | 12. Policies | Documentation, procedures |
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/pci-compliance/`
+- [ ] Create `experiments/pci-compliance/`
 - [ ] Network segmentation:
   - [ ] Cardholder data environment (CDE) isolation
   - [ ] Network policies for CDE namespace
@@ -123,7 +123,7 @@
 | Unique user ID | Service accounts, user attribution |
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/hipaa-compliance/`
+- [ ] Create `experiments/hipaa-compliance/`
 - [ ] PHI data isolation:
   - [ ] Dedicated namespace for PHI workloads
   - [ ] Network policies preventing PHI egress
@@ -162,7 +162,7 @@
 - Build compliance dashboards
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/compliance-automation/`
+- [ ] Create `experiments/compliance-automation/`
 - [ ] Continuous compliance scanning:
   - [ ] kube-bench scheduled scans
   - [ ] Trivy operator for runtime scanning
@@ -197,7 +197,7 @@
 - Automate security baseline enforcement
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/security-hardening/`
+- [ ] Create `experiments/security-hardening/`
 - [ ] CIS Kubernetes Benchmark:
   - [ ] Control plane hardening
   - [ ] Worker node hardening
@@ -240,7 +240,7 @@
 | **SLA** | Service Level Agreement - contractual commitment with penalties | Business/Legal/Customers |
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/sla-management/`
+- [ ] Create `experiments/sla-management/`
 - [ ] SLA definition:
   - [ ] Map business SLAs to technical SLOs
   - [ ] Define SLI metrics for each SLA

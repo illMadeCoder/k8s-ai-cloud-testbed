@@ -149,7 +149,7 @@ tasks:
         fi
 
         EXP_NAME="{{.CLI_ARGS}}"
-        EXP_PATH="experiments/scenarios/$EXP_NAME"
+        EXP_PATH="experiments/$EXP_NAME"
 
         if [ ! -d "$EXP_PATH" ]; then
           echo "ERROR: Experiment not found at $EXP_PATH"
@@ -162,7 +162,7 @@ tasks:
         echo ""
 
         # Check for target folder (experiments deploy to target)
-        TARGET_DIR="$EXP_PATH/target"
+        TARGET_DIR="$EXP_PATH/legacy/target"
         if [ ! -d "$TARGET_DIR" ]; then
           echo "ERROR: No target/ folder found in experiment"
           exit 1

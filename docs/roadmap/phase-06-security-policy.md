@@ -16,7 +16,7 @@
 - Automate certificate renewal and monitoring
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cert-manager-tutorial/`
+- [ ] Create `experiments/cert-manager-tutorial/`
 - [ ] Deploy cert-manager via ArgoCD
 - [ ] Configure Issuers:
   - [ ] SelfSigned (for development)
@@ -55,7 +55,7 @@ Hub Cluster                    Experiment Cluster
 ```
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/eso-openbao/`
+- [ ] Create `experiments/eso-openbao/`
 - [ ] Deploy OpenBao to hub:
   - [ ] Helm deployment
   - [ ] Initialize and unseal
@@ -85,7 +85,7 @@ Hub Cluster                    Experiment Cluster
 - Implement organizational policies at scale
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/policy-tutorial/`
+- [ ] Create `experiments/policy-tutorial/`
 - [ ] Deploy Kyverno (or OPA Gatekeeper)
 - [ ] Implement policies:
   - **Security:**
@@ -112,7 +112,7 @@ Hub Cluster                    Experiment Cluster
 **Goal:** Least-privilege workloads and access control
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/pod-security-tutorial/`
+- [ ] Create `experiments/pod-security-tutorial/`
 - [ ] Pod Security Standards (PSS):
   - [ ] Configure PSA labels (privileged, baseline, restricted)
   - [ ] Restricted security context
@@ -134,7 +134,7 @@ Hub Cluster                    Experiment Cluster
 **Goal:** Network segmentation with Kubernetes-native controls
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/network-policy-tutorial/`
+- [ ] Create `experiments/network-policy-tutorial/`
 - [ ] Default deny policies:
   - [ ] Deny all ingress
   - [ ] Deny all egress (allow DNS)
@@ -155,7 +155,7 @@ Hub Cluster                    Experiment Cluster
 **Goal:** Protect applications from common attacks
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/waf-tutorial/`
+- [ ] Create `experiments/waf-tutorial/`
 - [ ] ModSecurity with NGINX Ingress:
   - [ ] OWASP Core Rule Set
   - [ ] Custom rules

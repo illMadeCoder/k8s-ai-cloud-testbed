@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
       targetRevision: HEAD
-      path: experiments/components/apps/station-monitor/k8s
+      path: components/apps/station-monitor/k8s
   observability:
     serviceMonitor: true
     podLabels:

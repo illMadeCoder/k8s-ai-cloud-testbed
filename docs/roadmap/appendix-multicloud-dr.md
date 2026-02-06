@@ -12,7 +12,7 @@
 - Avoid unnecessary complexity
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/multicloud-strategy/`
+- [ ] Create `experiments/multicloud-strategy/`
 - [ ] Multi-cloud motivations:
   - [ ] Vendor lock-in avoidance
   - [ ] Best-of-breed services
@@ -73,7 +73,7 @@
 - Balance portability with cloud-native features
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cloud-abstraction/`
+- [ ] Create `experiments/cloud-abstraction/`
 - [ ] Abstraction spectrum:
   - [ ] Fully cloud-native (maximum lock-in)
   - [ ] Abstracted (portable but limited)
@@ -131,7 +131,7 @@
 - Plan for various disaster scenarios
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/dr-fundamentals/`
+- [ ] Create `experiments/dr-fundamentals/`
 - [ ] Key metrics:
   - [ ] RPO (Recovery Point Objective) - data loss tolerance
   - [ ] RTO (Recovery Time Objective) - downtime tolerance
@@ -196,7 +196,7 @@
 - Ensure data consistency in DR
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/dr-data-replication/`
+- [ ] Create `experiments/dr-data-replication/`
 - [ ] Replication types:
   - [ ] Synchronous (zero RPO, higher latency)
   - [ ] Asynchronous (some RPO, lower latency)
@@ -250,7 +250,7 @@
 - Plan and execute failback
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/failover-failback/`
+- [ ] Create `experiments/failover-failback/`
 - [ ] Failover types:
   - [ ] Automatic (system-initiated)
   - [ ] Manual (human-initiated)
@@ -314,7 +314,7 @@
 - Optimize for latency
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/geo-distribution/`
+- [ ] Create `experiments/geo-distribution/`
 - [ ] Multi-region motivations:
   - [ ] Latency reduction
   - [ ] Disaster recovery
@@ -374,7 +374,7 @@
 - Document lock-in decisions
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/lockin-management/`
+- [ ] Create `experiments/lockin-management/`
 - [ ] Lock-in types:
   - [ ] Technical (proprietary APIs)
   - [ ] Data (migration difficulty)
@@ -435,7 +435,7 @@
 - Test and maintain BCP
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/business-continuity/`
+- [ ] Create `experiments/business-continuity/`
 - [ ] BCP vs DR:
   - [ ] DR: Technical recovery
   - [ ] BCP: Business operations continuity
@@ -500,7 +500,7 @@
 - Monitor and control cloud spend
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cloud-cost-optimization/`
+- [ ] Create `experiments/cloud-cost-optimization/`
 - [ ] Pricing model understanding:
   - [ ] On-demand vs reserved vs spot
   - [ ] Data transfer costs

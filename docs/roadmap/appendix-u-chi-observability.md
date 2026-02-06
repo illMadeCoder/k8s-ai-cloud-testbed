@@ -35,7 +35,7 @@
 **Tool:** Cilium Hubble or Pixie
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/chi-glass-window/`
+- [ ] Create `experiments/chi-glass-window/`
 - [ ] Enable Hubble:
   ```bash
   cilium hubble enable --ui
@@ -68,7 +68,7 @@ After:  "Energy flows from A to B, but bunches up at C (queue depth = 50)"
 - **E**rrors: Failed operations (lost energy)
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/chi-gauge/`
+- [ ] Create `experiments/chi-gauge/`
 - [ ] Implement USE dashboards:
   ```promql
   # Saturation: Queue depth (the missing metric!)
@@ -136,7 +136,7 @@ After (With Mesh):
 ```
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/chi-valve/`
+- [ ] Create `experiments/chi-valve/`
 - [ ] Deploy Linkerd
 - [ ] Smart routing experiment:
   - [ ] 3 replicas of payment service
@@ -166,7 +166,7 @@ After (With Mesh):
 - Energy flow requires identity proof
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/chi-armor/`
+- [ ] Create `experiments/chi-armor/`
 - [ ] Verify mTLS:
   ```bash
   linkerd viz authz
@@ -208,7 +208,7 @@ Flow: order → Gateway A → Gateway B → payment
 ```
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/chi-federation/`
+- [ ] Create `experiments/chi-federation/`
 - [ ] Create two Kind clusters
 - [ ] Install Linkerd multicluster
 - [ ] Link clusters

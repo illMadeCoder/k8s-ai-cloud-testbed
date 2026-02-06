@@ -24,7 +24,7 @@
 - Choose appropriate storage engines for workloads
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/storage-engines/`
+- [ ] Create `experiments/storage-engines/`
 - [ ] Storage engine role:
   - [ ] Data organization on disk
   - [ ] Index structures
@@ -80,7 +80,7 @@
 - Troubleshoot index-related performance issues
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/database-indexing/`
+- [ ] Create `experiments/database-indexing/`
 - [ ] Index fundamentals:
   - [ ] Index as lookup structure
   - [ ] Primary vs secondary indexes
@@ -144,7 +144,7 @@
 - Understand query optimizer decisions
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/query-optimization/`
+- [ ] Create `experiments/query-optimization/`
 - [ ] Query processing pipeline:
   - [ ] Parsing
   - [ ] Planning/optimization
@@ -206,7 +206,7 @@
 - Debug transaction-related issues
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/transactions/`
+- [ ] Create `experiments/transactions/`
 - [ ] ACID properties:
   - [ ] Atomicity (all or nothing)
   - [ ] Consistency (valid state transitions)
@@ -266,7 +266,7 @@
 - Handle replication lag and failures
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/db-replication/`
+- [ ] Create `experiments/db-replication/`
 - [ ] Replication goals:
   - [ ] High availability
   - [ ] Read scaling
@@ -325,7 +325,7 @@
 - Handle cross-shard operations
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/db-sharding/`
+- [ ] Create `experiments/db-sharding/`
 - [ ] Partitioning vs Sharding:
   - [ ] Partitioning (single database)
   - [ ] Sharding (multiple databases)
@@ -385,7 +385,7 @@
 - Tune connection settings
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/connection-management/`
+- [ ] Create `experiments/connection-management/`
 - [ ] Connection overhead:
   - [ ] TCP handshake
   - [ ] TLS negotiation
@@ -446,7 +446,7 @@
 - Test recovery procedures
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/db-backup-recovery/`
+- [ ] Create `experiments/db-backup-recovery/`
 - [ ] Backup types:
   - [ ] Logical backups (pg_dump, mysqldump)
   - [ ] Physical backups (file-level)
@@ -507,7 +507,7 @@
 - Build effective dashboards
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/db-observability/`
+- [ ] Create `experiments/db-observability/`
 - [ ] Key metrics:
   - [ ] Query throughput (QPS)
   - [ ] Query latency (p50, p99)
@@ -571,7 +571,7 @@
 - Configure quorum reads/writes and reason about the consistency spectrum
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/distributed-db-fundamentals/`
+- [ ] Create `experiments/distributed-db-fundamentals/`
 - [ ] Gossip protocols:
   - [ ] Epidemic-style information dissemination
   - [ ] Push, pull, and push-pull gossip
@@ -630,7 +630,7 @@
 - Perform capacity planning for each topology on Kubernetes
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/db-scaling-topologies/`
+- [ ] Create `experiments/db-scaling-topologies/`
 - [ ] Single primary + read replicas:
   - [ ] Architecture: one writer, N readers
   - [ ] Replication lag and read consistency trade-offs
@@ -689,7 +689,7 @@
 - Compare saga patterns against distributed database transactions for correctness and performance
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/saga-patterns/`
+- [ ] Create `experiments/saga-patterns/`
 - [ ] Two-Phase Commit (2PC) in databases:
   - [ ] Prepare and commit phases
   - [ ] Coordinator as single point of failure
@@ -775,7 +775,7 @@
 - Apply a decision framework to select the right database for a given workload
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/db-category-comparison/`
+- [ ] Create `experiments/db-category-comparison/`
 - [ ] Relational databases:
   - [ ] PostgreSQL: extensibility, JSONB, strong ecosystem
   - [ ] MySQL/InnoDB: replication maturity, wide adoption
@@ -840,7 +840,7 @@
 - Determine when NewSQL is worth the operational overhead
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/newsql-distributed-sql/`
+- [ ] Create `experiments/newsql-distributed-sql/`
 - [ ] CockroachDB architecture:
   - [ ] Ranges: automatic range-based sharding of tables
   - [ ] Raft consensus per range (leaseholder + replicas)
@@ -905,7 +905,7 @@
 - Identify operator anti-patterns that lead to data loss or operational fragility
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/db-operators/`
+- [ ] Create `experiments/db-operators/`
 - [ ] CloudNativePG:
   - [ ] Architecture: single operator, no sidecar, direct PostgreSQL management
   - [ ] HA: automated failover with pg_rewind, fencing
@@ -964,7 +964,7 @@
 - Apply a decision framework accounting for team size, SLA requirements, and workload characteristics
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/db-managed-vs-selfhosted/`
+- [ ] Create `experiments/db-managed-vs-selfhosted/`
 - [ ] Cloud managed database services:
   - [ ] AWS RDS and Aurora (PostgreSQL, MySQL)
   - [ ] GCP Cloud SQL and AlloyDB
@@ -1024,7 +1024,7 @@
 - Design benchmark experiments with proper warm-up, steady-state, and percentile reporting
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/db-benchmarking/`
+- [ ] Create `experiments/db-benchmarking/`
 - [ ] pgbench (PostgreSQL):
   - [ ] Built-in TPC-B-like workload
   - [ ] Custom script mode for realistic workloads

@@ -25,9 +25,9 @@ platform/
 └── targets/            # Workload clusters managed by hub
     └── talos/          # Home lab (N100 hardware)
 
-experiments/
-├── scenarios/          # 17 runnable tutorials
-└── components/         # Reusable infra (50+ components)
+experiments/             # 17 runnable tutorials (one dir per experiment)
+
+components/              # Reusable infra (50+ components)
 
 docs/
 ├── adrs/               # Architecture Decision Records
@@ -101,7 +101,7 @@ Run `task hub:conduct -- <name>` to deploy any scenario:
 | **seaweedfs-tutorial** | O(1) lookups, Haystack architecture |
 | **observability-cost-tutorial** | Cardinality, log volume, retention tuning |
 
-[Full list →](experiments/scenarios/)
+[Full list →](experiments/)
 
 ## Architecture Decisions
 

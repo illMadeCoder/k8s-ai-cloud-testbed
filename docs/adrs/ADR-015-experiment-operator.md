@@ -23,7 +23,7 @@ This manual orchestration is error-prone (9 commits to fix the metrics pipeline 
 
 ### Current State
 
-- **15 experiment scenarios** under `experiments/scenarios/`
+- **15 experiment scenarios** under `experiments/`
 - **Crossplane v2.1.3** with Pipeline mode compositions (`function-patch-and-transform`, `function-go-templating`, `function-auto-ready`)
 - **Existing XRDs**: `XGKECluster` (GKE provisioning), `XObjectStorage` (multi-cloud storage)
 - **ADR-012** designed `XExperimentCluster` for unified cluster provisioning but did not address app deployment or observability

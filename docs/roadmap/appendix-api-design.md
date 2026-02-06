@@ -12,7 +12,7 @@
 - Handle complex operations in RESTful ways
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/rest-api-design/`
+- [ ] Create `experiments/rest-api-design/`
 - [ ] REST fundamentals:
   - [ ] REST constraints (client-server, stateless, cacheable, uniform interface, layered, code-on-demand)
   - [ ] Richardson Maturity Model (levels 0-3)
@@ -69,7 +69,7 @@
 - Implement GraphQL performance optimizations
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/graphql-patterns/`
+- [ ] Create `experiments/graphql-patterns/`
 - [ ] GraphQL fundamentals:
   - [ ] Schema definition language (SDL)
   - [ ] Queries, mutations, subscriptions
@@ -127,7 +127,7 @@
 - Understand gRPC streaming patterns
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/grpc-patterns/`
+- [ ] Create `experiments/grpc-patterns/`
 - [ ] Protocol Buffers (protobuf):
   - [ ] Proto3 syntax
   - [ ] Scalar types, messages, enums
@@ -189,7 +189,7 @@
 - Manage deprecation gracefully
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/api-versioning/`
+- [ ] Create `experiments/api-versioning/`
 - [ ] Why version:
   - [ ] Breaking vs non-breaking changes
   - [ ] Client compatibility
@@ -255,7 +255,7 @@
 - Keep documentation in sync with implementation
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/api-documentation/`
+- [ ] Create `experiments/api-documentation/`
 - [ ] OpenAPI fundamentals:
   - [ ] OpenAPI 3.0 vs 3.1 vs 2.0 (Swagger)
   - [ ] Specification structure
@@ -314,7 +314,7 @@
 - Integrate contract testing in CI/CD
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/contract-testing/`
+- [ ] Create `experiments/contract-testing/`
 - [ ] Contract testing fundamentals:
   - [ ] What is a contract
   - [ ] Provider vs consumer
@@ -374,7 +374,7 @@
 - Configure common gateway features
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/api-gateway/`
+- [ ] Create `experiments/api-gateway/`
 - [ ] API gateway fundamentals:
   - [ ] Edge service pattern
   - [ ] Responsibilities (routing, auth, rate limiting)
@@ -437,7 +437,7 @@
 - Design defense in depth for APIs
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/api-security/`
+- [ ] Create `experiments/api-security/`
 - [ ] OWASP API Security Top 10:
   - [ ] Broken Object Level Authorization (BOLA)
   - [ ] Broken Authentication

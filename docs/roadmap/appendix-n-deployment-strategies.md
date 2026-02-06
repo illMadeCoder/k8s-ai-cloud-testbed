@@ -12,7 +12,7 @@
 - Handle graceful shutdown correctly
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/rolling-update-tutorial/`
+- [ ] Create `experiments/rolling-update-tutorial/`
 - [ ] Build app with slow startup and graceful shutdown
 - [ ] Test parameter combinations:
   - [ ] maxSurge/maxUnavailable variations
@@ -41,7 +41,7 @@
 - Handle rollback scenarios
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/blue-green-tutorial/`
+- [ ] Create `experiments/blue-green-tutorial/`
 - [ ] Implement blue-green with:
   - [ ] Kubernetes Services (label selector swap)
   - [ ] Gateway API traffic switching
@@ -73,7 +73,7 @@
 - Implement metric-based promotion/rollback
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/canary-tutorial/`
+- [ ] Create `experiments/canary-tutorial/`
 - [ ] Install Argo Rollouts
 - [ ] Configure Rollout resource:
   - [ ] Traffic splitting steps (5% → 25% → 50% → 100%)
@@ -104,7 +104,7 @@
 - Use ApplicationSets for multi-cluster
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/argocd-patterns/`
+- [ ] Create `experiments/argocd-patterns/`
 - [ ] Sync strategies:
   - [ ] Auto-sync vs manual
   - [ ] Self-heal behavior
@@ -134,7 +134,7 @@
 - Combine with deployment strategies
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/feature-flags-tutorial/`
+- [ ] Create `experiments/feature-flags-tutorial/`
 - [ ] Deploy feature flag service:
   - [ ] Flagsmith (self-hosted) OR
   - [ ] OpenFeature with flagd
@@ -170,7 +170,7 @@
 - Automate rollback based on SLO violation
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/slo-based-deployment/`
+- [ ] Create `experiments/slo-based-deployment/`
 - [ ] SLO integration with Argo Rollouts:
   - [ ] AnalysisTemplate using SLI queries
   - [ ] Error rate SLO (e.g., 99.9% success rate)

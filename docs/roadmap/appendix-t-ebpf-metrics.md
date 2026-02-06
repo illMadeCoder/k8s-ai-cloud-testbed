@@ -33,7 +33,7 @@ Traditional metrics (CPU, RAM) miss critical dimensions:
 - bpftrace for ad-hoc tracing
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/ebpf-tutorial/`
+- [ ] Create `experiments/ebpf-tutorial/`
 - [ ] Deploy BCC tools container:
   ```yaml
   spec:
@@ -75,7 +75,7 @@ Traditional metrics miss this.
 ```
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/io-bottleneck/`
+- [ ] Create `experiments/io-bottleneck/`
 - [ ] Metrics to capture:
   - [ ] Latency (p50, p95, p99)
   - [ ] IOPS (read/write)
@@ -110,7 +110,7 @@ Root cause: Congestion causing retransmits
 ```
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/network-analysis/`
+- [ ] Create `experiments/network-analysis/`
 - [ ] Metrics to capture:
   - [ ] TCP connections (active, rate)
   - [ ] Retransmits (% of packets)
@@ -145,7 +145,7 @@ Root cause: Insufficient RAM for index caching
 ```
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cache-analysis/`
+- [ ] Create `experiments/cache-analysis/`
 - [ ] Metrics to capture:
   - [ ] Page cache hit/miss rate
   - [ ] VFS operations (read/write/open)
@@ -174,7 +174,7 @@ Root cause: Insufficient RAM for index caching
 - Resource profiling (CPU flamegraphs)
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/pixie-tutorial/`
+- [ ] Create `experiments/pixie-tutorial/`
 - [ ] Deploy Pixie:
   ```bash
   helm install pixie pixie-operator/pixie-operator-chart \
@@ -207,7 +207,7 @@ Root cause: Insufficient RAM for index caching
 - Historical analysis
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/parca-tutorial/`
+- [ ] Create `experiments/parca-tutorial/`
 - [ ] Deploy Parca:
   ```bash
   helm install parca parca/parca
@@ -231,7 +231,7 @@ Root cause: Insufficient RAM for index caching
 - Syscall filtering
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/tetragon-tutorial/`
+- [ ] Create `experiments/tetragon-tutorial/`
 - [ ] Deploy Tetragon:
   ```bash
   helm install tetragon cilium/tetragon

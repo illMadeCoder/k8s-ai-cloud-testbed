@@ -1,0 +1,268 @@
+# Tutorial configuration
+# When this file exists, `task kind:conduct` runs in interactive mode
+
+title: "LOG NEXUS - Central Logging Division"
+description: |
+  LogQL orientation for Systems Logging Technicians.
+  Weyland-Ishimura Corp. Log Analysis Training Protocol. See README.md for full orientation.
+
+instructions: |
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  LOG NEXUS                      ║  CENTRAL LOGGING TERMINAL          ║
+  ╠══════════════════════════════════════════════════════════════════════╣
+  ║  Welcome, Analyst. Your log analysis training begins now.            ║
+  ║  Log ingestion status: ACTIVE                                        ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  RECOMMENDED SETUP: Split your screen                               │
+  │                                                                     │
+  │  ┌─────────────────────┐  ┌─────────────────────┐                   │
+  │  │                     │  │                     │                   │
+  │  │     TERMINAL        │  │     BROWSER         │                   │
+  │  │  (this window)      │  │  (Grafana)          │                   │
+  │  │                     │  │                     │                   │
+  │  └─────────────────────┘  └─────────────────────┘                   │
+  │                                                                     │
+  │  Run LogQL queries in Grafana. Watch results change.                │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  ## Step 1: Set Your Environment Variables
+
+  Copy the IPs shown above into these exports:
+  ```bash
+  export LOKI_IP=<loki-gateway-ip>
+  export GRAFANA_IP=<grafana-ip>
+  export APP_IP=<logging-app-ip>
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 1: VERIFY SYSTEMS ONLINE
+  ═══════════════════════════════════════════════════════════════════════
+
+  Quick smoke test - all should return data:
+  ```bash
+  # Check Loki is running
+  curl -s "http://$LOKI_IP/ready"
+
+  # Check log generator is running
+  curl -s "http://$APP_IP:8080/health"
+
+  # Query Loki for recent logs
+  curl -s "http://$LOKI_IP/loki/api/v1/query" \
+    --data-urlencode 'query={app="logging-app"}' | jq '.data.result | length'
+  ```
+
+  Expected: "ready", healthy status, and a number > 0.
+
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║                                                                      ║
+  ║   >>> OPEN GRAFANA IN YOUR BROWSER NOW <<<                           ║
+  ║                                                                      ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 2: OPEN GRAFANA AND EXPLORE LOGS
+  ═══════════════════════════════════════════════════════════════════════
+
+  1. Open your browser to: http://<grafana-ip>:80
+
+  2. Login:
+     - Username: admin
+     - Password: admin
+     - Click "Skip" when asked to change password
+
+  3. Navigate to Explore:
+     - Click the hamburger menu (three lines, top-left)
+     - Click "Explore"
+     - Ensure "Loki" is selected as the datasource
+
+  4. Run your first LogQL query:
+     ```
+     {app="logging-app"}
+     ```
+     Click "Run query" - you should see live logs!
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 3: LABEL SELECTORS
+  ═══════════════════════════════════════════════════════════════════════
+
+  LogQL starts with label selectors (like PromQL):
+
+  Basic selector:
+  ```
+  {app="logging-app"}
+  ```
+
+  Multiple labels:
+  ```
+  {app="logging-app", namespace="demo"}
+  ```
+
+  Regex matching:
+  ```
+  {app=~"logging.*"}
+  ```
+
+  Not equal:
+  ```
+  {app="logging-app", namespace!="kube-system"}
+  ```
+
+  TRY EACH ONE in Grafana Explore!
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 4: LINE FILTERS
+  ═══════════════════════════════════════════════════════════════════════
+
+  After the selector, filter log content:
+
+  Contains (case-sensitive):
+  ```
+  {app="logging-app"} |= "error"
+  ```
+
+  Does not contain:
+  ```
+  {app="logging-app"} != "debug"
+  ```
+
+  Regex filter:
+  ```
+  {app="logging-app"} |~ "service-[0-9]+"
+  ```
+
+  Case-insensitive contains:
+  ```
+  {app="logging-app"} |~ "(?i)error"
+  ```
+
+  TRY: Find all logs containing "500" status codes.
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 5: JSON PARSING
+  ═══════════════════════════════════════════════════════════════════════
+
+  Our logs are JSON. Parse them to filter on fields:
+
+  Parse JSON:
+  ```
+  {app="logging-app"} | json
+  ```
+
+  Filter on parsed field:
+  ```
+  {app="logging-app"} | json | level="error"
+  ```
+
+  Multiple field filters:
+  ```
+  {app="logging-app"} | json | level="error" | status >= 500
+  ```
+
+  Filter by service:
+  ```
+  {app="logging-app"} | json | service="service-1"
+  ```
+
+  Format output (show only specific fields):
+  ```
+  {app="logging-app"} | json | line_format "{{.service}}: {{.message}}"
+  ```
+
+  TRY: Find all logs where duration_ms > 1000
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 6: METRIC QUERIES (Log → Metrics)
+  ═══════════════════════════════════════════════════════════════════════
+
+  Convert logs to metrics for dashboards and alerts!
+
+  Count logs per minute:
+  ```
+  sum(count_over_time({app="logging-app"} [1m]))
+  ```
+
+  Error count by service:
+  ```
+  sum by (service) (count_over_time({app="logging-app"} | json | level="error" [5m]))
+  ```
+
+  Error rate percentage:
+  ```
+  sum(count_over_time({app="logging-app"} | json | level="error" [5m]))
+  /
+  sum(count_over_time({app="logging-app"} [5m]))
+  * 100
+  ```
+
+  P95 response time from log field:
+  ```
+  quantile_over_time(0.95, {app="logging-app"} | json | unwrap duration_ms [5m]) by ()
+  ```
+
+  TRY: Calculate the error rate for service-1 only.
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 7: EXPLORE THE DASHBOARD
+  ═══════════════════════════════════════════════════════════════════════
+
+  1. Go to Dashboards (hamburger menu → Dashboards)
+  2. Open "Log Analysis - Loki Tutorial"
+
+  The dashboard shows:
+  - Log volume (per minute)
+  - Error rate (percentage)
+  - P95 duration (extracted from logs)
+  - Logs by level (stacked bar chart)
+  - Logs by service (time series)
+  - Live log stream
+
+  OBSERVE how the queries you learned power each panel!
+
+  ═══════════════════════════════════════════════════════════════════════
+  CHECKPOINT 8: CONTROL THE LOG GENERATOR
+  ═══════════════════════════════════════════════════════════════════════
+
+  Change log volume to see dashboard react:
+
+  Increase log rate:
+  ```bash
+  curl -X POST "http://$APP_IP:8080/config" \
+    -H "Content-Type: application/json" \
+    -d '{"rate": "high"}'
+  ```
+
+  Watch the dashboard - log volume should spike!
+
+  Decrease back to normal:
+  ```bash
+  curl -X POST "http://$APP_IP:8080/config" \
+    -H "Content-Type: application/json" \
+    -d '{"rate": "medium"}'
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  FULL TRAINING MATERIALS
+  ═══════════════════════════════════════════════════════════════════════
+
+  This quick-start covered LogQL basics. The full training includes:
+  - Part 1: Label Architecture (why Loki indexes labels, not content)
+  - Part 2: LogQL Mastery (pattern, regexp, unpack parsers)
+  - Part 3: Metric Queries (rate, count, quantile, bytes)
+  - Part 4: Alerting (log-based alerts via recording rules)
+  - Part 5: Correlation (logs ↔ metrics ↔ traces)
+
+  Access full orientation:
+  ```bash
+  less experiments/loki-tutorial/README.md
+  ```
+
+  ═══════════════════════════════════════════════════════════════════════
+  END SESSION
+  ═══════════════════════════════════════════════════════════════════════
+
+  Press ENTER when your shift is complete.
+
+  Next: Try the elk-tutorial to compare with Elasticsearch/Kibana,
+        then logging-comparison to see them side-by-side!

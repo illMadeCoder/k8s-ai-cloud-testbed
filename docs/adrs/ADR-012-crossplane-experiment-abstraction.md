@@ -247,7 +247,7 @@ stringData:
 ### File Structure
 
 ```
-experiments/components/infrastructure/
+components/infrastructure/
 ├── crossplane-providers/
 │   ├── provider-helm.yaml
 │   ├── provider-kubernetes.yaml

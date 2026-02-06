@@ -151,7 +151,7 @@ spec:
           transforms:
             - type: string
               string:
-                fmt: "experiments/scenarios/%s/target/argocd"
+                fmt: "experiments/%s/target/argocd"
         - fromFieldPath: status.clusterName
           toFieldPath: spec.destination.name
 ```

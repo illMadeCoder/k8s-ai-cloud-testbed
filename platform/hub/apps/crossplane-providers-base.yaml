@@ -17,7 +17,7 @@ spec:
   source:
     repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
     targetRevision: HEAD
-    path: experiments/components/infrastructure/crossplane-providers/base
+    path: components/infrastructure/crossplane-providers/base
   destination:
     server: https://kubernetes.default.svc
     namespace: crossplane-system

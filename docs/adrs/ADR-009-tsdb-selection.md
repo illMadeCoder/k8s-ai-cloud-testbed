@@ -203,7 +203,7 @@ Victoria Metrics and Mimir deserve exploration as alternatives:
 - Drop-in replacement shows portability
 - Different architectural trade-offs worth understanding
 
-**Implemented:** See `experiments/scenarios/tsdb-comparison/` - hands-on tutorial comparing all three TSDBs under identical workload with cardinality scaling from 1k to 50k series.
+**Implemented:** See `experiments/tsdb-comparison/` - hands-on tutorial comparing all three TSDBs under identical workload with cardinality scaling from 1k to 50k series.
 
 ### Environment Strategy
 
@@ -239,4 +239,4 @@ Victoria Metrics and Mimir deserve exploration as alternatives:
 - [Thanos Architecture](https://thanos.io/tip/thanos/design.md/)
 - [Mimir Architecture](https://grafana.com/docs/mimir/latest/references/architecture/)
 - [Victoria Metrics vs Prometheus Benchmarks](https://victoriametrics.github.io/benchmark/)
-- [TSDB Comparison Tutorial](../../experiments/scenarios/tsdb-comparison/README.md) - Hands-on comparison in this lab
+- [TSDB Comparison Tutorial](../../experiments/tsdb-comparison/README.md) - Hands-on comparison in this lab

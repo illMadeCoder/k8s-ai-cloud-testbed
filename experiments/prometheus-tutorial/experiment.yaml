@@ -1,0 +1,28 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Experiment
+metadata:
+  name: prometheus-tutorial
+  namespace: experiments
+spec:
+  description: "Prometheus metrics collection tutorial with Grafana dashboards"
+  ttlDays: 1
+
+  targets:
+    - name: app
+      cluster:
+        type: vcluster
+      components:
+        - app: kube-prometheus-stack
+          params:
+            grafana.enabled: "true"
+            prometheus.prometheusSpec.retention: "24h"
+        - app: metrics-app
+        - app: station-monitor
+      observability:
+        enabled: true
+        transport: direct
+
+  workflow:
+    template: prometheus-validation
+    completion:
+      mode: workflow

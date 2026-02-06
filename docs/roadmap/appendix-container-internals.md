@@ -12,7 +12,7 @@
 - Debug namespace-related issues
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/linux-namespaces/`
+- [ ] Create `experiments/linux-namespaces/`
 - [ ] Namespace fundamentals:
   - [ ] Process isolation mechanism
   - [ ] Each namespace type isolates specific resources
@@ -71,7 +71,7 @@
 - Monitor resource usage via cgroups
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cgroups/`
+- [ ] Create `experiments/cgroups/`
 - [ ] Cgroups fundamentals:
   - [ ] Resource limiting (CPU, memory, I/O)
   - [ ] Resource accounting
@@ -129,7 +129,7 @@
 - Debug runtime issues
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/container-runtimes/`
+- [ ] Create `experiments/container-runtimes/`
 - [ ] Runtime landscape overview:
   - [ ] High-level runtimes (containerd, CRI-O)
   - [ ] Low-level runtimes (runc, crun, gVisor)
@@ -192,7 +192,7 @@
 - Work with image registries
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/container-images/`
+- [ ] Create `experiments/container-images/`
 - [ ] OCI Image Specification:
   - [ ] Image manifest
   - [ ] Image index (multi-arch)
@@ -253,7 +253,7 @@
 - Implement security contexts
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/container-security/`
+- [ ] Create `experiments/container-security/`
 - [ ] Linux capabilities:
   - [ ] Root privilege decomposition
   - [ ] Common capabilities (NET_ADMIN, SYS_PTRACE, etc.)
@@ -312,7 +312,7 @@
 - Know CNI plugin architecture
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/container-networking/`
+- [ ] Create `experiments/container-networking/`
 - [ ] Linux networking primitives:
   - [ ] Network namespaces
   - [ ] Virtual ethernet pairs (veth)
@@ -373,7 +373,7 @@
 - Debug storage performance issues
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/container-storage/`
+- [ ] Create `experiments/container-storage/`
 - [ ] Union filesystems:
   - [ ] Copy-on-write concept
   - [ ] Layer stacking
@@ -432,7 +432,7 @@
 - Know limitations and workarounds
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/rootless-containers/`
+- [ ] Create `experiments/rootless-containers/`
 - [ ] Why rootless:
   - [ ] Security (no root on host)
   - [ ] Multi-tenancy

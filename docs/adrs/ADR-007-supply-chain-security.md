@@ -285,7 +285,7 @@ cosign verify-attestation \
 ├── build-components.yaml         # Auto-detection CI with signing
 └── auto-merge.yaml               # Auto-merge dependency PRs
 
-experiments/components/apps/hello-app/
+components/apps/hello-app/
 ├── Dockerfile                    # Multi-stage build
 ├── hello-app.yaml                # ArgoCD Application with Image Updater
 └── k8s/

@@ -12,7 +12,7 @@
 - Design password policies that balance security and usability
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/password-security/`
+- [ ] Create `experiments/password-security/`
 - [ ] Password hashing algorithms:
   - [ ] bcrypt - work factor tuning, cost parameter
   - [ ] Argon2 (Argon2id) - memory-hard, recommended for new systems
@@ -51,7 +51,7 @@
 - Recognize and prevent common JWT vulnerabilities
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/jwt-deep-dive/`
+- [ ] Create `experiments/jwt-deep-dive/`
 - [ ] JWT structure (RFC 7519):
   - [ ] Header (alg, typ, kid)
   - [ ] Payload (claims)
@@ -108,7 +108,7 @@
 - Know when JWE is appropriate vs JWS
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/jwe-encryption/`
+- [ ] Create `experiments/jwe-encryption/`
 - [ ] JWE structure (RFC 7516):
   - [ ] Protected header
   - [ ] Encrypted key
@@ -149,7 +149,7 @@
 - Choose the right flow for each application type
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/oauth-flows/`
+- [ ] Create `experiments/oauth-flows/`
 - [ ] OAuth 2.0 fundamentals (RFC 6749):
   - [ ] Roles: Resource Owner, Client, Authorization Server, Resource Server
   - [ ] Client types: Confidential vs Public
@@ -204,7 +204,7 @@
 - Configure OIDC discovery and validation
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/oidc-fundamentals/`
+- [ ] Create `experiments/oidc-fundamentals/`
 - [ ] OIDC overview:
   - [ ] Authentication vs Authorization (OIDC vs OAuth)
   - [ ] ID Token introduction
@@ -254,7 +254,7 @@
 - Prevent session-based attacks
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/session-management/`
+- [ ] Create `experiments/session-management/`
 - [ ] Session fundamentals:
   - [ ] Stateful vs stateless sessions
   - [ ] Session ID generation (CSPRNG, entropy)
@@ -304,7 +304,7 @@
 - Integrate IdP with platform services
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/identity-provider/`
+- [ ] Create `experiments/identity-provider/`
 - [ ] Keycloak deployment:
   - [ ] Helm chart installation
   - [ ] PostgreSQL backend
@@ -359,7 +359,7 @@
 - Secure service-to-service communication
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/auth-integration/`
+- [ ] Create `experiments/auth-integration/`
 - [ ] Traditional web application:
   - [ ] Server-side session management
   - [ ] OIDC integration with session binding
@@ -413,7 +413,7 @@
 - Design MFA enrollment and recovery flows
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/mfa-implementation/`
+- [ ] Create `experiments/mfa-implementation/`
 - [ ] MFA fundamentals:
   - [ ] Something you know, have, are
   - [ ] MFA vs 2FA vs 2SV
@@ -461,7 +461,7 @@
 - Integrate with policy engines
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/authorization-patterns/`
+- [ ] Create `experiments/authorization-patterns/`
 - [ ] Authorization fundamentals:
   - [ ] Authentication vs Authorization
   - [ ] Coarse-grained vs fine-grained
@@ -507,7 +507,7 @@
 - Implement security controls and hardening
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/identity-secops/`
+- [ ] Create `experiments/identity-secops/`
 - [ ] Logging and auditing:
   - [ ] Authentication events (success, failure)
   - [ ] Authorization decisions
@@ -552,7 +552,7 @@
 - Design PAT systems with appropriate scoping
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/api-key-management/`
+- [ ] Create `experiments/api-key-management/`
 - [ ] API keys fundamentals:
   - [ ] What API keys are (shared secrets, not user-bound)
   - [ ] API keys vs OAuth tokens (no user context, no expiration by default)

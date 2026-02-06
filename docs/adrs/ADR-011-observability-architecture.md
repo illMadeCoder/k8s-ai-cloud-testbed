@@ -244,7 +244,7 @@ The architecture supports side-by-side comparisons for learning:
 
 ### TSDB Comparison (Implemented)
 
-See `experiments/scenarios/tsdb-comparison/`
+See `experiments/tsdb-comparison/`
 
 | Aspect | Prometheus | Victoria Metrics | Mimir |
 |--------|------------|------------------|-------|
@@ -255,7 +255,7 @@ See `experiments/scenarios/tsdb-comparison/`
 
 ### Logging Comparison (Planned)
 
-See `experiments/scenarios/logging-comparison/`
+See `experiments/logging-comparison/`
 
 | Aspect | Loki | Elasticsearch |
 |--------|------|---------------|

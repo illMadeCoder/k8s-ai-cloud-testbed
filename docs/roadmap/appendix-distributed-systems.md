@@ -13,7 +13,7 @@
 - Know when consensus is needed vs overkill
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/consensus-algorithms/`
+- [ ] Create `experiments/consensus-algorithms/`
 - [ ] The consensus problem:
   - [ ] Agreement, validity, termination properties
   - [ ] FLP impossibility result (async systems)
@@ -58,7 +58,7 @@
 - Choose appropriate consistency for different use cases
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/consistency-models/`
+- [ ] Create `experiments/consistency-models/`
 - [ ] CAP theorem:
   - [ ] Consistency, Availability, Partition tolerance
   - [ ] Why you must choose (partition happens)
@@ -109,7 +109,7 @@
 - Know when to avoid distributed transactions entirely
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/distributed-transactions/`
+- [ ] Create `experiments/distributed-transactions/`
 - [ ] Why distributed transactions are hard:
   - [ ] Atomicity across boundaries
   - [ ] Partial failure scenarios
@@ -172,7 +172,7 @@
 - Know hybrid approaches used in practice
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/distributed-time/`
+- [ ] Create `experiments/distributed-time/`
 - [ ] Physical clock problems:
   - [ ] Clock drift and skew
   - [ ] NTP accuracy limits
@@ -224,7 +224,7 @@
 - Handle partial failures gracefully
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/failure-detection/`
+- [ ] Create `experiments/failure-detection/`
 - [ ] Failure models:
   - [ ] Crash failures (stop responding)
   - [ ] Omission failures (dropped messages)
@@ -279,7 +279,7 @@
 - Choose appropriate replication for different needs
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/replication-strategies/`
+- [ ] Create `experiments/replication-strategies/`
 - [ ] Why replicate:
   - [ ] Availability (survive failures)
   - [ ] Performance (read scaling, latency)
@@ -333,7 +333,7 @@
 - Design for partition-aware queries
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/partitioning/`
+- [ ] Create `experiments/partitioning/`
 - [ ] Why partition:
   - [ ] Data too large for single node
   - [ ] Throughput beyond single node
@@ -393,7 +393,7 @@
 - Know the pitfalls of distributed coordination
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/distributed-locking/`
+- [ ] Create `experiments/distributed-locking/`
 - [ ] Why distributed locks are hard:
   - [ ] No global time
   - [ ] Partial failures
@@ -453,7 +453,7 @@
 - Design systems that handle duplicates gracefully
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/exactly-once/`
+- [ ] Create `experiments/exactly-once/`
 - [ ] Delivery semantics:
   - [ ] At-most-once (fire and forget)
   - [ ] At-least-once (retry until ack)

@@ -171,7 +171,7 @@ exp:conduct:http-baseline:
 ## Experiment Structure
 
 ```
-experiments/scenarios/<experiment-name>/
+experiments/<experiment-name>/
 ├── loadgen/
 │   └── argocd/
 │       ├── app.yaml         # ArgoCD Application for k6 ConfigMap
@@ -197,21 +197,20 @@ labels:
 ## Files
 
 ```
+components/
+└── workflows/
+    └── argo-workflows/
+        └── argocd-reader-rbac.yaml   # RBAC for cleanup
+
 experiments/
-├── components/
-│   └── components/
-│       └── workflows/
-│           └── argo-workflows/
-│               └── argocd-reader-rbac.yaml   # RBAC for cleanup
-└── scenarios/
-    ├── hello-app/
-    │   ├── loadgen/argocd/...
-    │   ├── target/argocd/...
-    │   └── workflow/experiment.yaml
-    └── http-baseline/
-        ├── loadgen/argocd/...
-        ├── target/argocd/...
-        └── workflow/experiment.yaml
+├── hello-app/
+│   ├── loadgen/argocd/...
+│   ├── target/argocd/...
+│   └── workflow/experiment.yaml
+└── http-baseline/
+    ├── loadgen/argocd/...
+    ├── target/argocd/...
+    └── workflow/experiment.yaml
 ```
 
 ## References

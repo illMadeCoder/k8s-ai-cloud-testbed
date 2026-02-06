@@ -12,7 +12,7 @@
 - Tune for responsiveness vs stability
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/hpa-tutorial/`
+- [ ] Create `experiments/hpa-tutorial/`
 - [ ] Build test app with configurable CPU/memory load
 - [ ] Configure HPA scenarios:
   - [ ] CPU-based scaling
@@ -47,7 +47,7 @@
 - Implement scale-to-zero
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/keda-tutorial/`
+- [ ] Create `experiments/keda-tutorial/`
 - [ ] Install KEDA
 - [ ] Implement scalers:
   - [ ] Prometheus scaler (custom metrics)
@@ -79,7 +79,7 @@
 - Implement resource optimization workflow
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/vpa-tutorial/`
+- [ ] Create `experiments/vpa-tutorial/`
 - [ ] Install VPA
 - [ ] Configure VPA modes:
   - [ ] Off (recommendations only)
@@ -107,7 +107,7 @@
 - Optimize for cost and performance
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cluster-autoscaler-tutorial/`
+- [ ] Create `experiments/cluster-autoscaler-tutorial/`
 - [ ] Implement Cluster Autoscaler (AKS/EKS):
   - [ ] Node pool configuration
   - [ ] Scale-down policies
@@ -146,7 +146,7 @@
 - Automate tenant lifecycle
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/multi-tenancy-production/`
+- [ ] Create `experiments/multi-tenancy-production/`
 - [ ] Build on Phase 3.8 security foundations:
   - [ ] Verify isolation from Phase 3.8 still holds
   - [ ] Add resource management layer
@@ -192,7 +192,7 @@
 - Create cost optimization automation
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/finops-implementation/`
+- [ ] Create `experiments/finops-implementation/`
 - [ ] Deploy full Kubecost or OpenCost:
   - [ ] Integration with cloud billing APIs
   - [ ] Azure Cost Management connection
@@ -232,7 +232,7 @@
 - Compare serverless vs traditional deployment
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/serverless-knative/`
+- [ ] Create `experiments/serverless-knative/`
 - [ ] Knative Serving:
   - [ ] Deploy Knative Serving
   - [ ] Create Knative Services

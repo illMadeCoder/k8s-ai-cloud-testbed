@@ -12,7 +12,7 @@
 - Identify performance bottlenecks systematically
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/performance-fundamentals/`
+- [ ] Create `experiments/performance-fundamentals/`
 - [ ] Core metrics:
   - [ ] Latency (response time)
   - [ ] Throughput (requests/second, transactions/second)
@@ -64,7 +64,7 @@
 - Optimize CPU-bound workloads
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/cpu-profiling/`
+- [ ] Create `experiments/cpu-profiling/`
 - [ ] CPU fundamentals:
   - [ ] User vs system time
   - [ ] Context switching
@@ -119,7 +119,7 @@
 - Optimize memory-intensive workloads
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/memory-analysis/`
+- [ ] Create `experiments/memory-analysis/`
 - [ ] Memory fundamentals:
   - [ ] Virtual vs physical memory
   - [ ] RSS, VSZ, PSS
@@ -179,7 +179,7 @@
 - Optimize I/O-intensive workloads
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/io-performance/`
+- [ ] Create `experiments/io-performance/`
 - [ ] I/O fundamentals:
   - [ ] Synchronous vs asynchronous I/O
   - [ ] Buffered vs direct I/O
@@ -238,7 +238,7 @@
 - Interpret load test results accurately
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/load-testing/`
+- [ ] Create `experiments/load-testing/`
 - [ ] Load testing types:
   - [ ] Smoke tests (minimal load, verify works)
   - [ ] Load tests (expected load)
@@ -297,7 +297,7 @@
 - Plan for growth efficiently
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/capacity-planning/`
+- [ ] Create `experiments/capacity-planning/`
 - [ ] Capacity planning process:
   - [ ] Current state assessment
   - [ ] Growth forecasting
@@ -357,7 +357,7 @@
 - Balance latency vs other concerns
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/latency-optimization/`
+- [ ] Create `experiments/latency-optimization/`
 - [ ] Latency sources:
   - [ ] Network latency
   - [ ] Processing time
@@ -418,7 +418,7 @@
 - Detect and alert on regressions
 
 **Tasks:**
-- [ ] Create `experiments/scenarios/perf-regression/`
+- [ ] Create `experiments/perf-regression/`
 - [ ] Regression testing goals:
   - [ ] Catch regressions before production
   - [ ] Establish baselines
