@@ -10,6 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	experimentsv1alpha1 "github.com/illmadecoder/experiment-operator/api/v1alpha1"
+	"github.com/illmadecoder/experiment-operator/internal/components"
 )
 
 var (
@@ -24,11 +25,15 @@ var (
 // ApplicationManager manages ArgoCD Applications
 type ApplicationManager struct {
 	client.Client
+	Resolver *components.Resolver
 }
 
 // NewApplicationManager creates a new ApplicationManager
 func NewApplicationManager(c client.Client) *ApplicationManager {
-	return &ApplicationManager{Client: c}
+	return &ApplicationManager{
+		Client:   c,
+		Resolver: components.NewResolver(c),
+	}
 }
 
 // CreateApplication creates an ArgoCD Application for a target
@@ -50,33 +55,51 @@ func (m *ApplicationManager) CreateApplication(ctx context.Context, experimentNa
 		"experiments.illm.io/target":     target.Name,
 	})
 
-	// Build sources from components
+	// Resolve components using the resolver
+	resolvedComponents, err := m.Resolver.ResolveComponents(ctx, target.Components)
+	if err != nil {
+		return fmt.Errorf("failed to resolve components: %w", err)
+	}
+
+	// Build sources from resolved components
 	sources := []interface{}{}
-	for _, component := range target.Components {
-		if component.App != "" {
-			// TODO Phase 4: Resolve component reference to actual source
-			// For now, create a placeholder source
-			source := map[string]interface{}{
-				"repoURL":        "https://github.com/illMadeCoder/illm-k8s-ai-labs.git",
-				"targetRevision": "HEAD",
-				"path":           fmt.Sprintf("components/apps/%s", component.App),
+	for _, resolved := range resolvedComponents {
+		for _, source := range resolved.Sources {
+			argoSource := map[string]interface{}{
+				"repoURL":        source.RepoURL,
+				"targetRevision": source.TargetRevision,
+				"path":           source.Path,
 			}
 
-			// Add Helm parameters if provided
-			if len(component.Params) > 0 {
-				helmParams := []interface{}{}
-				for key, value := range component.Params {
-					helmParams = append(helmParams, map[string]interface{}{
-						"name":  key,
-						"value": value,
-					})
+			// Add Helm configuration if present
+			if source.Helm != nil {
+				helmConfig := map[string]interface{}{}
+
+				if source.Helm.ReleaseName != "" {
+					helmConfig["releaseName"] = source.Helm.ReleaseName
 				}
-				source["helm"] = map[string]interface{}{
-					"parameters": helmParams,
+
+				if len(source.Helm.ValuesFiles) > 0 {
+					helmConfig["valueFiles"] = source.Helm.ValuesFiles
+				}
+
+				if len(source.Helm.Parameters) > 0 {
+					helmParams := []interface{}{}
+					for key, value := range source.Helm.Parameters {
+						helmParams = append(helmParams, map[string]interface{}{
+							"name":  key,
+							"value": value,
+						})
+					}
+					helmConfig["parameters"] = helmParams
+				}
+
+				if len(helmConfig) > 0 {
+					argoSource["helm"] = helmConfig
 				}
 			}
 
-			sources = append(sources, source)
+			sources = append(sources, argoSource)
 		}
 	}
 
@@ -115,7 +138,7 @@ func (m *ApplicationManager) CreateApplication(ctx context.Context, experimentNa
 	// Check if application already exists
 	existing := &unstructured.Unstructured{}
 	existing.SetGroupVersionKind(applicationGVK)
-	err := m.Get(ctx, client.ObjectKey{Name: appName, Namespace: "argocd"}, existing)
+	err = m.Get(ctx, client.ObjectKey{Name: appName, Namespace: "argocd"}, existing)
 	if err == nil {
 		// Application exists, update it
 		existing.Object["spec"] = app.Object["spec"]

@@ -1,0 +1,36 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Component
+metadata:
+  name: nginx
+spec:
+  type: app
+  description: "NGINX web server"
+  
+  sources:
+    - repoURL: https://github.com/bitnami/charts.git
+      targetRevision: main
+      path: bitnami/nginx
+      helm:
+        releaseName: nginx
+        parameters:
+          - name: replicaCount
+            value: "2"
+          - name: service.type
+            value: ClusterIP
+  
+  parameters:
+    - name: replicaCount
+      type: int
+      default: "2"
+      description: "Number of replicas"
+    - name: service.type
+      type: string
+      default: "ClusterIP"
+      description: "Kubernetes service type"
+  
+  observability:
+    serviceMonitor: true
+    podLabels:
+      app: nginx
+    metricsPath: /metrics
+    metricsPort: 9113
