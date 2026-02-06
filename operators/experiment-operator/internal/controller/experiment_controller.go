@@ -28,6 +28,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	experimentsv1alpha1 "github.com/illmadecoder/experiment-operator/api/v1alpha1"
+	"github.com/illmadecoder/experiment-operator/internal/crossplane"
 )
 
 const (
@@ -37,7 +38,8 @@ const (
 // ExperimentReconciler reconciles a Experiment object
 type ExperimentReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme         *runtime.Scheme
+	ClusterManager *crossplane.ClusterManager
 }
 
 // +kubebuilder:rbac:groups=experiments.illm.io,resources=experiments,verbs=get;list;watch;create;update;patch;delete
@@ -46,6 +48,9 @@ type ExperimentReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=argoproj.io,resources=workflows,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=container.gcp.upbound.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=vclusters,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -78,6 +83,20 @@ func (r *ExperimentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	// Check TTL and auto-delete if exceeded
+	ttlDays := experiment.Spec.TTLDays
+	if ttlDays == 0 {
+		ttlDays = 1 // Default to 1 day
+	}
+	if crossplane.ShouldDeleteCluster(experiment.CreationTimestamp.Time, ttlDays) {
+		log.Info("Experiment TTL exceeded, deleting", "ttlDays", ttlDays, "age", time.Since(experiment.CreationTimestamp.Time))
+		if err := r.Delete(ctx, experiment); err != nil {
+			log.Error(err, "Failed to delete expired experiment")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
 	// Phase-based reconciliation
 	switch experiment.Status.Phase {
 	case "", experimentsv1alpha1.PhasePending:
@@ -89,8 +108,9 @@ func (r *ExperimentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	case experimentsv1alpha1.PhaseRunning:
 		return r.reconcileRunning(ctx, experiment)
 	case experimentsv1alpha1.PhaseComplete, experimentsv1alpha1.PhaseFailed:
-		// Terminal states, no action needed
-		return ctrl.Result{}, nil
+		// Terminal states - requeue to check TTL periodically
+		// Check TTL every hour for completed experiments
+		return ctrl.Result{RequeueAfter: 1 * time.Hour}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -103,8 +123,23 @@ func (r *ExperimentReconciler) handleDeletion(ctx context.Context, exp *experime
 	if controllerutil.ContainsFinalizer(exp, experimentFinalizer) {
 		log.Info("Cleaning up experiment resources")
 
-		// TODO: Clean up clusters, ArgoCD apps, workflows
-		// This will be implemented in later phases
+		// Delete clusters for each target
+		for i, target := range exp.Spec.Targets {
+			if i >= len(exp.Status.Targets) || exp.Status.Targets[i].ClusterName == "" {
+				continue
+			}
+
+			clusterName := exp.Status.Targets[i].ClusterName
+			log.Info("Deleting cluster", "cluster", clusterName, "type", target.Cluster.Type)
+
+			if err := r.ClusterManager.DeleteCluster(ctx, clusterName, target.Cluster.Type); err != nil {
+				log.Error(err, "Failed to delete cluster", "cluster", clusterName)
+				// Continue with other clusters, don't block finalizer removal
+			}
+		}
+
+		// TODO Phase 3: Delete ArgoCD Applications
+		// TODO Phase 5: Delete Argo Workflows
 
 		// Remove finalizer
 		controllerutil.RemoveFinalizer(exp, experimentFinalizer)
@@ -122,8 +157,43 @@ func (r *ExperimentReconciler) reconcilePending(ctx context.Context, exp *experi
 	log := logf.FromContext(ctx)
 	log.Info("Reconciling Pending phase")
 
-	// TODO Phase 2: Build dependency graph and create clusters
-	// For now, just transition to Provisioning
+	// Initialize target status if needed
+	if len(exp.Status.Targets) == 0 {
+		exp.Status.Targets = make([]experimentsv1alpha1.TargetStatus, len(exp.Spec.Targets))
+		for i, target := range exp.Spec.Targets {
+			exp.Status.Targets[i] = experimentsv1alpha1.TargetStatus{
+				Name:  target.Name,
+				Phase: "Pending",
+			}
+		}
+	}
+
+	// Create clusters for each target (respecting dependencies)
+	// For simplicity, create all clusters in parallel for now
+	// TODO: Implement proper dependency graph traversal
+	for i, target := range exp.Spec.Targets {
+		// Check if cluster already exists in status
+		if exp.Status.Targets[i].ClusterName != "" {
+			log.Info("Cluster already created", "target", target.Name, "cluster", exp.Status.Targets[i].ClusterName)
+			continue
+		}
+
+		// Create the cluster
+		clusterName, err := r.ClusterManager.CreateCluster(ctx, exp.Name, target)
+		if err != nil {
+			log.Error(err, "Failed to create cluster", "target", target.Name)
+			// Continue with other targets, will retry on next reconcile
+			exp.Status.Targets[i].Phase = "Failed"
+			continue
+		}
+
+		// Update target status
+		exp.Status.Targets[i].ClusterName = clusterName
+		exp.Status.Targets[i].Phase = "Provisioning"
+		log.Info("Created cluster", "target", target.Name, "cluster", clusterName)
+	}
+
+	// Transition to Provisioning phase
 	exp.Status.Phase = experimentsv1alpha1.PhaseProvisioning
 	if err := r.Status().Update(ctx, exp); err != nil {
 		log.Error(err, "Failed to update status to Provisioning")
@@ -138,28 +208,57 @@ func (r *ExperimentReconciler) reconcileProvisioning(ctx context.Context, exp *e
 	log := logf.FromContext(ctx)
 	log.Info("Reconciling Provisioning phase")
 
-	// TODO Phase 2: Check cluster readiness
-	// TODO Phase 3: Register clusters with ArgoCD and create Applications
-	// For now, simulate waiting and transition to Ready
+	allReady := true
 
-	// Initialize target status if empty
-	if len(exp.Status.Targets) == 0 {
-		exp.Status.Targets = make([]experimentsv1alpha1.TargetStatus, len(exp.Spec.Targets))
-		for i, target := range exp.Spec.Targets {
-			exp.Status.Targets[i] = experimentsv1alpha1.TargetStatus{
-				Name:  target.Name,
-				Phase: "Provisioning",
-			}
+	// Check each cluster's readiness
+	for i, target := range exp.Spec.Targets {
+		if exp.Status.Targets[i].ClusterName == "" {
+			log.Info("Target has no cluster name", "target", target.Name)
+			allReady = false
+			continue
 		}
-	}
 
-	// Simulate cluster provisioning - in reality, would check Crossplane XRDs
-	log.Info("Clusters would be provisioning here, transitioning to Ready for now")
-	exp.Status.Phase = experimentsv1alpha1.PhaseReady
-	for i := range exp.Status.Targets {
+		clusterName := exp.Status.Targets[i].ClusterName
+		ready, err := r.ClusterManager.IsClusterReady(ctx, clusterName, target.Cluster.Type)
+		if err != nil {
+			log.Error(err, "Failed to check cluster readiness", "cluster", clusterName)
+			allReady = false
+			continue
+		}
+
+		if !ready {
+			log.Info("Cluster not ready yet", "cluster", clusterName)
+			allReady = false
+			continue
+		}
+
+		// Get cluster endpoint if available
+		endpoint, err := r.ClusterManager.GetClusterEndpoint(ctx, clusterName, target.Cluster.Type)
+		if err != nil {
+			log.Error(err, "Failed to get cluster endpoint", "cluster", clusterName)
+		} else if endpoint != "" {
+			exp.Status.Targets[i].Endpoint = endpoint
+		}
+
+		// Mark target as ready
 		exp.Status.Targets[i].Phase = "Ready"
+		log.Info("Cluster is ready", "cluster", clusterName, "endpoint", endpoint)
 	}
 
+	if !allReady {
+		// Requeue after 10 seconds to check again
+		if err := r.Status().Update(ctx, exp); err != nil {
+			log.Error(err, "Failed to update status")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	// TODO Phase 3: Register clusters with ArgoCD
+	// TODO Phase 3: Create ArgoCD Applications for each target
+
+	// All clusters ready, transition to Ready phase
+	exp.Status.Phase = experimentsv1alpha1.PhaseReady
 	if err := r.Status().Update(ctx, exp); err != nil {
 		log.Error(err, "Failed to update status to Ready")
 		return ctrl.Result{}, err

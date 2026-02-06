@@ -135,6 +135,13 @@ spec:
                   - name
                   type: object
                 type: array
+              ttlDays:
+                default: 1
+                description: TTL in days - experiment will be auto-deleted after this
+                  many days
+                maximum: 365
+                minimum: 0
+                type: integer
               workflow:
                 description: Workflow for validation and lifecycle
                 properties:

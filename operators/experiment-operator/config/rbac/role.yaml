@@ -30,6 +30,19 @@ rules:
   - update
   - watch
 - apiGroups:
+  - cluster.x-k8s.io
+  - container.gcp.upbound.io
+  resources:
+  - clusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - experiments.illm.io
   resources:
   - experiments
@@ -55,3 +68,15 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - vclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

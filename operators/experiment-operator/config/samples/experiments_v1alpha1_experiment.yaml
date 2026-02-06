@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "Gateway API tutorial: Ingress to GRPCRoute"
+  ttlDays: 1  # Auto-delete after 1 day (default)
 
   targets:
     - name: app

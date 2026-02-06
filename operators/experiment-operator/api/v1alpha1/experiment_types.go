@@ -36,6 +36,13 @@ type ExperimentSpec struct {
 	// Workflow for validation and lifecycle
 	// +required
 	Workflow WorkflowSpec `json:"workflow"`
+
+	// TTL in days - experiment will be auto-deleted after this many days
+	// +optional
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=365
+	TTLDays int `json:"ttlDays,omitempty"`
 }
 
 // Target defines a deployment target (cluster + components)
