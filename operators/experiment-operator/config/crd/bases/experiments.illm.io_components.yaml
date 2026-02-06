@@ -109,6 +109,10 @@ spec:
                 items:
                   description: ComponentSource defines a source location for a component
                   properties:
+                    chart:
+                      description: Chart name for Helm repository sources (use instead
+                        of Path for Helm repos)
+                      type: string
                     helm:
                       description: Helm chart configuration
                       properties:
@@ -142,18 +146,17 @@ spec:
                           type: array
                       type: object
                     path:
-                      description: Path within the repository
+                      description: Path within a Git repository
                       type: string
                     repoURL:
-                      description: RepoURL is the Git repository URL
+                      description: RepoURL is the repository URL (Git or Helm)
                       type: string
                     targetRevision:
                       default: HEAD
                       description: TargetRevision is the Git ref (branch, tag, commit
-                        SHA)
+                        SHA) or chart version
                       type: string
                   required:
-                  - path
                   - repoURL
                   type: object
                 type: array

@@ -32,6 +32,7 @@ type ResolvedSource struct {
 	RepoURL        string
 	TargetRevision string
 	Path           string
+	Chart          string
 	Helm           *HelmConfig
 }
 
@@ -95,6 +96,7 @@ func (r *Resolver) resolveFromCR(component *experimentsv1alpha1.Component, param
 			RepoURL:        source.RepoURL,
 			TargetRevision: targetRevision,
 			Path:           source.Path,
+			Chart:          source.Chart,
 		}
 
 		// Handle Helm configuration

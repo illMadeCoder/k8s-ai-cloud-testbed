@@ -331,8 +331,14 @@ func (r *ExperimentReconciler) reconcileProvisioning(ctx context.Context, exp *e
 				kubeconfig = []byte("# Placeholder kubeconfig")
 			}
 		} else {
-			// For hub cluster, no separate kubeconfig needed
-			kubeconfig = []byte("# In-cluster")
+			// Hub cluster: ArgoCD already has in-cluster access via https://kubernetes.default.svc.
+			// Skip cluster secret registration — just create the ArgoCD Application.
+			if err := r.ArgoCD.AppManager.CreateApplication(ctx, exp.Name, target, server); err != nil {
+				log.Error(err, "Failed to create application for hub target", "target", target.Name)
+				continue
+			}
+			log.Info("Created ArgoCD Application for hub target (no cluster registration needed)", "target", target.Name)
+			continue
 		}
 
 		// Register cluster and create applications

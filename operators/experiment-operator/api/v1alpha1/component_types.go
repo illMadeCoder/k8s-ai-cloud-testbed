@@ -46,18 +46,22 @@ type ComponentSpec struct {
 
 // ComponentSource defines a source location for a component
 type ComponentSource struct {
-	// RepoURL is the Git repository URL
+	// RepoURL is the repository URL (Git or Helm)
 	// +required
 	RepoURL string `json:"repoURL"`
 
-	// TargetRevision is the Git ref (branch, tag, commit SHA)
+	// TargetRevision is the Git ref (branch, tag, commit SHA) or chart version
 	// +optional
 	// +kubebuilder:default="HEAD"
 	TargetRevision string `json:"targetRevision,omitempty"`
 
-	// Path within the repository
-	// +required
-	Path string `json:"path"`
+	// Path within a Git repository
+	// +optional
+	Path string `json:"path,omitempty"`
+
+	// Chart name for Helm repository sources (use instead of Path for Helm repos)
+	// +optional
+	Chart string `json:"chart,omitempty"`
 
 	// Helm chart configuration
 	// +optional

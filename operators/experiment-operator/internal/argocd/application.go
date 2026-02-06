@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,7 +71,13 @@ func (m *ApplicationManager) CreateApplication(ctx context.Context, experimentNa
 			argoSource := map[string]interface{}{
 				"repoURL":        source.RepoURL,
 				"targetRevision": source.TargetRevision,
-				"path":           source.Path,
+			}
+
+			// Use 'chart' for Helm repositories, 'path' for Git repositories
+			if source.Chart != "" {
+				argoSource["chart"] = source.Chart
+			} else {
+				argoSource["path"] = source.Path
 			}
 
 			// Add Helm configuration if present
@@ -109,13 +118,20 @@ func (m *ApplicationManager) CreateApplication(ctx context.Context, experimentNa
 		return nil
 	}
 
+	// Pre-create the destination namespace with appropriate labels
+	// This ensures PodSecurity labels are set before ArgoCD syncs workloads
+	if err := m.ensureNamespace(ctx, experimentName); err != nil {
+		log.Error(err, "Failed to ensure namespace", "namespace", experimentName)
+		// Non-fatal: ArgoCD's CreateNamespace=true will create it without labels
+	}
+
 	// Build Application spec
 	spec := map[string]interface{}{
 		"project": "default",
 		"sources":  sources,
 		"destination": map[string]interface{}{
 			"server":    clusterServer,
-			"namespace": "default",
+			"namespace": experimentName,
 		},
 		"syncPolicy": map[string]interface{}{
 			"automated": map[string]interface{}{
@@ -167,6 +183,10 @@ func (m *ApplicationManager) DeleteApplication(ctx context.Context, experimentNa
 	app.SetNamespace("argocd")
 
 	if err := m.Delete(ctx, app); err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("ArgoCD Application already deleted", "name", appName)
+			return nil
+		}
 		return fmt.Errorf("failed to delete application: %w", err)
 	}
 
@@ -234,4 +254,32 @@ func (m *ApplicationManager) GetApplicationComponents(ctx context.Context, exper
 	}
 
 	return components, nil
+}
+
+// ensureNamespace creates the experiment namespace with appropriate labels
+func (m *ApplicationManager) ensureNamespace(ctx context.Context, name string) error {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by":           "experiment-operator",
+				"pod-security.kubernetes.io/enforce":     "privileged",
+				"pod-security.kubernetes.io/enforce-version": "latest",
+			},
+		},
+	}
+
+	existing := &corev1.Namespace{}
+	err := m.Get(ctx, client.ObjectKey{Name: name}, existing)
+	if err == nil {
+		// Namespace exists, ensure labels
+		if existing.Labels == nil {
+			existing.Labels = make(map[string]string)
+		}
+		existing.Labels["pod-security.kubernetes.io/enforce"] = "privileged"
+		existing.Labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+		return m.Update(ctx, existing)
+	}
+
+	return m.Create(ctx, ns)
 }

@@ -16,7 +16,7 @@ import (
 
 const (
 	// DefaultNamespace is the default namespace for Argo Workflows
-	DefaultNamespace = "argo"
+	DefaultNamespace = "argo-workflows"
 )
 
 var (
@@ -87,6 +87,7 @@ func (m *Manager) SubmitWorkflow(ctx context.Context, experimentName string, spe
 
 	// Build workflow spec referencing the template
 	wfSpec := map[string]interface{}{
+		"serviceAccountName": "argo-workflow",
 		"workflowTemplateRef": map[string]interface{}{
 			"name": spec.Template,
 		},
@@ -146,7 +147,8 @@ func (m *Manager) submitInlineWorkflow(ctx context.Context, workflowName string,
 	// Build a simple inline workflow with a suspend step
 	// This allows manual approval or automatic timeout
 	wfSpec := map[string]interface{}{
-		"entrypoint": "experiment-lifecycle",
+		"serviceAccountName": "argo-workflow",
+		"entrypoint":         "experiment-lifecycle",
 		"templates": []interface{}{
 			map[string]interface{}{
 				"name": "experiment-lifecycle",

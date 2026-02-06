@@ -71,10 +71,9 @@ spec:
                         preemptible:
                           type: boolean
                         type:
-                          description: 'Type: gke, talos, vcluster, hub (existing)'
+                          description: 'Type: gke, vcluster, hub (existing hub cluster)'
                           enum:
                           - gke
-                          - talos
                           - vcluster
                           - hub
                           type: string
@@ -142,6 +141,49 @@ spec:
                 maximum: 365
                 minimum: 0
                 type: integer
+              tutorial:
+                description: Tutorial configuration for interactive learning
+                properties:
+                  exposeKubeconfig:
+                    description: Expose kubeconfig for user kubectl access to target
+                      clusters
+                    type: boolean
+                  path:
+                    description: Path to tutorial file relative to experiment directory,
+                      default "tutorial.yaml"
+                    type: string
+                  services:
+                    description: Services to discover on target clusters
+                    items:
+                      description: TutorialServiceRef references a service to discover
+                        on a target cluster
+                      properties:
+                        name:
+                          description: Name is a friendly name for the service (e.g.,
+                            "grafana")
+                          type: string
+                        namespace:
+                          description: Namespace is the Kubernetes namespace of the
+                            service
+                          type: string
+                        port:
+                          description: Port is the service port (optional, uses first
+                            port if unset)
+                          type: integer
+                        service:
+                          description: Service is the Kubernetes service name
+                          type: string
+                        target:
+                          description: Target is the target name from spec.targets
+                          type: string
+                      required:
+                      - name
+                      - namespace
+                      - service
+                      - target
+                      type: object
+                    type: array
+                type: object
               workflow:
                 description: Workflow for validation and lifecycle
                 properties:
@@ -149,9 +191,11 @@ spec:
                     description: Completion mode configuration
                     properties:
                       mode:
-                        description: 'Mode: workflow (wait for workflow completion)'
+                        description: 'Mode: workflow (auto-complete after workflow),
+                          manual (stay Running until user tears down)'
                         enum:
                         - workflow
+                        - manual
                         type: string
                     required:
                     - mode
@@ -267,6 +311,10 @@ spec:
                       type: array
                     endpoint:
                       type: string
+                    kubeconfigSecret:
+                      description: KubeconfigSecret is the name of the secret containing
+                        the kubeconfig for this target
+                      type: string
                     name:
                       type: string
                     phase:
@@ -275,6 +323,36 @@ spec:
                   - name
                   type: object
                 type: array
+              tutorialStatus:
+                description: Tutorial status (populated when spec.tutorial is set)
+                properties:
+                  kubeconfigSecrets:
+                    additionalProperties:
+                      type: string
+                    description: KubeconfigSecrets maps target names to kubeconfig
+                      secret names in the experiments namespace
+                    type: object
+                  services:
+                    description: Discovered services with resolved endpoints
+                    items:
+                      description: DiscoveredService represents a service discovered
+                        on a target cluster
+                      properties:
+                        endpoint:
+                          description: Endpoint is the resolved service endpoint (LoadBalancer
+                            IP or ClusterIP)
+                          type: string
+                        name:
+                          description: Name is the friendly service name from spec.tutorial.services
+                          type: string
+                        ready:
+                          description: Ready indicates whether the service is accessible
+                          type: boolean
+                      required:
+                      - name
+                      type: object
+                    type: array
+                type: object
               workflowStatus:
                 description: Workflow status
                 properties:
