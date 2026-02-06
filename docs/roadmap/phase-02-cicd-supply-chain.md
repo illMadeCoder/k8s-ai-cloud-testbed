@@ -40,16 +40,12 @@
   - [ ] Push to GitHub Container Registry (GHCR)
   - [ ] Tag strategies (semver, git SHA, branch)
   - [ ] Cache optimization (layer caching, buildx)
-- [ ] GitLab CI comparison:
-  - [ ] Create `.gitlab-ci.yml` equivalent
-  - [ ] Deploy GitLab Runner on Kubernetes (Helm chart)
-  - [ ] Compare GitLab Registry vs GHCR
 - [ ] ArgoCD Image Updater:
   - [ ] Automatic image tag updates
   - [ ] Write-back strategies (Git vs annotation)
   - [ ] Semver constraints
 - [ ] Document CI/CD pipeline patterns
-- [ ] **ADR:** Document CI platform selection (GitHub Actions vs GitLab CI)
+- [ ] **ADR:** Document CI platform selection rationale
 
 ---
 
@@ -176,7 +172,6 @@
   - [ ] Schema compatibility checks
   - [ ] Consumer-driven contracts
 - [ ] Infrastructure testing:
-  - [ ] Terratest for Terraform
   - [ ] Test cluster provisioning
   - [ ] Smoke tests post-deployment
 - [ ] Test environments:

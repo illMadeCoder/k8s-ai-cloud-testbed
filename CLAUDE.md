@@ -41,4 +41,4 @@ bd sync && git push
 
 - **ArgoCD apps**: Use labels `experiment: {name}`, `cluster: target|loadgen`
 - **ArgoCD patterns**: Multi-source, sync waves, `ignoreDifferences` for CRDs (see `docs/gitops-patterns.md`)
-- **Terraform**: GitLab CI pipelines; credentials in GitLab CI variables, state in GitLab-managed backend
+- **Infrastructure**: Crossplane for cloud resource provisioning; credentials synced from OpenBao via ExternalSecrets

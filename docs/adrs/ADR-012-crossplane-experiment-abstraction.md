@@ -16,7 +16,7 @@ This lab runs experiments across multiple infrastructure providers:
 Currently, each provider has separate tooling:
 - `task kind:up` / `task kind:down` (imperative, Taskfile-driven)
 - `task talos:up` / `task talos:down` (targets existing cluster)
-- Cloud clusters would require additional Terraform or CLI tooling
+- Cloud clusters would require additional CLI tooling
 
 This fragmentation leads to:
 1. **Inconsistent UX** - Different commands per provider
@@ -219,7 +219,7 @@ stringData:
 | Approach | Pros | Cons |
 |----------|------|------|
 | **Current (Taskfile per provider)** | Simple, no dependencies | Inconsistent UX, duplicated logic |
-| **Terraform** | Declarative, mature | Separate state, not K8s-native |
+| **CLI tooling** | Simple, direct | Imperative, not K8s-native |
 | **Cluster API** | K8s-native, cloud-focused | Heavy, no vcluster support |
 | **Crossplane** | K8s-native, extensible, GitOps-friendly | Learning curve, more abstractions |
 

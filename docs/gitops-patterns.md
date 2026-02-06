@@ -8,12 +8,12 @@ The project uses a layered GitOps approach:
 
 | Layer | Tool | Responsibility |
 |-------|------|----------------|
-| Cloud Infrastructure | GitLab CI + Terraform | VNets, subnets, AKS/EKS clusters, IAM |
+| Cloud Infrastructure | Crossplane | VPCs, subnets, GKE/AKS/EKS clusters, IAM |
 | Kubernetes Platform | ArgoCD | Core platform components, observability, infrastructure |
 | Applications | ArgoCD | Experiment workloads, demo apps |
 | Workflows | Argo Workflows | Experiment orchestration, load testing |
 
-ArgoCD serves as the GitOps engine for all Kubernetes resources, while GitLab CI manages cloud infrastructure provisioning via Terraform (see [ADR-001](adrs/ADR-001-gitlab-ci-for-iac.md)).
+ArgoCD serves as the GitOps engine for all Kubernetes resources, while Crossplane manages cloud infrastructure provisioning declaratively (see [ADR-012](adrs/ADR-012-crossplane-experiment-abstraction.md)).
 
 ---
 
@@ -502,6 +502,6 @@ Each component follows this pattern:
 
 ## Related Documentation
 
-- [ADR-001: GitLab CI for IaC Orchestration](adrs/ADR-001-gitlab-ci-for-iac.md)
+- [ADR-012: Crossplane Experiment Abstraction](adrs/ADR-012-crossplane-experiment-abstraction.md)
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
 - [ArgoCD Application Specification](https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification/)

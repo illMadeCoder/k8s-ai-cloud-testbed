@@ -233,27 +233,7 @@ task talos:bootstrap
 
 ---
 
-### 1.4 GitLab CI Setup (Cloud IaC)
-
-**Goal:** Establish GitLab CI for Terraform state management and IaC orchestration
-
-*Used when experiments need cloud resources (AKS, EKS, cloud databases, etc.). Dormant until needed.*
-
-**Learning objectives:**
-- Understand GitLab CI pipelines for Terraform
-- Configure GitLab-managed Terraform state backend
-- Set up GitOps workflow for infrastructure changes
-
-**Tasks:**
-- [x] Create GitLab account and connect GitHub repo (mirror)
-- [x] Create `.gitlab-ci.yml` for Terraform pipelines
-- [x] Configure GitLab CI variables for cloud credentials (Azure, AWS)
-- [ ] Document GitLab CI workflow patterns
-- [x] **ADR:** Document why GitLab CI over Spacelift/Terraform Cloud (see `docs/adrs/ADR-001-gitlab-ci-for-iac.md`)
-
----
-
-### 1.5 Crossplane Fundamentals
+### 1.4 Crossplane Fundamentals
 
 **Goal:** Master Crossplane for cloud resource provisioning
 
@@ -270,11 +250,11 @@ task talos:bootstrap
 - [ ] Verify existing XRDs: Database, ObjectStorage, Queue, Cache
 - [ ] Test claims provision real cloud resources
 - [ ] Document XRD authoring patterns
-- [ ] **ADR:** Document Crossplane vs Terraform for app teams
+- [ ] **ADR:** Document Crossplane abstraction patterns for app teams
 
 ---
 
-### 1.6 FinOps Foundation & Cost Tagging
+### 1.5 FinOps Foundation & Cost Tagging
 
 **Goal:** Establish cost visibility foundation and tagging strategy
 

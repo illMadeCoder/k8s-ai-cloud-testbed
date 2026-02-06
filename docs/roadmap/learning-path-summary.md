@@ -2,7 +2,7 @@
 
 | Phase | Focus | Experiments | Key Skills |
 |-------|-------|-------------|------------|
-| 1 | Platform Bootstrap & GitOps | 6 | GitOps, Hub Cluster, Talos/N100, GitLab CI, Crossplane, FinOps |
+| 1 | Platform Bootstrap & GitOps | 5 | GitOps, Hub Cluster, Talos/N100, Crossplane, FinOps |
 | 2 | CI/CD & Supply Chain Security | 4 | Image building, scanning, signing, SBOM, registries |
 | 3 | Security Foundations | 9 | Sealed Secrets, SOPS+age, OpenBao+ESO, cert-manager, policies, identity, multi-tenancy |
 | 4 | Observability | 6 | Prometheus, SLOs, MinIO, Loki, OpenTelemetry, Thanos |

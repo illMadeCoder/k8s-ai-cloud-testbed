@@ -100,12 +100,8 @@
   - [ ] Environment-specific configs
   - [ ] Promotion gates and approvals
   - [ ] Automated rollback on failure
-- [ ] GitLab CI advanced patterns:
-  - [ ] GitLab Kubernetes Agent
-  - [ ] Auto DevOps vs custom pipelines
-  - [ ] Review environments
 - [ ] Hybrid CI/CD architecture:
-  - [ ] CI (GitHub Actions/GitLab) + CD (ArgoCD)
+  - [ ] CI (GitHub Actions) + CD (ArgoCD)
   - [ ] Image Updater for GitOps
   - [ ] Notification integration
 - [ ] Document advanced CI/CD patterns

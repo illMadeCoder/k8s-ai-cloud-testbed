@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted (supersedes Spacelift decision)
+**Superseded** by [ADR-012: Crossplane Experiment Abstraction](ADR-012-crossplane-experiment-abstraction.md)
+
+Cloud infrastructure provisioning is now handled entirely by Crossplane running on the hub cluster. GitLab CI and Terraform are no longer used in this project.
 
 ## Context
 

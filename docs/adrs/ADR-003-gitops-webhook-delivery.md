@@ -89,7 +89,7 @@ We prefer webhook for immediate feedback, but the hub cluster may run:
 6. GitHub webhook configured
 
 **Cloudflare Tunnel setup:**
-1. Create tunnel in Cloudflare Zero Trust dashboard (or via API/Terraform)
+1. Create tunnel in Cloudflare Zero Trust dashboard (or via API)
 2. Get tunnel token
 3. Store token in OpenBao: `bao kv put secret/cloudflared token=<token>`
 4. Deploy `cloudflared` to hub via ArgoCD (ExternalSecret pulls token from OpenBao)

@@ -32,7 +32,6 @@
   - [ ] Redundancy (DR across clouds)
 - [ ] Abstraction approaches:
   - [ ] Kubernetes as abstraction layer
-  - [ ] Terraform multi-provider
   - [ ] Crossplane
   - [ ] Application-level abstraction
 - [ ] Kubernetes multi-cloud:
@@ -98,10 +97,8 @@
   - [ ] Vault/OpenBao
   - [ ] Cloud secrets backend
 - [ ] Infrastructure as Code:
-  - [ ] Terraform modules per cloud
-  - [ ] Pulumi multi-cloud
   - [ ] Crossplane compositions
-  - [ ] CDK for Terraform
+  - [ ] Pulumi multi-cloud
 - [ ] Application patterns:
   - [ ] 12-factor app principles
   - [ ] Configuration externalization

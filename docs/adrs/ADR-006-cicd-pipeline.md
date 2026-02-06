@@ -61,14 +61,6 @@ The platform needs a CI/CD pipeline to build, test, and deploy containerized app
 
 ### CI Platform: GitHub Actions
 
-| Feature | GitHub Actions | GitLab CI |
-|---------|----------------|-----------|
-| Repository integration | Native | Requires mirror |
-| Container registry | GHCR (free) | GitLab Registry |
-| Secrets management | GitHub Secrets | CI Variables |
-| Self-hosted runners | Supported | Supported |
-| Cost | Free for public repos | Free tier limited |
-
 **Decision**: GitHub Actions for tight integration with GitHub repository.
 
 ### Container Registry: GHCR

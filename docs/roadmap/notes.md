@@ -35,7 +35,6 @@ task exp:teardown experiment=http-baseline # Clean up
 
 **Other Notes:**
 - **CapEx over OpEx**: Home lab infrastructure is self-hosted; cloud resources only for experiments that require them
-- GitLab CI + Terraform for cloud IaC when experiments need cloud resources
 - Crossplane for K8s-native cloud resource provisioning
 - Ansible for initial Talos provisioning, not ongoing management
 - Each experiment should have a portfolio-ready README
