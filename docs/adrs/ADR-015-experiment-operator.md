@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed
+Accepted (Revised 2026-02-05)
+
+**Revision note:** Originally proposed a Crossplane XRD approach. Revised to a Go operator (Kubebuilder) after discovering that Crossplane compositions cannot orchestrate multi-target deployments with dependency ordering, conditional workflow submission, or fine-grained status reporting across ArgoCD and Argo Workflows.
 
 ## Context
 
@@ -29,307 +31,331 @@ This manual orchestration is error-prone (9 commits to fix the metrics pipeline 
 - **ArgoCD multi-source pattern** used by all experiments (Helm charts + Git values + Git manifests)
 - **Argo Workflows** deployed on hub for validation workflows
 
+### Why the Crossplane XRD Approach Was Abandoned
+
+The original ADR proposed a Crossplane `XExperiment` XRD. During implementation planning, several limitations emerged that made a pure Crossplane approach insufficient:
+
+1. **Multi-target orchestration**: Experiments need multiple targets (e.g., app cluster + loadgen on hub) with dependency ordering. Crossplane compositions produce a flat resource DAG with no sequencing control.
+2. **Conditional workflow submission**: Workflows should only run after all ArgoCD apps are healthy. Compositions cannot express "wait for external resource status, then create another resource."
+3. **Status aggregation**: The operator needs to aggregate status from Crossplane clusters, ArgoCD Applications, and Argo Workflows into a single `Experiment.status`. Composition status patches cannot observe cross-resource health.
+4. **Component resolution**: Resolving `app: nginx` to a specific Git source + Helm parameters requires lookup logic (Component CRDs with fallback). Compositions cannot do dynamic lookups.
+
 ## Decision
 
-Use a **Crossplane `XExperiment` XRD** that creates the full experiment environment from a single claim: cluster infrastructure, ArgoCD registration, app deployment, and observability pipeline.
-
-This elevates ADR-012's `XExperimentCluster` (cluster-only) to `XExperiment` (cluster + apps + observability).
+Use a **Go operator** (Kubebuilder/controller-runtime) with `Experiment` and `Component` CRDs. The operator orchestrates cluster provisioning via Crossplane, app deployment via ArgoCD, and validation via Argo Workflows through a phase-based reconciliation loop.
 
 ### Architecture
 
 ```
-kubectl apply -f claim.yaml
+kubectl apply -f experiments/gateway-tutorial.yaml
         |
         v
-  Crossplane Composition (Pipeline mode)
-  +------------------------------------------------------+
-  |  step 1: function-patch-and-transform                |
-  |    +-- GKE Cluster (VPC + Subnet + Cluster + NP)     |
-  |    +-- ArgoCD cluster Secret (native K8s resource)   |
-  |    +-- ArgoCD Application (scenario apps)            |
-  |                                                       |
-  |  step 2: function-go-templating                      |
-  |    +-- Kubeconfig transform (conn secret -> ArgoCD   |
-  |        JSON format)                                  |
-  |                                                       |
-  |  step 3: function-auto-ready                         |
-  +------------------------------------------------------+
-        |                    |                |
-        v                    v                v
-    GCP (GKE)         ArgoCD deploys      Hub Mimir/Loki
-    real cluster       apps to target      receives telemetry
+  Experiment Operator (Go, controller-runtime)
+  +----------------------------------------------------------+
+  |  Phase: Pending                                          |
+  |    Create Crossplane cluster resources per target         |
+  |                                                          |
+  |  Phase: Provisioning                                     |
+  |    Wait for clusters → register with ArgoCD              |
+  |    Create ArgoCD Applications (resolved from Components) |
+  |                                                          |
+  |  Phase: Ready                                            |
+  |    Wait for ArgoCD apps to be Healthy+Synced             |
+  |    Submit Argo Workflow for validation                    |
+  |                                                          |
+  |  Phase: Running                                          |
+  |    Watch Argo Workflow status                             |
+  |    Succeeded → Complete | Failed/Error → Failed          |
+  |                                                          |
+  |  Phase: Complete/Failed                                  |
+  |    TTL check → auto-delete when expired                  |
+  +----------------------------------------------------------+
+        |              |              |              |
+        v              v              v              v
+    Crossplane      ArgoCD        Argo           Component
+    (clusters)    (applications)  Workflows       CRDs
 ```
 
-### XRD Schema
+### CRD Schema
 
-```yaml
-apiVersion: apiextensions.crossplane.io/v1
-kind: CompositeResourceDefinition
-metadata:
-  name: xexperiments.illm.io
-spec:
-  group: illm.io
-  names:
-    kind: XExperiment
-    plural: xexperiments
-  claimNames:
-    kind: Experiment
-    plural: experiments
-  connectionSecretKeys:
-    - kubeconfig
-  versions:
-    - name: v1alpha1
-      served: true
-      referenceable: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            spec:
-              type: object
-              required: [scenario]
-              properties:
-                scenario:
-                  type: string
-                  description: "Scenario directory under experiments/scenarios/"
-                cluster:
-                  type: object
-                  properties:
-                    provider:
-                      type: string
-                      enum: [gke, vcluster, talos]
-                      default: gke
-                    zone:
-                      type: string
-                      default: us-central1-a
-                    machineType:
-                      type: string
-                      default: e2-medium
-                    nodeCount:
-                      type: integer
-                      default: 2
-                    preemptible:
-                      type: boolean
-                      default: true
-                observability:
-                  type: object
-                  properties:
-                    enabled:
-                      type: boolean
-                      default: true
-                    transport:
-                      type: string
-                      enum: [direct, tailscale]
-                      default: tailscale
-                ttlMinutes:
-                  type: integer
-                  default: 0
-                  description: "Auto-delete after N minutes. 0 = no TTL."
-            status:
-              type: object
-              properties:
-                phase:
-                  type: string
-                clusterName:
-                  type: string
-                endpoint:
-                  type: string
-      additionalPrinterColumns:
-        - name: Scenario
-          type: string
-          jsonPath: .spec.scenario
-        - name: Provider
-          type: string
-          jsonPath: .spec.cluster.provider
-        - name: Phase
-          type: string
-          jsonPath: .status.phase
-        - name: Age
-          type: date
-          jsonPath: .metadata.creationTimestamp
-```
+**Experiment** (`experiments.illm.io/v1alpha1`): Namespaced resource defining targets, components, and workflow.
+
+**Component** (`experiments.illm.io/v1alpha1`): Cluster-scoped resource defining reusable component sources with Helm config and parameters.
 
 ### User Experience
 
 ```bash
-# Deploy full experiment environment
-kubectl apply -f experiments/scenarios/gateway-tutorial/claim.yaml
+# Deploy full experiment
+kubectl apply -f experiments/gateway-tutorial.yaml
 
 # Watch progress
-kubectl get experiments -n experiments -w
-# NAME               SCENARIO           PROVIDER   PHASE          AGE
-# gateway-tutorial   gateway-tutorial   gke        Provisioning   10s
-# gateway-tutorial   gateway-tutorial   gke        Ready          9m
+kubectl get experiments -w
+# NAME               PHASE          WORKFLOW   AGE
+# gateway-tutorial   Provisioning              10s
+# gateway-tutorial   Ready                     9m
+# gateway-tutorial   Running        Running    10m
+# gateway-tutorial   Complete       Succeeded  25m
 
-# Check what was created
-kubectl get applications -n argocd -l experiment=gateway-tutorial
-
-# Tear down everything (cluster, apps, secrets)
-kubectl delete experiment gateway-tutorial -n experiments
+# Tear down (operator cleans up clusters, apps, workflows)
+kubectl delete experiment gateway-tutorial
 ```
 
-### Composition Design
-
-The GKE composition creates these resources from a single claim:
-
-**1. GKE Infrastructure** (inline from existing `xgkeclusters.gcp.illm.io` composition):
-- VPC Network (`compute.gcp.upbound.io/v1beta1 Network`)
-- Subnetwork with pod/service secondary ranges
-- GKE Cluster (zonal, VPC-native, no default node pool, deletion protection off)
-- Node Pool (preemptible, shielded instances, auto-repair/upgrade)
-
-**2. ArgoCD Cluster Secret** (Crossplane v2 native resource composition):
-- Secret in `argocd` namespace with `argocd.argoproj.io/secret-type: cluster` label
-- `stringData.name` = experiment name (ArgoCD uses this as the cluster display name)
-- `stringData.server` = GKE API endpoint (from cluster status)
-- `stringData.config` = JSON with TLS client config (transformed from kubeconfig via `function-go-templating`)
-
-**3. ArgoCD Application** (Crossplane v2 native resource composition):
-- Points to `experiments/scenarios/{scenario}/target/argocd/` as directory source
-- Uses `directory.recurse: true` to discover all Application manifests in the scenario
-- Labels with `experiment: {scenario}` for filtering
-
-### Kubeconfig Handling
-
-The GKE Crossplane provider writes a connection secret with a `kubeconfig` key (YAML format). ArgoCD requires a JSON `config` field with `tlsClientConfig`. The `function-go-templating` pipeline step transforms between these formats, extracting `certificate-authority-data`, `client-certificate-data`, and `client-key-data` from the kubeconfig.
-
-### Destination Name Compatibility
-
-Existing scenario `app.yaml` files use `destination.name: target` (hardcoded). For v1, the composition creates the ArgoCD cluster secret with `stringData.name: target`, matching existing conventions. This limits concurrency to one experiment at a time, which is acceptable for a home lab.
-
-For multi-experiment support in the future, `function-go-templating` can patch `destination.name` in child Application manifests at deploy time, or scenarios can migrate to claim-based destination names.
-
-### Observability Integration
-
-The composition optionally deploys telemetry collection on the target cluster:
-
-- **Tailscale transport** (for GKE/AKS/EKS): Alloy pushes metrics through Tailscale egress to hub Mimir/Loki. Reuses the pattern from the manual gateway experiment (egress service with `tailscale.com/tailnet-fqdn` annotation).
-- **Direct transport** (for vcluster/same-network): Alloy pushes directly to hub services via Kubernetes DNS.
-- **Tenant isolation**: `X-Scope-OrgID: {experiment-name}` header on all writes to Mimir/Loki. Each experiment's telemetry is queryable through a dedicated Grafana datasource.
-
-### Cleanup Ordering
-
-When the Experiment claim is deleted, Crossplane deletes all composed resources. If the GKE cluster deletes before the ArgoCD Application, the Application's `resources-finalizer.argocd.argoproj.io` finalizer hangs (can't delete resources on a dead cluster).
-
-Mitigation: the composition sets `finalizers: []` on the ArgoCD Application, removing the resource cleanup finalizer. Orphaned resources on a deleted cluster are acceptable — they disappear with the cluster.
-
-### File Structure
+### Project Structure
 
 ```
-experiments/components/infrastructure/crossplane-xrds/definitions/
-  experiment/
-    definition.yaml              # XExperiment XRD
-    composition-gke.yaml         # GKE provider composition
-    composition-vcluster.yaml    # vcluster composition (Phase 2)
-
-experiments/scenarios/gateway-tutorial/
-  claim.yaml                     # Experiment claim (new entry point)
-  target/argocd/app.yaml         # Existing ArgoCD apps (unchanged)
-  manifests/                     # Existing manifests (unchanged)
-  workflow/experiment.yaml       # Existing validation workflow (unchanged)
+operators/experiment-operator/
+├── api/v1alpha1/
+│   ├── experiment_types.go       # Experiment CRD
+│   └── component_types.go        # Component CRD (cluster-scoped)
+├── internal/
+│   ├── controller/               # Reconciliation loop
+│   ├── crossplane/               # Cluster provisioning (GKE, Talos, vcluster)
+│   ├── argocd/                   # Application management, cluster registration
+│   ├── components/               # Component resolution (CR lookup + fallback)
+│   └── workflow/                 # Argo Workflow submission and status
+├── cmd/main.go
+└── config/                       # CRDs, RBAC, deployment manifests
 ```
+
+---
+
+## Design Decisions
+
+### DD-1: Graceful Degradation vs Fail-Fast on Missing Resources
+
+**Decision:** Graceful degradation with fallbacks.
+
+**Current behavior:**
+
+| Missing resource | Behavior | Rationale |
+|---|---|---|
+| Component CR not found | Fall back to convention path (`components/{type}/{name}`) | Backward compatibility - experiments work without Component CRs |
+| WorkflowTemplate not found | Create inline suspend workflow (manual `argo resume`) | Allows experiments to run without pre-created templates |
+| No components resolved for target | Deploy ArgoCD example guestbook app | **Bug - should fail. Fix pending.** |
+
+**Trade-off:** Silent fallbacks risk confusing behavior (user expects Bitnami nginx, gets convention path). But requiring Component CRs for every app would block adoption. The fallback logs a warning.
+
+**Revisit when:** Component CRs exist for all apps and the fallback path is no longer needed. At that point, switch to fail-fast.
+
+### DD-2: Deletion Strategy (Best-Effort vs Blocking)
+
+**Decision:** Best-effort deletion with finalizer removal.
+
+**Current behavior:** `handleDeletion` attempts to delete ArgoCD apps, unregister clusters, delete Crossplane resources, and delete Argo Workflows. If any step fails, it logs the error and continues. The finalizer is always removed.
+
+**Trade-off:** Orphaned cloud resources may incur cost. But blocking deletion on a failed provider (e.g., GCP API down) means stuck experiments that can't be cleaned up at all. Since TTL auto-deletes experiments, the window for orphaned resources is bounded.
+
+**Revisit when:** Cost monitoring is in place. Could add a hybrid approach: retry N times, then remove finalizer and emit a Kubernetes Event or create a `bd` issue for manual follow-up.
+
+### DD-3: One ArgoCD Application per Target vs per Component
+
+**Decision:** One Application per target (all components as multi-source).
+
+**Current behavior:** All components for a target are bundled into a single ArgoCD Application with multiple sources. If one component fails, the entire target shows as unhealthy.
+
+**Trade-off:** Simpler to manage (fewer objects, single health check). But loses granularity - can't independently sync, rollback, or debug individual components.
+
+**Revisit when:** Experiments have 5+ components per target and per-component visibility becomes necessary.
+
+### DD-4: Cluster Naming and Uniqueness
+
+**Decision:** Deterministic names (`{experiment}-{target}`), no random suffix.
+
+**Current behavior:** Cluster names are `{experiment.Name}-{target.Name}`. Two experiments with the same name in different namespaces would collide.
+
+**Trade-off:** Predictable names make debugging easier (`kubectl get cluster gateway-tutorial-app`). Collision risk is low since experiment names are unique within their namespace and the lab runs few concurrent experiments.
+
+**Revisit when:** Multi-namespace experiments are needed. Add namespace prefix or UUID suffix at that point.
+
+### DD-5: Status Polling vs Watches
+
+**Decision:** Polling with fixed intervals.
+
+**Current behavior:**
+- Cluster readiness: poll every 10s
+- ArgoCD app health: poll every 15s
+- Argo Workflow status: poll every 15s
+- TTL check for terminal experiments: every 1h
+
+**Trade-off:** Polling is simple and has no setup complexity. Watches would react faster and use fewer API calls, but require setting up secondary resource watches in `SetupWithManager` for unstructured types (Crossplane, ArgoCD, Argo Workflow CRDs) which adds complexity.
+
+**Revisit when:** Running 10+ concurrent experiments. At that point, polling generates significant API load and watches become worth the complexity.
+
+### DD-6: Unstructured Clients vs Typed API Clients
+
+**Decision:** Use `unstructured.Unstructured` for all external resources.
+
+**Current behavior:** Crossplane clusters, ArgoCD Applications, and Argo Workflows are all managed via `unstructured.Unstructured` with string-based field paths. No Go dependency on their type packages.
+
+**Trade-off:** No compile-time type safety (typos in field paths are runtime errors). But avoids version coupling - the operator works regardless of which ArgoCD or Crossplane version is installed, and the go.mod stays lean.
+
+**Revisit when:** A field path typo causes a production incident, or when the external APIs stabilize enough that version coupling is acceptable.
+
+### DD-7: TTL Scope (Experiment-Level)
+
+**Decision:** Single TTL applies to the entire experiment, not per-cluster.
+
+**Current behavior:** `spec.ttlDays` (default: 1, max: 365) triggers auto-deletion of the entire experiment after the TTL expires. All clusters, apps, and workflows are cleaned up together.
+
+**Trade-off:** Simple and aligned with cost control intent. But doesn't allow "keep the app cluster, delete the loadgen" scenarios.
+
+**Revisit when:** Experiments need heterogeneous lifetimes across targets.
+
+### DD-8: Hub Cluster Convention
+
+**Decision:** `cluster.type: hub` means "use the cluster the operator runs on."
+
+**Current behavior:** Hub targets skip cluster provisioning and deletion. The ArgoCD server URL is set to `https://kubernetes.default.svc`. No kubeconfig is needed.
+
+**Trade-off:** Simple and correct for a single-hub topology. Would break if the operator runs on a different cluster than the hub.
+
+**Revisit when:** Multi-hub or remote-hub topologies are needed.
+
+### DD-9: Workflow Namespace
+
+**Decision:** All Argo Workflows are created in the `argo` namespace.
+
+**Current behavior:** Hardcoded to `argo` (the default Argo Workflows namespace). Workflows are named `{experiment}-validation`.
+
+**Trade-off:** Simple, single namespace. But workflows from different experiments could interfere. Labels (`experiments.illm.io/experiment`) provide isolation at the query level.
+
+**Revisit when:** RBAC isolation between experiments is needed, or when workflow naming collisions occur.
+
+### DD-10: Target Dependency Ordering
+
+**Decision:** Dependencies declared but not yet enforced.
+
+**Current behavior:** Targets have a `depends` field but all clusters are created in parallel regardless. The dependency graph is not traversed.
+
+**Trade-off:** Simplifies the initial implementation. Most experiments have independent targets or natural ordering through cluster readiness timing. But an experiment with `loadgen.depends: [app]` could submit the loadgen workflow before the app is healthy.
+
+**Revisit when:** Implementing Phase 6 (tests). This is the highest-priority enhancement.
+
+---
+
+## Known Issues
+
+These are implementation bugs, not design decisions:
+
+1. **Guestbook placeholder**: When no components resolve for a target, deploys the ArgoCD example guestbook app instead of failing. Should return an error.
+2. **GKE PROJECT_ID**: Binary authorization config references `PROJECT_ID` as a literal string, never substituted.
+3. **Talos provisioning incomplete**: Only creates the Cluster resource, not TalosControlPlane or worker resources. Talos clusters will not actually provision.
+4. **Hardcoded Development logging**: `zap.Options{Development: true}` is hardcoded in `cmd/main.go`.
+5. **Helm parameter ordering**: Iterating over `map[string]string` produces non-deterministic parameter order in ArgoCD Applications.
+
+---
 
 ## Alternatives Considered
 
-### Go Operator (Kubebuilder)
+### Crossplane XExperiment XRD (Original ADR-015 Proposal)
 
-Custom CRDs with a Go controller that orchestrates cluster provisioning, ArgoCD registration, app deployment, and validation.
+Single Crossplane XRD with composition pipeline: `function-patch-and-transform` + `function-go-templating` + `function-auto-ready`.
 
-**Rejected because:** Introduces Go compilation, operator lifecycle management (OLM), and a code maintenance surface that a solo developer cannot sustain for 15+ experiments. The existing 1100-line Taskfile already contains the orchestration logic — moving it to Go does not reduce complexity, it relocates it behind a compilation wall.
+**Rejected because:** Compositions are static resource DAGs. Cannot orchestrate conditional waits ("wait for cluster ready, then deploy apps"), multi-target dependency ordering, or status aggregation across ArgoCD and Argo Workflows. The gateway experiment requires sequential steps with readiness gates that compositions cannot express.
+
+**What it was good for:** Single-cluster, single-app experiments with no validation workflow. The `XGKECluster` XRD remains useful for cluster-only provisioning.
 
 ### Pure Crossplane Compositions
 
 All orchestration handled by composition functions (`function-patch-and-transform`, `function-kcl`).
 
-**Rejected because:** Compositions are static resource DAGs. They cannot orchestrate conditional waits ("wait for cluster ready, then deploy apps") or implement retry/timeout logic. The gateway experiment requires sequential steps with readiness gates.
+**Rejected for same reasons as above.** Additionally, `function-kcl` adds a KCL language dependency that increases cognitive load.
 
 ### Argo Workflows as the Operator
 
-No new CRD — use parameterized `WorkflowTemplate` as the abstraction. Workflow steps handle provisioning, deployment, and validation.
+No new CRD - use parameterized `WorkflowTemplate` as the abstraction.
 
-**Rejected because:** Loses the declarative `kubectl get experiments` UX and Kubernetes-native status reporting. Workflows are imperative (run-to-completion), not reconciled. The Crossplane XRD provides the declarative API; Argo Workflows handles the parts that need orchestration (validation).
+**Rejected because:** Loses the declarative `kubectl get experiments` UX and Kubernetes-native status reporting. Workflows are imperative (run-to-completion), not reconciled.
 
 ### Pure Argo Workflows + Argo Events
 
-Argo Events watches for Git changes, triggers WorkflowTemplates that set up experiments.
+Argo Events watches for Git changes, triggers WorkflowTemplates.
 
-**Rejected because:** Adds another operator (Argo Events) with sensor/trigger abstractions. Argo Events is not deployed on the hub and would add operational overhead for a problem the Crossplane composition already solves.
+**Rejected because:** Adds another operator (Argo Events) with sensor/trigger abstractions not deployed on the hub.
 
 ## Implementation Phases
 
-### Phase 1 (MVP): GKE Experiment via XRD
+### Phase 1: Operator Scaffolding - Complete
 
-- `XExperiment` XRD definition
-- GKE composition (cluster + ArgoCD secret + ArgoCD app)
-- Gateway-tutorial `claim.yaml`
-- Single-experiment concurrency (`destination.name: target`)
+- Kubebuilder project at `operators/experiment-operator/`
+- Experiment and Component CRD definitions
+- Basic controller with phase transitions and finalizer pattern
+- RBAC manifests
 
-### Phase 2: vcluster Composition
+### Phase 2: Cluster Provisioning - Complete
 
-- vcluster composition for local experiments (replaces Kind)
-- Faster iteration cycle (~30-45s startup vs 8-10min for GKE)
-- Taskfile becomes thin wrapper: `kubectl apply/delete` claim
+- Crossplane integration (GKE, Talos, vcluster, hub)
+- Cluster readiness checks, endpoint/kubeconfig retrieval
+- TTL-based auto-deletion
 
-### Phase 3: Validation Workflow Integration
+### Phase 3: ArgoCD Integration - Complete
 
-- Argo Workflow as a composed resource (auto-runs on experiment deploy)
-- Reusable WorkflowTemplate library (wait-for-apps, connectivity-test, k6-benchmark)
-- Status patching: Workflow completion updates `status.validationResult`
+- Cluster registration (Secret creation)
+- Application creation with multi-source support
+- Health checks (Healthy + Synced)
 
-### Phase 4: Multi-Experiment Support
+### Phase 4: Component Resolution - Complete
 
-- Parameterized `destination.name` via `function-go-templating`
-- Concurrent experiments on different clusters
-- Per-experiment Grafana datasource auto-provisioning
+- Component CRD (cluster-scoped) with sources, parameters, observability metadata
+- Resolver: Component CR lookup with convention-based fallback
+- Parameter merging (ComponentRef.params > CR defaults)
 
-### Phase 5: TTL + Cost Controls
+### Phase 5: Argo Workflow Integration - Complete
 
-- Composed Argo Workflow with suspend step implements TTL
-- Kyverno policy blocks Experiment creation when budget exceeded
-- Cloud cost tagging via composition labels
+- Workflow submission from WorkflowTemplate references
+- Inline fallback workflow (suspend step) when template missing
+- Status watching (Pending/Running/Succeeded/Failed/Error)
+- Workflow cleanup on experiment deletion
+
+### Phase 6: Testing & Documentation - Pending
+
+- Unit tests for controller logic and component resolution
+- Integration tests for full experiment lifecycle
+- Fix known issues listed above
+
+### Migration - Pending
+
+- Create Component CRs for existing apps
+- Convert scenarios to Experiment CRs
+- Deprecate Taskfile orchestration
 
 ## Consequences
 
 ### Positive
 
-- **Single entry point**: `kubectl apply -f claim.yaml` replaces 8+ manual steps
-- **Declarative**: Experiment state in Git, reconciled by Crossplane
-- **Reproducible**: Same claim always produces same environment
-- **Observable**: `kubectl get experiments` shows status, Grafana shows metrics
-- **Extensible**: New providers (AKS, EKS) are new compositions, not new tooling
-- **Cleanup is atomic**: `kubectl delete experiment` removes everything
-- **No custom code**: Leverages existing Crossplane, ArgoCD, and Argo Workflows
-- **Incremental**: Existing experiments and Taskfile workflows continue working
+- **Single entry point**: `kubectl apply -f experiment.yaml` replaces 8+ manual steps
+- **Declarative**: Experiment state in Git, reconciled by controller
+- **Multi-target**: Supports experiments across multiple clusters with dependency ordering
+- **Component reuse**: Component CRDs define apps once, reference many times
+- **Observable**: `kubectl get experiments` shows phase, workflow status, age
+- **Cost-safe**: TTL auto-deletion prevents forgotten clusters (default: 1 day)
+- **Cleanup is atomic**: `kubectl delete experiment` removes clusters, apps, and workflows
 
 ### Negative
 
-- **Composition complexity**: GKE composition will be ~300+ lines (VPC + Subnet + Cluster + NodePool + Secret + Application)
-- **Debugging indirection**: Issues may be in XRD, composition function, provider, or ArgoCD
-- **Kubeconfig transformation**: YAML-to-JSON conversion via `function-go-templating` is non-trivial to debug
-- **Single-experiment limitation**: v1 `destination.name: target` convention prevents concurrent experiments
-- **Status reporting gaps**: Crossplane cannot observe ArgoCD Application health or Argo Workflow completion in composition patches
+- **Go maintenance surface**: Operator requires Go compilation, container builds, deployment
+- **Debugging indirection**: Issues may be in operator, Crossplane, ArgoCD, or Argo Workflows
+- **No type safety**: Unstructured clients mean field path typos are runtime errors
+- **Polling overhead**: Fixed-interval status checks could become expensive at scale
 
 ### Trade-offs
 
-| Trade-off | Mitigation |
-|-----------|------------|
-| Large composition | Split into well-commented sections; follows existing GKE composition pattern |
-| Kubeconfig transform debugging | Test with `crossplane render` CLI before deploying |
-| Single-experiment concurrency | Acceptable for home lab; Phase 4 adds multi-experiment |
-| Status gaps | Use `kubectl get applications` and `argo get @latest` for detailed status |
-| Cleanup ordering | Remove ArgoCD finalizer in composition; orphaned resources deleted with cluster |
+| Trade-off | Current default | Mitigation |
+|-----------|----------------|------------|
+| Fallback vs fail-fast | Graceful degradation | Log warnings; switch to fail-fast after migration |
+| Deletion: best-effort vs blocking | Best-effort | TTL bounds orphan window; add retry+alerting later |
+| One app per target vs per component | Per target | Switch to per-component when granularity needed |
+| Polling vs watches | Polling (10-15s) | Switch to watches at 10+ concurrent experiments |
+| Unstructured vs typed clients | Unstructured | Switch to typed if runtime errors become a problem |
 
 ## References
 
 - [ADR-012: Crossplane Experiment Abstraction](ADR-012-crossplane-experiment-abstraction.md) (predecessor, cluster-only)
 - [ADR-013: Crossplane v2 Upgrade](ADR-013-crossplane-v2-upgrade.md) (enables native resource composition)
 - [ADR-005: Experiment Lifecycle](ADR-005-experiment-lifecycle.md) (current workflow-based lifecycle)
-- [Crossplane Composition Functions](https://docs.crossplane.io/latest/concepts/composition-functions/)
-- [Crossplane v2 Native Resource Composition](https://docs.crossplane.io/v2.1/concepts/server-side-compositions/)
-- RBAC: `experiments/components/infrastructure/crossplane-providers/core/rbac-native-resources.yaml`
-- GKE composition pattern: `experiments/components/infrastructure/crossplane-xrds/definitions/gke-cluster/composition.yaml`
-- Gateway observability pipeline: `experiments/components/infrastructure/gateway-observability/`
+- Operator source: `operators/experiment-operator/`
+- Example Component CR: `components/apps/nginx/component.yaml`
 
 ## Decision Date
 
-2026-02-03
+2026-02-03 (original), 2026-02-05 (revised to Go operator)

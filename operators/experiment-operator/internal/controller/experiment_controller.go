@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +31,7 @@ import (
 	experimentsv1alpha1 "github.com/illmadecoder/experiment-operator/api/v1alpha1"
 	"github.com/illmadecoder/experiment-operator/internal/argocd"
 	"github.com/illmadecoder/experiment-operator/internal/crossplane"
+	"github.com/illmadecoder/experiment-operator/internal/workflow"
 )
 
 const (
@@ -42,6 +44,7 @@ type ExperimentReconciler struct {
 	Scheme         *runtime.Scheme
 	ClusterManager *crossplane.ClusterManager
 	ArgoCD         *argocd.Client
+	Workflow       *workflow.Manager
 }
 
 // +kubebuilder:rbac:groups=experiments.illm.io,resources=experiments,verbs=get;list;watch;create;update;patch;delete
@@ -160,7 +163,13 @@ func (r *ExperimentReconciler) handleDeletion(ctx context.Context, exp *experime
 			}
 		}
 
-		// TODO Phase 5: Delete Argo Workflows
+		// Delete Argo Workflows
+		if exp.Status.WorkflowStatus != nil && exp.Status.WorkflowStatus.Name != "" {
+			if err := r.Workflow.DeleteWorkflow(ctx, exp.Status.WorkflowStatus.Name); err != nil {
+				log.Error(err, "Failed to delete workflow", "workflow", exp.Status.WorkflowStatus.Name)
+				// Continue - don't block finalizer removal
+			}
+		}
 
 		// Remove finalizer
 		controllerutil.RemoveFinalizer(exp, experimentFinalizer)
@@ -371,8 +380,20 @@ func (r *ExperimentReconciler) reconcileReady(ctx context.Context, exp *experime
 		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
-	// TODO Phase 5: Submit Argo Workflow
-	// For now, transition to Running
+	// Submit Argo Workflow for validation
+	workflowName, err := r.Workflow.SubmitWorkflow(ctx, exp.Name, exp.Spec.Workflow)
+	if err != nil {
+		log.Error(err, "Failed to submit workflow")
+		// Don't fail the experiment - requeue and try again
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	now := metav1.Now()
+	exp.Status.WorkflowStatus = &experimentsv1alpha1.WorkflowStatus{
+		Name:      workflowName,
+		Phase:     "Pending",
+		StartedAt: &now,
+	}
 	exp.Status.Phase = experimentsv1alpha1.PhaseRunning
 
 	if err := r.Status().Update(ctx, exp); err != nil {
@@ -388,11 +409,47 @@ func (r *ExperimentReconciler) reconcileRunning(ctx context.Context, exp *experi
 	log := logf.FromContext(ctx)
 	log.Info("Reconciling Running phase")
 
-	// TODO Phase 5: Watch workflow status and update phase
-	// For now, simulate completion after a delay
-	log.Info("Workflow would be running here, check back later")
+	if exp.Status.WorkflowStatus == nil || exp.Status.WorkflowStatus.Name == "" {
+		log.Info("No workflow status found, transitioning to Complete")
+		exp.Status.Phase = experimentsv1alpha1.PhaseComplete
+		return ctrl.Result{}, r.Status().Update(ctx, exp)
+	}
 
-	// Requeue after 15 seconds to check workflow status
+	// Get workflow status from Argo
+	result, err := r.Workflow.GetWorkflowStatus(ctx, exp.Status.WorkflowStatus.Name)
+	if err != nil {
+		log.Error(err, "Failed to get workflow status", "workflow", exp.Status.WorkflowStatus.Name)
+		// Requeue - workflow might not be visible yet
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	// Update workflow status
+	exp.Status.WorkflowStatus.Phase = result.Phase
+	if result.StartedAt != nil {
+		exp.Status.WorkflowStatus.StartedAt = result.StartedAt
+	}
+	if result.FinishedAt != nil {
+		exp.Status.WorkflowStatus.FinishedAt = result.FinishedAt
+	}
+
+	// Check if workflow reached a terminal state
+	if workflow.IsTerminal(result.Phase) {
+		if workflow.IsSucceeded(result.Phase) {
+			log.Info("Workflow succeeded", "workflow", exp.Status.WorkflowStatus.Name)
+			exp.Status.Phase = experimentsv1alpha1.PhaseComplete
+		} else {
+			log.Info("Workflow failed", "workflow", exp.Status.WorkflowStatus.Name, "phase", result.Phase, "message", result.Message)
+			exp.Status.Phase = experimentsv1alpha1.PhaseFailed
+		}
+		return ctrl.Result{}, r.Status().Update(ctx, exp)
+	}
+
+	// Workflow still running, requeue to check again
+	log.Info("Workflow still running", "workflow", exp.Status.WorkflowStatus.Name, "phase", result.Phase)
+	if err := r.Status().Update(ctx, exp); err != nil {
+		log.Error(err, "Failed to update workflow status")
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 }
 

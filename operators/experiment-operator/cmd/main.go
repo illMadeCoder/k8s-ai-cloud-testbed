@@ -39,6 +39,7 @@ import (
 	"github.com/illmadecoder/experiment-operator/internal/argocd"
 	"github.com/illmadecoder/experiment-operator/internal/controller"
 	"github.com/illmadecoder/experiment-operator/internal/crossplane"
+	"github.com/illmadecoder/experiment-operator/internal/workflow"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -185,6 +186,7 @@ func main() {
 		Scheme:         mgr.GetScheme(),
 		ClusterManager: crossplane.NewClusterManager(mgr.GetClient()),
 		ArgoCD:         argocd.NewClient(mgr.GetClient()),
+		Workflow:       workflow.NewManager(mgr.GetClient()),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Experiment")
 		os.Exit(1)
