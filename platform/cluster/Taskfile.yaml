@@ -1,0 +1,495 @@
+version: '3'
+
+# Kind Tier - Hub + Experiments on Kind clusters
+#
+# Usage:
+#   task hub:bootstrap              # Bootstrap hub cluster
+#   task hub:destroy                # Destroy hub cluster
+#   task hub:status                 # Show hub status
+#   task hub:password               # Get ArgoCD password
+#   task hub:list                   # List experiments
+#   task hub:up -- <name>            # Deploy experiment
+#   task hub:tutorial -- <name>      # Run tutorial (interactive TUI)
+#   task hub:up -- <name>           # Deploy experiment
+#   task hub:down -- <name>         # Destroy experiment clusters
+
+silent: true
+
+vars:
+  HUB_CLUSTER: hub
+  ARGOCD_NAMESPACE: argocd
+  # ENVIRONMENT CONFIG: If changing Kind network, also update:
+  #   - platform/manifests/metallb-config/kustomization.yaml (POOL_RANGE)
+  #   - platform/values/dns-stack.yaml (loadBalancerIP)
+  #   - platform/values/argocd.yaml (loadBalancerIP)
+  #   - platform/bootstrap/argocd-values-kind.yaml (loadBalancerIP)
+  DNS_IP: 172.19.255.200
+  # OpenBao persistence (use $HOME instead of ~ for reliable expansion)
+  OPENBAO_KEYS_FILE: $HOME/.illmlab/openbao-keys.json
+  OPENBAO_NAMESPACE: openbao
+
+tasks:
+  # =============================================================================
+  # Hub Lifecycle
+  # =============================================================================
+  bootstrap:
+    desc: Bootstrap hub on Kind (full setup)
+    cmds:
+      - |
+        echo "=== Preparing persistent storage ==="
+        mkdir -p ~/.illmlab/openbao-data
+        chmod 777 ~/.illmlab/openbao-data
+      - |
+        echo "=== Creating Kind cluster ==="
+        kind create cluster --name {{.HUB_CLUSTER}} --config platform/cluster/cluster-config.yaml --wait 60s || true
+        kubectl config use-context kind-{{.HUB_CLUSTER}}
+      - |
+        echo "=== Installing ArgoCD ==="
+        helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
+        helm repo update argo
+        helm upgrade --install argocd argo/argo-cd \
+          -n {{.ARGOCD_NAMESPACE}} --create-namespace \
+          -f platform/bootstrap/argocd-values-kind.yaml
+      - |
+        echo "=== Applying hub application ==="
+        kubectl apply -f platform/bootstrap/hub-application.yaml
+      - |
+        echo "=== Waiting for services ==="
+        echo "Waiting for dns-stack to be healthy..."
+        until kubectl get application dns-stack -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null | grep -q "Healthy"; do
+          sleep 5
+        done
+        echo "dns-stack healthy!"
+
+        echo "Waiting for k8s_gateway LoadBalancer..."
+        until kubectl get svc dns-stack-k8s-gateway -n dns-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null | grep -q "{{.DNS_IP}}"; do
+          sleep 2
+        done
+        echo "k8s_gateway ready at {{.DNS_IP}}"
+      - |
+        echo "=== Initializing OpenBao ==="
+        echo "Waiting for OpenBao pod to be running..."
+        # Wait for namespace to exist
+        until kubectl get ns {{.OPENBAO_NAMESPACE}} 2>/dev/null; do
+          sleep 2
+        done
+        # Wait for pod to be running (not Ready - it needs init/unseal first)
+        until kubectl get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; do
+          sleep 2
+        done
+        echo "OpenBao pod running!"
+
+        # Get OpenBao address
+        OPENBAO_POD=$(kubectl get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}')
+
+        # Check if already initialized
+        INIT_STATUS=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- bao status -format=json 2>/dev/null | jq -r '.initialized' || echo "false")
+
+        KEYS_FILE="{{.OPENBAO_KEYS_FILE}}"
+
+        if [ "$INIT_STATUS" = "false" ]; then
+          echo "Initializing OpenBao (first time setup)..."
+          INIT_OUTPUT=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- bao operator init -key-shares=1 -key-threshold=1 -format=json)
+          echo "$INIT_OUTPUT" > "$KEYS_FILE"
+          chmod 600 "$KEYS_FILE"
+          echo "Keys saved to $KEYS_FILE"
+        else
+          echo "OpenBao already initialized"
+        fi
+
+        # Check if sealed
+        SEALED=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- bao status -format=json 2>/dev/null | jq -r '.sealed')
+
+        if [ "$SEALED" = "true" ]; then
+          if [ -f "$KEYS_FILE" ]; then
+            echo "Unsealing OpenBao..."
+            UNSEAL_KEY=$(jq -r '.unseal_keys_b64[0]' "$KEYS_FILE")
+            kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- bao operator unseal "$UNSEAL_KEY" > /dev/null
+            echo "OpenBao unsealed!"
+          else
+            echo "ERROR: OpenBao is sealed but no keys file found at $KEYS_FILE"
+            exit 1
+          fi
+        else
+          echo "OpenBao already unsealed"
+        fi
+
+        # Show status
+        ROOT_TOKEN=$(jq -r '.root_token' "$KEYS_FILE" 2>/dev/null || echo "unknown")
+        echo "OpenBao ready! Root token: $ROOT_TOKEN"
+      - |
+        echo "=== Configuring OpenBao ==="
+        KEYS_FILE="{{.OPENBAO_KEYS_FILE}}"
+        ROOT_TOKEN=$(jq -r '.root_token' "$KEYS_FILE")
+        OPENBAO_POD=$(kubectl get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}')
+
+        # Enable KV v2 secrets engine (if not already enabled)
+        kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- env BAO_TOKEN="$ROOT_TOKEN" bao secrets enable -path=secret -version=2 kv 2>/dev/null || echo "KV engine already enabled"
+
+        # Check if Cloudflare token exists in OpenBao
+        CF_EXISTS=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- env BAO_TOKEN="$ROOT_TOKEN" bao kv get secret/cloudflare 2>/dev/null && echo "yes" || echo "no")
+
+        if [ "$CF_EXISTS" = "no" ]; then
+          echo ""
+          echo "Cloudflare API token not found in OpenBao."
+          echo "To store it, run:"
+          echo "  kubectl exec -n openbao \$(kubectl get pods -n openbao -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}') -- \\"
+          echo "    env BAO_TOKEN=\"$ROOT_TOKEN\" bao kv put secret/cloudflare api-token=\"YOUR_TOKEN\""
+          echo ""
+        else
+          echo "Cloudflare token already stored in OpenBao"
+        fi
+
+        # Wait for external-secrets namespace to exist
+        echo "Waiting for external-secrets namespace..."
+        until kubectl get ns external-secrets 2>/dev/null; do
+          sleep 2
+        done
+
+        # Create/update openbao-token secret for ESO
+        echo "Configuring ESO authentication..."
+        kubectl create secret generic openbao-token \
+          -n external-secrets \
+          --from-literal=token="$ROOT_TOKEN" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        echo "ESO configured with OpenBao token"
+      - |
+        echo "=== Configuring OpenBao PKI (Internal CA) ==="
+        KEYS_FILE="{{.OPENBAO_KEYS_FILE}}"
+        ROOT_TOKEN=$(jq -r '.root_token' "$KEYS_FILE")
+        OPENBAO_POD=$(kubectl get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}')
+
+        # Enable PKI secrets engine
+        kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao secrets enable -path=pki pki 2>/dev/null || echo "PKI engine already enabled"
+
+        # Configure max TTL (10 years for root CA)
+        kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao secrets tune -max-lease-ttl=87600h pki
+
+        # Check if root CA already exists
+        CA_EXISTS=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao read pki/cert/ca 2>/dev/null && echo "yes" || echo "no")
+
+        if [ "$CA_EXISTS" = "no" ]; then
+          echo "Generating internal root CA..."
+          kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+            env BAO_TOKEN="$ROOT_TOKEN" bao write pki/root/generate/internal \
+            common_name="illmlab-internal-ca" \
+            ttl=87600h \
+            key_bits=4096
+        else
+          echo "Root CA already exists"
+        fi
+
+        # Configure CA and CRL URLs
+        kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao write pki/config/urls \
+          issuing_certificates="http://openbao.openbao.svc.cluster.local:8200/v1/pki/ca" \
+          crl_distribution_points="http://openbao.openbao.svc.cluster.local:8200/v1/pki/crl"
+
+        # Create role for internal certificates
+        # Use allow_any_name=true to support all internal service name patterns
+        # (e.g., argocd-server, argocd-server.argocd, argocd-server.argocd.svc)
+        kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao write pki/roles/internal-tls \
+          allow_any_name=true \
+          enforce_hostnames=true \
+          max_ttl=720h \
+          key_bits=2048
+
+        echo "OpenBao PKI configured!"
+
+        # Create token for cert-manager (scoped to PKI)
+        echo "Creating cert-manager PKI token..."
+        PKI_POLICY='path "pki/*" { capabilities = ["create", "read", "update", "delete", "list"] }'
+        kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" sh -c "echo '$PKI_POLICY' | bao policy write pki-policy -" 2>/dev/null || true
+
+        PKI_TOKEN=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao token create -policy=pki-policy -ttl=87600h -format=json | jq -r '.auth.client_token')
+
+        # Create secret for cert-manager
+        kubectl create secret generic openbao-pki-token \
+          -n cert-manager \
+          --from-literal=token="$PKI_TOKEN" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        echo "cert-manager PKI token configured"
+
+        # Export CA certificate for clients to trust
+        echo "Exporting internal CA certificate..."
+        CA_CERT=$(kubectl exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao read -field=certificate pki/cert/ca)
+
+        # Create CA secret in argocd namespace for webhook-relay
+        kubectl create secret generic openbao-internal-ca \
+          -n argocd \
+          --from-literal=ca.crt="$CA_CERT" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        echo "Internal CA certificate exported"
+      - |
+        echo "=== Configuring host DNS ==="
+        if grep -q "{{.DNS_IP}}" /etc/resolv.conf 2>/dev/null; then
+          echo "Already configured"
+        else
+          if sudo -n true 2>/dev/null; then
+            if grep -q "nameserver" /etc/resolv.conf; then
+              sudo sed -i '0,/nameserver/s/nameserver/nameserver {{.DNS_IP}}\nnameserver/' /etc/resolv.conf
+            else
+              echo "nameserver {{.DNS_IP}}" | sudo tee -a /etc/resolv.conf
+            fi
+            echo "DNS configured"
+          else
+            echo "Skipped (needs sudo). Run manually:"
+            echo "  echo 'nameserver {{.DNS_IP}}' | sudo tee -a /etc/resolv.conf"
+          fi
+        fi
+      - |
+        echo ""
+        echo "=== Bootstrap Complete ==="
+        kubectl get applications -n {{.ARGOCD_NAMESPACE}}
+        echo ""
+        echo "ArgoCD UI: https://argocd-server.argocd.k8s.local"
+        echo "Password:  $(kubectl -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+
+  destroy:
+    desc: Destroy Kind hub cluster
+    cmds:
+      - kind delete cluster --name {{.HUB_CLUSTER}}
+
+  status:
+    desc: Show Kind hub status
+    cmds:
+      - |
+        echo "=== Kind Hub Cluster ==="
+        kubectl config use-context kind-{{.HUB_CLUSTER}} 2>/dev/null || { echo "Hub cluster not found"; exit 1; }
+        echo ""
+        echo "=== ArgoCD Applications ==="
+        kubectl get applications -n {{.ARGOCD_NAMESPACE}} 2>/dev/null || echo "ArgoCD not installed"
+
+  password:
+    desc: Get ArgoCD admin password
+    cmds:
+      - kubectl --context kind-{{.HUB_CLUSTER}} -n {{.ARGOCD_NAMESPACE}} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
+
+  secret:
+    desc: "Store secret in OpenBao: task hub:secret -- <path> <key>=<value> [key2=value2...]"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task hub:secret -- <path> <key>=<value> [key2=value2...]"
+          echo ""
+          echo "Examples:"
+          echo "  task hub:secret -- cloudflare api-token=abc123"
+          echo "  task hub:secret -- github token=xyz user=myuser"
+          exit 1
+        fi
+
+        KEYS_FILE="{{.OPENBAO_KEYS_FILE}}"
+
+        if [ ! -f "$KEYS_FILE" ]; then
+          echo "ERROR: OpenBao keys file not found at $KEYS_FILE"
+          echo "Run 'task hub:bootstrap' first."
+          exit 1
+        fi
+
+        ROOT_TOKEN=$(jq -r '.root_token' "$KEYS_FILE")
+        OPENBAO_POD=$(kubectl --context kind-{{.HUB_CLUSTER}} get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}')
+
+        # Parse arguments: first is path, rest are key=value pairs
+        set -- {{.CLI_ARGS}}
+        SECRET_PATH="$1"
+        shift
+
+        echo "Storing secret at: secret/$SECRET_PATH"
+        kubectl --context kind-{{.HUB_CLUSTER}} exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao kv put "secret/$SECRET_PATH" "$@"
+
+        echo "Secret stored successfully!"
+
+  cert-backup:
+    desc: "Manually backup Let's Encrypt certificate to OpenBao (usually automatic via PushSecret)"
+    cmds:
+      - |
+        KEYS_FILE="{{.OPENBAO_KEYS_FILE}}"
+        if [ ! -f "$KEYS_FILE" ]; then
+          echo "ERROR: OpenBao keys file not found at $KEYS_FILE"
+          exit 1
+        fi
+
+        # Check if the Let's Encrypt cert exists and is ready
+        CERT_STATUS=$(kubectl --context kind-{{.HUB_CLUSTER}} get certificate -n argocd argocd-server-tls-letsencrypt -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+        if [ "$CERT_STATUS" != "True" ]; then
+          echo "ERROR: Let's Encrypt certificate not ready"
+          echo "Status: $CERT_STATUS"
+          echo "Wait for cert-manager to issue the certificate first."
+          exit 1
+        fi
+
+        # Extract cert and key from the secret
+        echo "Extracting certificate from cluster..."
+        TLS_CRT=$(kubectl --context kind-{{.HUB_CLUSTER}} get secret -n argocd argocd-server-tls-letsencrypt -o jsonpath='{.data.tls\.crt}')
+        TLS_KEY=$(kubectl --context kind-{{.HUB_CLUSTER}} get secret -n argocd argocd-server-tls-letsencrypt -o jsonpath='{.data.tls\.key}')
+
+        if [ -z "$TLS_CRT" ] || [ -z "$TLS_KEY" ]; then
+          echo "ERROR: Could not extract certificate data"
+          exit 1
+        fi
+
+        # Store in OpenBao (base64 encoded to preserve formatting)
+        ROOT_TOKEN=$(jq -r '.root_token' "$KEYS_FILE")
+        OPENBAO_POD=$(kubectl --context kind-{{.HUB_CLUSTER}} get pods -n {{.OPENBAO_NAMESPACE}} -l app.kubernetes.io/name=openbao -o jsonpath='{.items[0].metadata.name}')
+
+        echo "Storing certificate in OpenBao..."
+        kubectl --context kind-{{.HUB_CLUSTER}} exec -n {{.OPENBAO_NAMESPACE}} $OPENBAO_POD -- \
+          env BAO_TOKEN="$ROOT_TOKEN" bao kv put secret/tls/argocd \
+          "tls.crt=$TLS_CRT" \
+          "tls.key=$TLS_KEY"
+
+        echo "Certificate backed up to OpenBao at secret/tls/argocd"
+        echo ""
+        echo "ESO will now sync this to argocd-server-tls secret."
+        echo "On next cluster cycle, the cert will be restored automatically."
+
+  cert-status:
+    desc: "Show TLS certificate status"
+    cmds:
+      - |
+        echo "=== Let's Encrypt Certificate (staging) ==="
+        kubectl --context kind-{{.HUB_CLUSTER}} get certificate -n argocd argocd-server-tls-letsencrypt 2>/dev/null || echo "Not found"
+
+        echo ""
+        echo "=== ArgoCD TLS Secret (ESO-managed) ==="
+        kubectl --context kind-{{.HUB_CLUSTER}} get externalsecret -n argocd argocd-server-tls 2>/dev/null || echo "Not found"
+        kubectl --context kind-{{.HUB_CLUSTER}} get secret -n argocd argocd-server-tls 2>/dev/null || echo "Not found"
+
+        echo ""
+        echo "=== Certificate Details ==="
+        kubectl --context kind-{{.HUB_CLUSTER}} get secret -n argocd argocd-server-tls -o json 2>/dev/null | \
+          jq -r '.data["tls.crt"]' | base64 -d | \
+          openssl x509 -noout -subject -issuer -dates 2>/dev/null || echo "No valid certificate"
+
+  # =============================================================================
+  # Experiment Lifecycle (via Experiment Operator CRDs)
+  # =============================================================================
+  list:
+    desc: List available experiments
+    cmds:
+      - |
+        echo "=== Available Experiments ==="
+        for dir in experiments/*/; do
+          name=$(basename "$dir")
+          [ "$name" = "_template" ] && continue
+          if [ -f "$dir/experiment.yaml" ]; then
+            echo "  $name  (has experiment.yaml)"
+          else
+            echo "  $name  (no experiment.yaml yet)"
+          fi
+        done
+        echo ""
+        echo "=== Deployed Experiments ==="
+        kubectl --context kind-{{.HUB_CLUSTER}} get experiments -A 2>/dev/null || echo "  (operator not installed or no experiments running)"
+
+  up:
+    desc: "Deploy experiment: task hub:up -- <name>"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task hub:up -- <experiment-name>"
+          echo ""
+          echo "Applies the Experiment CR; the operator handles cluster provisioning,"
+          echo "ArgoCD app deployment, and workflow execution."
+          exit 1
+        fi
+
+        EXP_NAME="{{.CLI_ARGS}}"
+        EXP_FILE="experiments/$EXP_NAME/experiment.yaml"
+
+        if [ ! -f "$EXP_FILE" ]; then
+          echo "ERROR: No experiment.yaml found at $EXP_FILE"
+          echo ""
+          echo "Available experiments with CRs:"
+          ls experiments/*/experiment.yaml 2>/dev/null | sed 's|experiments/||;s|/experiment.yaml||' | sed 's/^/  /'
+          exit 1
+        fi
+
+        echo "Applying experiment: $EXP_NAME"
+        kubectl --context kind-{{.HUB_CLUSTER}} apply -f "$EXP_FILE"
+        echo ""
+        echo "Experiment CR applied. The operator will reconcile:"
+        echo "  - Provision target clusters"
+        echo "  - Deploy components via ArgoCD"
+        echo "  - Run validation workflows"
+        echo ""
+        echo "Watch progress:"
+        echo "  kubectl get experiment $EXP_NAME -w"
+        echo "  kubectl get experiments -A"
+        echo ""
+        if [ -f "experiments/$EXP_NAME/tutorial.yaml" ]; then
+          echo "Run the tutorial:"
+          echo "  task hub:tutorial -- $EXP_NAME"
+          echo ""
+        fi
+        echo "Clean up when done:"
+        echo "  task hub:down -- $EXP_NAME"
+
+  tutorial:
+    desc: "Run tutorial: task hub:tutorial -- <name>"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task hub:tutorial -- <experiment-name>"
+          echo ""
+          echo "Available tutorials:"
+          for dir in experiments/*/; do
+            name=$(basename "$dir")
+            [ "$name" = "_template" ] && continue
+            [ -f "$dir/tutorial.yaml" ] && echo "  $name"
+          done
+          exit 1
+        fi
+        labctl tutorial {{.CLI_ARGS}}
+
+  status:experiment:
+    desc: "Show experiment status: task hub:status:experiment -- <name>"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task hub:status:experiment -- <experiment-name>"
+          echo ""
+          kubectl --context kind-{{.HUB_CLUSTER}} get experiments -A 2>/dev/null || echo "No experiments found"
+          exit 0
+        fi
+
+        EXP_NAME="{{.CLI_ARGS}}"
+        kubectl --context kind-{{.HUB_CLUSTER}} get experiment "$EXP_NAME" -o yaml 2>/dev/null || echo "Experiment '$EXP_NAME' not found"
+
+  down:
+    desc: "Destroy experiment: task hub:down -- <name>"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task hub:down -- <experiment-name>"
+          exit 1
+        fi
+
+        EXP_NAME="{{.CLI_ARGS}}"
+        EXP_FILE="experiments/$EXP_NAME/experiment.yaml"
+
+        echo "Deleting experiment: $EXP_NAME"
+
+        if [ -f "$EXP_FILE" ]; then
+          kubectl --context kind-{{.HUB_CLUSTER}} delete -f "$EXP_FILE" 2>/dev/null || true
+        else
+          kubectl --context kind-{{.HUB_CLUSTER}} delete experiment "$EXP_NAME" 2>/dev/null || true
+        fi
+
+        # Clean up local kubeconfig files
+        rm -f "$HOME/.illmlab/kubeconfig-$EXP_NAME-"* 2>/dev/null
+
+        echo "Experiment CR deleted. The operator will clean up:"
+        echo "  - Delete ArgoCD Applications"
+        echo "  - Deprovision clusters"
+        echo "  - Remove kubeconfig secrets"
+        echo "Done."
+

@@ -127,7 +127,7 @@ Foundation              Stateful + Security        Complexity
 <summary>Phase 1: Platform Bootstrap (click to expand)</summary>
 
 **Phase 1: Platform Bootstrap**
-- [x] Create `platform/hub/` directory structure
+- [x] Create `platform/` directory structure
 - [x] Create ArgoCD bootstrap values with app-of-apps reference
 - [x] Create Kind app-of-apps with ArgoCD self-management
 - [x] Add MetalLB to Kind app-of-apps
@@ -334,7 +334,7 @@ Upgraded from Crossplane v1.18.1 to v2.1.3. All compositions converted to Pipeli
 
 ### Istio Service Mesh for Hub (Deferred)
 
-Previously deployed on Kind cluster; disabled on current Talos rebuild. Apps parked in `platform/hub/apps/disabled/` for Phase 7 re-activation.
+Previously deployed on Kind cluster; disabled on current Talos rebuild. Apps parked in `platform/apps/disabled/` for Phase 7 re-activation.
 
 - [x] Deploy Istio via ArgoCD (istio-base, istio-cni, istio-istiod, istio-ingress) — *completed on Kind, disabled on Talos*
 - [x] Document in [ADR-014](docs/adrs/ADR-014-service-mesh-istio.md)

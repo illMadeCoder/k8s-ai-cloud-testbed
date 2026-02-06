@@ -28,7 +28,7 @@ ArgoCD serves as the GitOps engine for all Kubernetes resources, while GitLab CI
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │              core-infrastructure (App-of-Apps)                   │   │
-│  │              platform/hub/apps/core-infrastructure.yaml │   │
+│  │              platform/apps/core-infrastructure.yaml │   │
 │  └───────────────────────────┬─────────────────────────────────────┘   │
 │                              │                                          │
 │       ┌──────────────────────┼──────────────────────┐                  │
@@ -45,7 +45,7 @@ ArgoCD serves as the GitOps engine for all Kubernetes resources, while GitLab CI
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    Stack Applications                            │   │
-│  │                    platform/hub/apps/stack-*            │   │
+│  │                    platform/apps/stack-*            │   │
 │  ├─────────────────────────────┬───────────────────────────────────┤   │
 │  │       stack-elk             │          stack-loki               │   │
 │  │  (eck-operator + elk-stack) │    (loki + promtail)              │   │
@@ -64,7 +64,7 @@ ArgoCD serves as the GitOps engine for all Kubernetes resources, while GitLab CI
 
 ### Root Application
 
-**File:** `platform/hub/apps/core-infrastructure.yaml`
+**File:** `platform/apps/core-infrastructure.yaml`
 
 The root Application uses multi-source configuration to selectively deploy platform components:
 
@@ -104,11 +104,11 @@ spec:
 
 Stacks group related components that are deployed together:
 
-**File:** `platform/hub/apps/stack-elk.yaml`
+**File:** `platform/apps/stack-elk.yaml`
 - Deploys ECK Operator + ELK Stack as a unit
 - Used when full Elasticsearch logging is needed
 
-**File:** `platform/hub/apps/stack-loki.yaml`
+**File:** `platform/apps/stack-loki.yaml`
 - Deploys Loki + Promtail for lightweight logging
 - Alternative to ELK for simpler use cases
 

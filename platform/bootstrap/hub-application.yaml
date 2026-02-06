@@ -1,0 +1,33 @@
+# Hub root Application
+#
+# Applied after ArgoCD install to bootstrap GitOps.
+# ArgoCD syncs this, which creates all child Applications.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hub
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    targetRevision: HEAD
+    path: platform/apps
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jqPathExpressions:
+        - .metadata.finalizers
+        - .metadata.labels["argocd.argoproj.io/instance"]
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

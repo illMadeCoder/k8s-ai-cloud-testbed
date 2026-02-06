@@ -1,0 +1,13 @@
+# ArgoCD values for Talos hub cluster (bootstrap only)
+#
+# Used by: task talos:bootstrap (or manual helm install)
+# After bootstrap, ArgoCD manages itself via platform/values/argocd.yaml
+#
+# Access via: kubectl port-forward svc/argocd-server -n argocd 8080:80
+# Then Tailscale ingress takes over after GitOps sync.
+
+server:
+  service:
+    type: ClusterIP
+  extraArgs:
+    - --insecure

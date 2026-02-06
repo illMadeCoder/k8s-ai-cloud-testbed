@@ -282,7 +282,7 @@ volume:
     storageClass: local-path
 ```
 
-This is now configured in `platform/hub/values/seaweedfs.yaml`.
+This is now configured in `platform/values/seaweedfs.yaml`.
 
 ### Migration Path
 - SeaweedFS is S3-compatible

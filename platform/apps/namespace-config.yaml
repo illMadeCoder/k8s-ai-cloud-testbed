@@ -1,0 +1,27 @@
+# Namespace Configuration (Wave -1)
+# PSS labels and namespace setup - runs early
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: namespace-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    targetRevision: HEAD
+    path: platform/manifests/namespace-config
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

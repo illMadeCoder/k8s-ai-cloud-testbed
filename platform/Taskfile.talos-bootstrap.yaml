@@ -1,0 +1,185 @@
+version: '3'
+
+# Talos Hub Bootstrap - kube-vip, storage, and cluster management
+#
+# Usage:
+#   task talos:bootstrap             # Install kube-vip + local-path-provisioner
+#   task talos:status                # Show cluster status
+#   task talos:reset                 # Reset cluster (delete non-system namespaces)
+#   task talos:up -- <name>          # Deploy experiment
+#   task talos:down -- <name>        # Remove experiment
+
+silent: true
+
+vars:
+  TALOS_CONTEXT: talos-hub
+  TALOS_IP: 192.168.1.178
+  HUB_CONTEXT: talos-hub
+  ARGOCD_NAMESPACE: argocd
+  # Namespaces to preserve during reset (system + infrastructure)
+  PRESERVED_NS: "kube-system kube-public kube-node-lease default local-path-storage"
+
+tasks:
+  bootstrap:
+    desc: Install kube-vip and local-path-provisioner on Talos
+    cmds:
+      - |
+        echo "=============================================="
+        echo "  BOOTSTRAPPING TALOS PLATFORM"
+        echo "=============================================="
+        echo ""
+
+        # Step 1: Install kube-vip for LoadBalancer support
+        echo "=== Step 1: Installing kube-vip ==="
+        kubectl --context {{.TALOS_CONTEXT}} apply -f platform/bootstrap/kube-vip.yaml
+
+        echo "Waiting for kube-vip pods..."
+        kubectl --context {{.TALOS_CONTEXT}} -n kube-system wait --for=condition=ready pod -l app=kube-vip --timeout=60s
+        kubectl --context {{.TALOS_CONTEXT}} -n kube-system wait --for=condition=ready pod -l app=kube-vip-cloud-provider --timeout=60s
+        echo "kube-vip ready! LoadBalancer IP range: 192.168.1.240-192.168.1.250"
+
+        echo ""
+
+        # Step 2: Install local-path-provisioner for PVC support
+        echo "=== Step 2: Installing local-path-provisioner ==="
+        kubectl --context {{.TALOS_CONTEXT}} apply -f platform/bootstrap/local-path-provisioner.yaml
+
+        echo "Waiting for local-path-provisioner..."
+        kubectl --context {{.TALOS_CONTEXT}} -n local-path-storage wait --for=condition=ready pod -l app=local-path-provisioner --timeout=60s
+        echo "local-path-provisioner ready! Default StorageClass: local-path"
+
+        echo ""
+        echo "=============================================="
+        echo "  TALOS BOOTSTRAP COMPLETE"
+        echo "=============================================="
+        echo ""
+        echo "Installed:"
+        echo "  - kube-vip (LoadBalancer: 192.168.1.240-250)"
+        echo "  - local-path-provisioner (StorageClass: local-path)"
+        echo ""
+        kubectl --context {{.TALOS_CONTEXT}} get sc
+
+  status:
+    desc: Show Talos cluster status
+    cmds:
+      - |
+        echo "=== Talos Cluster Status ==="
+        echo ""
+        echo "Endpoint: {{.TALOS_IP}}"
+        echo "Context: {{.TALOS_CONTEXT}}"
+        echo ""
+
+        echo "=== Nodes ==="
+        kubectl --context {{.TALOS_CONTEXT}} get nodes -o wide
+
+        echo ""
+        echo "=== Namespaces ==="
+        kubectl --context {{.TALOS_CONTEXT}} get namespaces
+
+        echo ""
+        echo "=== Running Pods (non-system) ==="
+        kubectl --context {{.TALOS_CONTEXT}} get pods -A --field-selector=metadata.namespace!=kube-system
+
+  reset:
+    desc: Reset Talos cluster for new experiment (delete all non-system resources)
+    cmds:
+      - |
+        echo "=== Resetting Talos cluster ==="
+        echo ""
+
+        # Step 1: Clean up any ArgoCD apps pointing to Talos
+        echo "Step 1: Cleaning ArgoCD apps targeting Talos..."
+        for app in $(kubectl --context {{.HUB_CONTEXT}} get apps -n argocd -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+          dest=$(kubectl --context {{.HUB_CONTEXT}} get app "$app" -n argocd -o jsonpath='{.spec.destination.server}' 2>/dev/null)
+          if echo "$dest" | grep -q "{{.TALOS_IP}}"; then
+            echo "  Removing finalizer and deleting: $app"
+            kubectl --context {{.HUB_CONTEXT}} patch app "$app" -n argocd -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+            kubectl --context {{.HUB_CONTEXT}} delete app "$app" -n argocd --wait=false 2>/dev/null || true
+          fi
+        done
+
+        # Step 2: Delete all non-system namespaces on Talos
+        echo ""
+        echo "Step 2: Deleting experiment namespaces..."
+        PRESERVED="{{.PRESERVED_NS}}"
+        for ns in $(kubectl --context {{.TALOS_CONTEXT}} get namespaces -o jsonpath='{.items[*].metadata.name}'); do
+          if ! echo " $PRESERVED " | grep -q " $ns "; then
+            echo "  Deleting namespace: $ns"
+            kubectl --context {{.TALOS_CONTEXT}} delete namespace "$ns" --wait=false 2>/dev/null || true
+          fi
+        done
+
+        # Step 2b: Clean up resources in default namespace (preserve namespace but not resources)
+        echo ""
+        echo "Step 2b: Cleaning default namespace resources..."
+        kubectl --context {{.TALOS_CONTEXT}} delete deployments,services,configmaps,secrets,pods --all -n default 2>/dev/null || true
+
+        # Step 3: Wait for namespace deletion
+        echo ""
+        echo "Step 3: Waiting for cleanup..."
+        sleep 5
+        for i in $(seq 1 30); do
+          REMAINING=$(kubectl --context {{.TALOS_CONTEXT}} get namespaces -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | while read ns; do
+            if ! echo " $PRESERVED " | grep -q " $ns "; then
+              echo "$ns"
+            fi
+          done | wc -w)
+
+          if [ "$REMAINING" -eq 0 ]; then
+            echo "  All experiment resources cleaned up!"
+            break
+          fi
+          echo "  Waiting for $REMAINING namespaces to terminate... ($i/30)"
+          sleep 2
+        done
+
+        echo ""
+        echo "=== Reset Complete ==="
+        kubectl --context {{.TALOS_CONTEXT}} get namespaces
+
+  up:
+    desc: "Deploy experiment to Talos: task talos:up -- <name>"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task talos:up -- <experiment-name>"
+          echo ""
+          echo "Applies the Experiment CR; the operator handles deployment to Talos."
+          exit 1
+        fi
+
+        EXP_NAME="{{.CLI_ARGS}}"
+        EXP_FILE="experiments/$EXP_NAME/experiment.yaml"
+
+        if [ ! -f "$EXP_FILE" ]; then
+          echo "ERROR: No experiment.yaml found at $EXP_FILE"
+          exit 1
+        fi
+
+        echo "Applying experiment: $EXP_NAME (targeting Talos)"
+        kubectl --context {{.HUB_CONTEXT}} apply -f "$EXP_FILE"
+        echo ""
+        echo "Experiment CR applied. The operator will reconcile."
+        echo "Watch progress: kubectl --context {{.HUB_CONTEXT}} get experiment $EXP_NAME -w"
+
+  down:
+    desc: "Remove experiment from Talos: task talos:down -- <name>"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task talos:down -- <experiment-name>"
+          exit 1
+        fi
+
+        EXP_NAME="{{.CLI_ARGS}}"
+        EXP_FILE="experiments/$EXP_NAME/experiment.yaml"
+
+        echo "Deleting experiment: $EXP_NAME"
+
+        if [ -f "$EXP_FILE" ]; then
+          kubectl --context {{.HUB_CONTEXT}} delete -f "$EXP_FILE" 2>/dev/null || true
+        else
+          kubectl --context {{.HUB_CONTEXT}} delete experiment "$EXP_NAME" 2>/dev/null || true
+        fi
+
+        echo "Experiment deleted. Run 'task talos:reset' for full namespace cleanup."

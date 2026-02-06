@@ -158,7 +158,7 @@ task talos:bootstrap
 ```
 
 **Tasks (in order):**
-1. [x] Create `platform/hub/` directory structure
+1. [x] Create `platform/` directory structure
 2. [x] Create ArgoCD bootstrap values with app-of-apps reference
 3. [x] Create Kind app-of-apps with ArgoCD self-management
 4. [x] Add MetalLB to Kind app-of-apps

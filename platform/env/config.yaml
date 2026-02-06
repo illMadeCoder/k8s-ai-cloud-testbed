@@ -1,0 +1,93 @@
+# Kind Environment Configuration Reference
+#
+# This file documents environment-specific values and where to change them.
+# NOT used programmatically - each location below manages its own config.
+#
+# To customize for a different Kind network:
+#   1. Find your Kind docker network: docker network inspect kind
+#   2. Update the files listed below
+#   3. Commit and push - ArgoCD will sync the changes
+
+# ============================================================================
+# Network Configuration (172.19.255.x for Kind docker network)
+# ============================================================================
+
+# MetalLB IP Pool Range
+# File: manifests/metallb-config/kustomization.yaml
+# Value: POOL_RANGE=172.19.255.200-172.19.255.250
+
+# DNS (k8s_gateway) LoadBalancer IP
+# Files:
+#   - values/dns-stack.yaml (loadBalancerIP)
+#   - platform/cluster/Taskfile.yaml (DNS_IP variable)
+# Value: 172.19.255.200
+
+# ArgoCD LoadBalancer IP
+# Files:
+#   - values/argocd.yaml (loadBalancerIP)
+#   - platform/bootstrap/argocd-values-kind.yaml (loadBalancerIP)
+# Value: 172.19.255.201
+
+# ============================================================================
+# TLS Configuration (Let's Encrypt via Cloudflare DNS-01)
+# ============================================================================
+
+# ArgoCD Domain
+# File: manifests/cert-manager-config/kustomization.yaml
+# Value: ARGOCD_DOMAIN=argocd.illmlab.xyz
+
+# ACME Email (Let's Encrypt notifications)
+# File: manifests/cert-manager-config/kustomization.yaml
+# Value: ACME_EMAIL=admin@illmlab.xyz
+
+# ============================================================================
+# Local DNS Configuration
+# ============================================================================
+
+# k8s_gateway domain (for local cluster DNS)
+# Files:
+#   - values/dns-stack.yaml (domain)
+#   - platform/cluster/Taskfile.yaml (DNSMASQ_DOMAIN)
+# Value: k8s.local
+
+# ============================================================================
+# Webhook Configuration (GitHub -> smee.io -> ArgoCD)
+# ============================================================================
+
+# smee.io Channel URL
+# File: manifests/webhook-relay/kustomization.yaml
+# Value: SMEE_URL=https://smee.io/<your-channel-id>
+#
+# Setup:
+#   1. Go to https://smee.io/new in browser
+#   2. Copy the channel URL
+#   3. Update kustomization.yaml
+#   4. Configure GitHub webhook to point to smee.io URL
+
+# GitHub Webhook Secret (stored in OpenBao)
+# OpenBao path: secret/github/argocd-webhook
+# Store with: task kind:secret -- github/argocd-webhook secret=<your-secret>
+#
+# The same secret must be configured in GitHub repo webhook settings.
+
+# ============================================================================
+# Internal PKI (Zero-Trust Internal TLS)
+# ============================================================================
+
+# OpenBao PKI Engine
+# Path: pki/
+# Root CA: illmlab-internal-ca (10 year validity)
+# Role: internal-tls (30 day certs, allow_any_name=true)
+# Set up by: task kind:bootstrap
+#
+# The role uses allow_any_name=true to support all Kubernetes
+# service name patterns (short names, namespace-qualified, FQDN).
+# enforce_hostnames=true ensures names are valid DNS hostnames.
+
+# cert-manager ClusterIssuer: openbao-pki
+# File: manifests/cert-manager-config/openbao-issuer.yaml
+# Token: openbao-pki-token secret in cert-manager namespace
+
+# Internal CA Certificate (for clients to trust)
+# Secret: openbao-internal-ca in argocd namespace
+# Usage: Mount as volume, set NODE_EXTRA_CA_CERTS or add to trust store

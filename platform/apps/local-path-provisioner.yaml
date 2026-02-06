@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: local-path-provisioner
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  sources:
+    # Namespace with pod-security labels (helper pods need privileged)
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: platform/manifests/local-path-provisioner
+    # Helm chart from upstream
+    - repoURL: https://github.com/rancher/local-path-provisioner.git
+      targetRevision: v0.0.30
+      path: deploy/chart/local-path-provisioner
+      helm:
+        valuesObject:
+          storageClass:
+            name: local-path
+            defaultClass: false
+          nodePathMap:
+            - node: DEFAULT_PATH_FOR_NON_LISTED_NODES
+              paths:
+                - /opt/local-path-provisioner
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: local-path-storage
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

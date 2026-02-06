@@ -1,0 +1,48 @@
+# Tailscale Operator for Hub
+#
+# Exposes cluster services to your Tailscale network.
+# Access Grafana, ArgoCD, etc. from anywhere on your tailnet.
+#
+# SETUP: Create OAuth client at https://login.tailscale.com/admin/settings/oauth
+# Then store in OpenBao: task hub:secret -- kv/tailscale client_id=xxx client_secret=yyy
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tailscale-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+    environment: talos
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"  # After cert-manager, before observability
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://pkgs.tailscale.com/helmcharts
+      chart: tailscale-operator
+      targetRevision: 1.82.0
+      helm:
+        valueFiles:
+          - $values/platform/values/tailscale-operator.yaml
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tailscale
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: operator-oauth
+      jsonPointers:
+        - /data
+        - /stringData
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
