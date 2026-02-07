@@ -20,7 +20,7 @@ spec:
       type: string
     - jsonPath: .spec.targets[*].name
       name: Targets
-      type: integer
+      type: string
     - jsonPath: .status.workflowStatus.phase
       name: Workflow
       type: string

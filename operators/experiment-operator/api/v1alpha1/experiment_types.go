@@ -304,7 +304,7 @@ type WorkflowStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="Targets",type=integer,JSONPath=`.spec.targets[*].name`
+// +kubebuilder:printcolumn:name="Targets",type=string,JSONPath=`.spec.targets[*].name`
 // +kubebuilder:printcolumn:name="Workflow",type=string,JSONPath=`.status.workflowStatus.phase`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
