@@ -18,9 +18,7 @@ package controller
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
-	"net/http"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -778,12 +776,8 @@ func bootstrapClusterRBAC(ctx context.Context, kubeconfig []byte, gcpServiceAcco
 		Host:        cfg.Host,
 		BearerToken: token.AccessToken,
 		TLSClientConfig: restclient.TLSClientConfig{
-			CAData: cfg.TLSClientConfig.CAData,
-		},
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: cfg.TLSClientConfig.Insecure,
-			},
+			CAData:   cfg.TLSClientConfig.CAData,
+			Insecure: cfg.TLSClientConfig.Insecure,
 		},
 	}
 
