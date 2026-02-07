@@ -1,0 +1,35 @@
+# Experiment Operator
+#
+# Custom controller that manages Experiment CRs — provisions GKE clusters
+# via Crossplane, deploys components via ArgoCD, and handles lifecycle.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: experiment-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: hub
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    targetRevision: HEAD
+    path: operators/experiment-operator/config/default
+    kustomize:
+      images:
+        - controller=ghcr.io/illmadecoder/experiment-operator:latest
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: experiment-operator-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
