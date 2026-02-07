@@ -64,6 +64,7 @@ type ExperimentReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=argoproj.io,resources=workflows,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=experiments.illm.io,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=illm.io,resources=gkeclusters,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

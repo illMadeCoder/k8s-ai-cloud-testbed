@@ -32,6 +32,14 @@ rules:
 - apiGroups:
   - experiments.illm.io
   resources:
+  - components
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - experiments.illm.io
+  resources:
   - experiments
   verbs:
   - create
