@@ -37,14 +37,14 @@
         "type": "range",
         "unit": "cores",
         "description": "Total CPU usage",
-        "error": "metrics query: Get \"http://victoria-metrics-server.observability.svc:8428/api/v1/query_range?end=1770674616\u0026query=sum%28rate%28container_cpu_usage_seconds_total%7Bexperiment%3D%22hello-app-w9zqq%22%7D%5B1m%5D%29%29\u0026start=1770673858\u0026step=60s\": dial tcp: lookup victoria-metrics-server.observability.svc on 10.96.0.10:53: no such host"
+        "error": "metrics query: Get \"http://victoria-metrics-server.observability.svc:8428/api/v1/query_range?end=1770674616&query=sum%28rate%28container_cpu_usage_seconds_total%7Bexperiment%3D%22hello-app-w9zqq%22%7D%5B1m%5D%29%29&start=1770673858&step=60s\": dial tcp: lookup victoria-metrics-server.observability.svc on 10.96.0.10:53: no such host"
       },
       "memory_usage": {
         "query": "sum(container_memory_working_set_bytes{experiment=\"hello-app-w9zqq\"})",
         "type": "range",
         "unit": "bytes",
         "description": "Total memory working set",
-        "error": "metrics query: Get \"http://victoria-metrics-server.observability.svc:8428/api/v1/query_range?end=1770674616\u0026query=sum%28container_memory_working_set_bytes%7Bexperiment%3D%22hello-app-w9zqq%22%7D%29\u0026start=1770673858\u0026step=60s\": dial tcp: lookup victoria-metrics-server.observability.svc on 10.96.0.10:53: no such host"
+        "error": "metrics query: Get \"http://victoria-metrics-server.observability.svc:8428/api/v1/query_range?end=1770674616&query=sum%28container_memory_working_set_bytes%7Bexperiment%3D%22hello-app-w9zqq%22%7D%29&start=1770673858&step=60s\": dial tcp: lookup victoria-metrics-server.observability.svc on 10.96.0.10:53: no such host"
       }
     }
   },
@@ -55,5 +55,19 @@
       "app": 0.004213629807677779
     },
     "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  },
+  "analysis": {
+    "summary": "The hello-app-w9zqq experiment completed successfully in 12.6 minutes with workflow validation passing in 20 seconds. However, both CPU and memory metrics failed to collect due to DNS resolution errors when querying the Victoria Metrics server. The experiment cost approximately $0.0042 for the GKE cluster runtime.",
+    "metricInsights": {
+      "cpu_usage": "Metric collection failed due to DNS lookup error for victoria-metrics-server.observability.svc, preventing any CPU usage analysis for the experiment duration.",
+      "memory_usage": "Metric collection failed due to DNS lookup error for victoria-metrics-server.observability.svc, preventing any memory working set analysis for the experiment duration."
+    },
+    "recommendations": [
+      "Fix the observability stack DNS configuration to ensure victoria-metrics-server.observability.svc is resolvable within the cluster",
+      "Verify that Victoria Metrics is deployed and the observability namespace exists before running experiments",
+      "Add health checks for metrics endpoints as a prerequisite step in the experiment workflow to fail fast if monitoring is unavailable"
+    ],
+    "generatedAt": "2026-02-09T22:03:49Z",
+    "model": "claude-opus-4-6"
   }
 }
