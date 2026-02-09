@@ -57,7 +57,7 @@ type ExperimentReconciler struct {
 	ArgoCD         *argocd.Client
 	Workflow       *workflow.Manager
 	S3Client       *storage.Client
-	MimirURL       string
+	MetricsURL     string
 }
 
 // +kubebuilder:rbac:groups=experiments.illm.io,resources=experiments,verbs=get;list;watch;create;update;patch;delete
@@ -222,12 +222,12 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 	// Build summary
 	summary := metrics.CollectSummary(exp)
 
-	// Collect Mimir snapshot (best-effort)
-	mimirData, err := metrics.CollectMimirSnapshot(ctx, r.MimirURL, exp)
+	// Collect metrics snapshot (best-effort)
+	metricsData, err := metrics.CollectMetricsSnapshot(ctx, r.MetricsURL, exp.Name, exp)
 	if err != nil {
-		log.Error(err, "Mimir snapshot failed — continuing without metrics")
+		log.Error(err, "Metrics snapshot failed — continuing without metrics")
 	}
-	summary.MimirMetrics = mimirData
+	summary.MimirMetrics = metricsData
 
 	// Estimate cost
 	summary.CostEstimate = metrics.EstimateCost(exp)
@@ -237,10 +237,10 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 		return fmt.Errorf("upload summary.json: %w", err)
 	}
 
-	// Upload Mimir snapshot separately for easier tooling consumption
-	if mimirData != nil {
-		if err := r.S3Client.PutJSON(ctx, prefix+"/mimir-snapshot.json", mimirData); err != nil {
-			log.Error(err, "Failed to upload mimir-snapshot.json — non-fatal")
+	// Upload metrics snapshot separately for easier tooling consumption
+	if metricsData != nil {
+		if err := r.S3Client.PutJSON(ctx, prefix+"/metrics-snapshot.json", metricsData); err != nil {
+			log.Error(err, "Failed to upload metrics-snapshot.json — non-fatal")
 		}
 	}
 
@@ -469,6 +469,33 @@ func (r *ExperimentReconciler) reconcileProvisioning(ctx context.Context, exp *e
 		}
 
 		log.Info("Registered cluster with ArgoCD and created applications", "cluster", clusterName)
+	}
+
+	// Copy Tailscale OAuth secret to target clusters that need tailscale transport
+	for i, target := range exp.Spec.Targets {
+		if target.Observability == nil || !target.Observability.Enabled || target.Observability.Transport != "tailscale" {
+			continue
+		}
+		if target.Cluster.Type == "hub" {
+			continue // Hub cluster already has Tailscale
+		}
+		if i >= len(exp.Status.Targets) || exp.Status.Targets[i].ClusterName == "" {
+			continue
+		}
+
+		clusterName := exp.Status.Targets[i].ClusterName
+		kubeconfigBytes, kcErr := r.ClusterManager.GetClusterKubeconfig(ctx, clusterName, target.Cluster.Type)
+		if kcErr != nil {
+			log.Error(kcErr, "Failed to get kubeconfig for Tailscale secret copy", "cluster", clusterName)
+			continue
+		}
+
+		if err := r.copyTailscaleSecret(ctx, kubeconfigBytes); err != nil {
+			log.Error(err, "Failed to copy Tailscale OAuth secret to target cluster", "cluster", clusterName)
+			// Non-fatal: Tailscale operator will fail to start but experiment can still run
+		} else {
+			log.Info("Copied Tailscale OAuth secret to target cluster", "cluster", clusterName)
+		}
 	}
 
 	// Copy kubeconfigs to experiments namespace for tutorial access
@@ -719,6 +746,70 @@ func (r *ExperimentReconciler) copyKubeconfigSecrets(ctx context.Context, exp *e
 		exp.Status.Targets[i].KubeconfigSecret = dstSecretName
 		exp.Status.TutorialStatus.KubeconfigSecrets[target.Name] = dstSecretName
 		log.Info("Copied kubeconfig secret", "cluster", clusterName, "dst", dstSecretName)
+	}
+
+	return nil
+}
+
+// copyTailscaleSecret reads the operator-oauth Secret from the tailscale namespace
+// on the hub and creates a matching secret + namespace on the target cluster.
+func (r *ExperimentReconciler) copyTailscaleSecret(ctx context.Context, targetKubeconfig []byte) error {
+	log := logf.FromContext(ctx)
+
+	// Read operator-oauth secret from hub
+	hubSecret := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{
+		Name:      "operator-oauth",
+		Namespace: "tailscale",
+	}, hubSecret); err != nil {
+		return fmt.Errorf("failed to read operator-oauth secret from hub: %w", err)
+	}
+
+	// Build client for target cluster
+	targetCfg, err := clientcmd.RESTConfigFromKubeConfig(targetKubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to parse target kubeconfig: %w", err)
+	}
+	targetClient, err := kubernetes.NewForConfig(targetCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create target clientset: %w", err)
+	}
+
+	// Ensure tailscale namespace exists on target
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "tailscale",
+		},
+	}
+	if _, err := targetClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{}); err != nil {
+		if !errors.IsAlreadyExists(err) {
+			return fmt.Errorf("failed to create tailscale namespace on target: %w", err)
+		}
+	}
+
+	// Create or update the secret on target
+	targetSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "operator-oauth",
+			Namespace: "tailscale",
+		},
+		Data: hubSecret.Data,
+		Type: hubSecret.Type,
+	}
+	if _, err := targetClient.CoreV1().Secrets("tailscale").Create(ctx, targetSecret, metav1.CreateOptions{}); err != nil {
+		if errors.IsAlreadyExists(err) {
+			existing, getErr := targetClient.CoreV1().Secrets("tailscale").Get(ctx, "operator-oauth", metav1.GetOptions{})
+			if getErr != nil {
+				return fmt.Errorf("failed to get existing secret on target: %w", getErr)
+			}
+			existing.Data = hubSecret.Data
+			if _, updateErr := targetClient.CoreV1().Secrets("tailscale").Update(ctx, existing, metav1.UpdateOptions{}); updateErr != nil {
+				return fmt.Errorf("failed to update secret on target: %w", updateErr)
+			}
+			log.Info("Updated operator-oauth secret on target cluster")
+			return nil
+		}
+		return fmt.Errorf("failed to create operator-oauth secret on target: %w", err)
 	}
 
 	return nil

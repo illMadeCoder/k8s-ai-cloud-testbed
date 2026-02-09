@@ -1,5 +1,5 @@
 # Grafana values for hub cluster
-# Pre-configured with Loki, Mimir, and Tempo data sources
+# Pre-configured with VictoriaMetrics, Loki, and Tempo data sources
 
 replicas: 1
 
@@ -29,31 +29,19 @@ grafana.ini:
   server:
     root_url: "%(protocol)s://%(domain)s/"
 
-# Data sources for LGTM stack
+# Data sources for observability stack
 datasources:
   datasources.yaml:
     apiVersion: 1
     datasources:
-      - name: Mimir
+      - name: VictoriaMetrics
         type: prometheus
-        url: http://mimir-gateway.observability.svc.cluster.local/prometheus
+        url: http://victoria-metrics-server.observability.svc.cluster.local:8428
         access: proxy
+        uid: victoria-metrics
         isDefault: true
         jsonData:
           httpMethod: POST
-          manageAlerts: true
-          prometheusType: Mimir
-
-      - name: Mimir (Gateway Lab)
-        type: prometheus
-        url: http://mimir-gateway.observability.svc.cluster.local/prometheus
-        access: proxy
-        jsonData:
-          httpMethod: POST
-          prometheusType: Mimir
-          httpHeaderName1: X-Scope-OrgID
-        secureJsonData:
-          httpHeaderValue1: gateway-lab
 
       - name: Loki
         type: loki
@@ -78,9 +66,9 @@ datasources:
             datasourceUid: loki
             tags: ['job', 'namespace', 'pod']
           tracesToMetrics:
-            datasourceUid: mimir
+            datasourceUid: victoria-metrics
           serviceMap:
-            datasourceUid: mimir
+            datasourceUid: victoria-metrics
           lokiSearch:
             datasourceUid: loki
 

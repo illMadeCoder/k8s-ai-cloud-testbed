@@ -14,6 +14,9 @@ spec:
         preemptible: true
       components:
         - app: hello-app
+      observability:
+        enabled: true
+        transport: tailscale
 
   workflow:
     template: hello-app-validation

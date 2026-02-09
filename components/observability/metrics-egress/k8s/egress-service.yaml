@@ -1,5 +1,3 @@
-# Tailscale egress to hub VictoriaMetrics
-# Apply on GKE cluster after creating observability namespace
 apiVersion: v1
 kind: Service
 metadata:

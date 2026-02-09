@@ -1,0 +1,30 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Component
+metadata:
+  name: metrics-agent
+spec:
+  type: app
+  description: "Grafana Alloy metrics agent — scrapes container metrics and remote-writes to hub VictoriaMetrics"
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      targetRevision: "0.12.0"
+      chart: alloy
+      helm:
+        releaseName: alloy
+        valuesFiles:
+          - $values/components/observability/metrics-agent/values.yaml
+        parameters:
+          - name: alloy.configMap.content
+            value: ""
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: components/observability/metrics-agent
+  parameters:
+    - name: experiment-name
+      type: string
+      default: anonymous
+      description: "Experiment name used as external label for filtering"
+  observability:
+    serviceMonitor: false
+    podLabels:
+      app.kubernetes.io/name: alloy

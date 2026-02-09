@@ -1,0 +1,11 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Component
+metadata:
+  name: metrics-egress
+spec:
+  type: config
+  description: "Tailscale egress service to hub VictoriaMetrics — creates observability namespace and ExternalName service"
+  sources:
+    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+      targetRevision: HEAD
+      path: components/observability/metrics-egress/k8s

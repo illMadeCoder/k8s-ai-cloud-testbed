@@ -1,0 +1,19 @@
+# Expose VictoriaMetrics via Tailscale for remote write from target clusters
+apiVersion: v1
+kind: Service
+metadata:
+  name: vm-tailscale
+  namespace: observability
+  annotations:
+    tailscale.com/expose: "true"
+    tailscale.com/hostname: vm-hub
+spec:
+  type: ClusterIP
+  selector:
+    app: server
+    app.kubernetes.io/instance: victoria-metrics
+  ports:
+    - name: http
+      port: 8428
+      targetPort: 8428
+      protocol: TCP

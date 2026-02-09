@@ -122,10 +122,11 @@ func CollectSummary(exp *experimentsv1alpha1.Experiment) *ExperimentSummary {
 	return s
 }
 
-// CollectMimirSnapshot queries Mimir for key container metrics over the
+// CollectMetricsSnapshot queries VictoriaMetrics for key container metrics over the
 // experiment lifetime and returns the raw Prometheus query_range response.
-func CollectMimirSnapshot(ctx context.Context, mimirURL string, exp *experimentsv1alpha1.Experiment) (map[string]any, error) {
-	if mimirURL == "" {
+// The experimentName parameter is used to filter metrics by the experiment external label.
+func CollectMetricsSnapshot(ctx context.Context, metricsURL string, experimentName string, exp *experimentsv1alpha1.Experiment) (map[string]any, error) {
+	if metricsURL == "" {
 		return nil, nil
 	}
 
@@ -143,13 +144,13 @@ func CollectMimirSnapshot(ctx context.Context, mimirURL string, exp *experiments
 	}
 
 	queries := map[string]string{
-		"cpu":    `sum(rate(container_cpu_usage_seconds_total{namespace=~".*"}[1m]))`,
-		"memory": `sum(container_memory_working_set_bytes{namespace=~".*"})`,
+		"cpu":    fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment=%q}[1m]))`, experimentName),
+		"memory": fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment=%q})`, experimentName),
 	}
 
 	result := make(map[string]any)
 	for name, query := range queries {
-		data, err := queryMimirRange(ctx, mimirURL, query, start, end)
+		data, err := queryMetricsRange(ctx, metricsURL, query, start, end)
 		if err != nil {
 			// Non-fatal: include the error in the result
 			result[name] = map[string]any{"error": err.Error()}
@@ -161,13 +162,13 @@ func CollectMimirSnapshot(ctx context.Context, mimirURL string, exp *experiments
 	return result, nil
 }
 
-// queryMimirRange executes a Prometheus-compatible range query against Mimir.
-func queryMimirRange(ctx context.Context, mimirURL, query string, start, end time.Time) (any, error) {
+// queryMetricsRange executes a Prometheus-compatible range query against VictoriaMetrics.
+func queryMetricsRange(ctx context.Context, metricsURL, query string, start, end time.Time) (any, error) {
 	step := selectStep(end.Sub(start))
 
-	u, err := url.Parse(mimirURL + "/prometheus/api/v1/query_range")
+	u, err := url.Parse(metricsURL + "/api/v1/query_range")
 	if err != nil {
-		return nil, fmt.Errorf("parse mimir URL: %w", err)
+		return nil, fmt.Errorf("parse metrics URL: %w", err)
 	}
 	q := u.Query()
 	q.Set("query", query)
@@ -180,26 +181,25 @@ func queryMimirRange(ctx context.Context, mimirURL, query string, start, end tim
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-Scope-OrgID", "anonymous")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("mimir query: %w", err)
+		return nil, fmt.Errorf("metrics query: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read mimir response: %w", err)
+		return nil, fmt.Errorf("read metrics response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("mimir returned %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("metrics server returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var data any
 	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, fmt.Errorf("unmarshal mimir response: %w", err)
+		return nil, fmt.Errorf("unmarshal metrics response: %w", err)
 	}
 	return data, nil
 }

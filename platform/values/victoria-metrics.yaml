@@ -1,0 +1,16 @@
+# VictoriaMetrics Single values for hub cluster
+# Replaces Mimir distributed — single binary, much lower resource usage
+
+server:
+  retentionPeriod: 7d
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistentVolume:
+    enabled: true
+    storageClass: local-path
+    size: 10Gi

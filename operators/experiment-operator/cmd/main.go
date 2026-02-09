@@ -191,7 +191,7 @@ func main() {
 		setupLog.Error(err, "Failed to create S3 client — results collection disabled")
 	}
 
-	mimirURL := getEnvOrDefault("MIMIR_URL", "http://mimir-gateway.observability.svc:80")
+	metricsURL := getEnvOrDefault("METRICS_URL", "http://victoria-metrics-server.observability.svc:8428")
 
 	if err := (&controller.ExperimentReconciler{
 		Client:         mgr.GetClient(),
@@ -200,7 +200,7 @@ func main() {
 		ArgoCD:         argocd.NewClient(mgr.GetClient()),
 		Workflow:       workflow.NewManager(mgr.GetClient()),
 		S3Client:       s3Client,
-		MimirURL:       mimirURL,
+		MetricsURL:     metricsURL,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Experiment")
 		os.Exit(1)

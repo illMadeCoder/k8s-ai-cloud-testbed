@@ -1,0 +1,73 @@
+alloy:
+  configMap:
+    content: |
+      // Discover kubelet cadvisor for container CPU and memory metrics
+      discovery.kubernetes "nodes" {
+        role = "node"
+      }
+
+      discovery.relabel "cadvisor" {
+        targets = discovery.kubernetes.nodes.targets
+
+        rule {
+          replacement = "/metrics/cadvisor"
+          target_label = "__metrics_path__"
+        }
+
+        rule {
+          source_labels = ["__address__"]
+          regex = "(.+?)(?::\\d+)?"
+          replacement = "${1}:10250"
+          target_label = "__address__"
+        }
+
+        rule {
+          replacement = "https"
+          target_label = "__scheme__"
+        }
+      }
+
+      prometheus.scrape "cadvisor" {
+        targets         = discovery.relabel.cadvisor.output
+        scrape_interval = "30s"
+
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        tls_config {
+          insecure_skip_verify = true
+        }
+
+        forward_to = [prometheus.relabel.filter.receiver]
+      }
+
+      // Keep only the metrics we care about to reduce cardinality
+      prometheus.relabel "filter" {
+        rule {
+          source_labels = ["__name__"]
+          regex         = "container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_network_receive_bytes_total|container_network_transmit_bytes_total"
+          action        = "keep"
+        }
+
+        // Drop metrics for pause containers
+        rule {
+          source_labels = ["container"]
+          regex         = "^$|POD"
+          action        = "drop"
+        }
+
+        forward_to = [prometheus.remote_write.vm.receiver]
+      }
+
+      // Remote write to Hub VictoriaMetrics via Tailscale egress service
+      prometheus.remote_write "vm" {
+        external_labels = {
+          experiment = env("EXPERIMENT_NAME"),
+        }
+
+        endpoint {
+          url = "http://vm-hub.observability.svc:8428/api/v1/write"
+        }
+      }
+
+  extraEnv:
+    - name: EXPERIMENT_NAME
+      value: anonymous
