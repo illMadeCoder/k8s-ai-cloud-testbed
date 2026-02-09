@@ -114,10 +114,16 @@ jq --slurpfile analysis "${ANALYSIS_FILE}" \
   '. + {analysis: $analysis[0]}' \
   "${SUMMARY_FILE}" > "${ENRICHED_FILE}"
 
-# Upload enriched summary back to S3
+# Upload enriched summary back to S3 using AWS CLI (supports S3v4 signing)
 echo "==> Uploading enriched summary to S3"
-if ! curl -sf -X PUT -T "${ENRICHED_FILE}" "${S3_URL}"; then
-  echo "WARNING: Failed to upload enriched summary to S3 — continuing to GitHub commit"
+export AWS_ACCESS_KEY_ID="${S3_ACCESS_KEY:-any}"
+export AWS_SECRET_ACCESS_KEY="${S3_SECRET_KEY:-any}"
+S3_DEST="s3://experiment-results/${EXPERIMENT_NAME}/summary.json"
+if ! aws --endpoint-url "http://${S3_ENDPOINT}" s3 cp "${ENRICHED_FILE}" "${S3_DEST}" --no-sign-request 2>/dev/null; then
+  # Try with signing
+  if ! aws --endpoint-url "http://${S3_ENDPOINT}" s3 cp "${ENRICHED_FILE}" "${S3_DEST}" 2>&1; then
+    echo "WARNING: Failed to upload enriched summary to S3 — continuing to GitHub commit"
+  fi
 fi
 
 # Commit to GitHub if token is available
