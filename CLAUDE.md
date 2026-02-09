@@ -42,8 +42,10 @@ operators/experiment-operator/   Kubebuilder operator (Go, CI-built)
 components/{apps,core,obs,...}/  42 components with component.yaml (8 categories)
 experiments/{name}/              17 experiment scenarios (+ _template)
 platform/{apps,manifests,values} Hub cluster config + ArgoCD apps
+site/                            Astro benchmark results site (GitHub Pages, ADR-017)
+site/data/                       Experiment result JSONs (committed, not LFS)
 docs/{adrs,roadmap}              17 ADRs, phase docs
-.github/workflows/               build-operator, build-components, auto-merge
+.github/workflows/               build-operator, build-components, deploy-site, auto-merge
 ```
 
 ## Infrastructure Stack
@@ -60,7 +62,8 @@ docs/{adrs,roadmap}              17 ADRs, phase docs
 | Object storage | SeaweedFS | S3-compatible, experiment results |
 | Policy | Kyverno + Cosign | Supply chain security |
 | Secrets | OpenBao | |
-| CI | GitHub Actions | Builds operator + component images |
+| Benchmark site | Astro + Vega-Lite | GitHub Pages at `illmadecoder.github.io/k8s-ai-cloud-testbed/` (ADR-017) |
+| CI | GitHub Actions | Builds operator + component images, deploys site |
 
 Operator image: `ghcr.io/illmadecoder/experiment-operator`
 
@@ -125,7 +128,31 @@ kubectl run -n seaweedfs s3check --rm -it --restart=Never \
   curl -s http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333/experiment-results/<name>/summary.json
 ```
 
-### 5. SeaweedFS bucket / credential updates
+### 5. Publish experiment results to benchmark site
+
+After an experiment completes, the operator stores `summary.json` in SeaweedFS S3.
+To publish results to the GitHub Pages site, copy the JSON to `site/data/` and push:
+
+```bash
+# 1. Get the experiment name
+EXP_NAME=$(kubectl get experiments -n experiments -o jsonpath='{.items[-1].metadata.name}')
+
+# 2. Fetch summary.json from S3
+kubectl run -n seaweedfs s3fetch --rm -it --restart=Never \
+  --image=curlimages/curl:8.5.0 -- \
+  curl -s http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333/experiment-results/${EXP_NAME}/summary.json \
+  > site/data/${EXP_NAME}.json
+
+# 3. Commit and push (triggers deploy-site workflow → GitHub Pages)
+git add site/data/${EXP_NAME}.json
+git commit -m "data: Add ${EXP_NAME} results"
+git push
+```
+
+The file must conform to the `ExperimentSummary` JSON shape (see `operators/experiment-operator/internal/metrics/collector.go`).
+Site types mirror Go structs in `site/src/types.ts`.
+
+### 6. SeaweedFS bucket / credential updates
 
 ```bash
 # Re-create bucket job
