@@ -541,8 +541,23 @@ func (r *ExperimentReconciler) reconcileReady(ctx context.Context, exp *experime
 		}
 	}
 
+	// Build workflow params: inject experiment-name and first target endpoint
+	// so WorkflowTemplates can reach the deployed application.
+	wfSpec := exp.Spec.Workflow.DeepCopy()
+	if wfSpec.Params == nil {
+		wfSpec.Params = make(map[string]string)
+	}
+	wfSpec.Params["experiment-name"] = exp.Name
+	for i, target := range exp.Spec.Targets {
+		if i < len(exp.Status.Targets) && exp.Status.Targets[i].Endpoint != "" {
+			wfSpec.Params["target-endpoint"] = exp.Status.Targets[i].Endpoint
+			wfSpec.Params["target-name"] = target.Name
+			break
+		}
+	}
+
 	// Submit Argo Workflow for validation
-	workflowName, err := r.Workflow.SubmitWorkflow(ctx, exp.Name, exp.Spec.Workflow)
+	workflowName, err := r.Workflow.SubmitWorkflow(ctx, exp.Name, *wfSpec)
 	if err != nil {
 		log.Error(err, "Failed to submit workflow")
 		// Don't fail the experiment - requeue and try again

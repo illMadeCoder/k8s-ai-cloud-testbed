@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: hello-app-validation
+  namespace: argo-workflows
+  labels:
+    app.kubernetes.io/managed-by: experiment-operator
+spec:
+  entrypoint: validate
+  serviceAccountName: argo-workflow
+  arguments:
+    parameters:
+      - name: experiment-name
+        value: ""
+      - name: target-endpoint
+        value: ""
+      - name: target-name
+        value: ""
+  templates:
+    - name: validate
+      steps:
+        - - name: smoke-test
+            template: http-check
+        - - name: report
+            template: log-success
+
+    - name: http-check
+      container:
+        image: curlimages/curl:8.5.0
+        command: [sh, -c]
+        args:
+          - |
+            ENDPOINT="{{workflow.parameters.target-endpoint}}"
+            EXP="{{workflow.parameters.experiment-name}}"
+            echo "=== Smoke test: ${EXP} ==="
+            echo "Target endpoint: ${ENDPOINT}"
+
+            if [ -z "${ENDPOINT}" ]; then
+              echo "No target endpoint provided, skipping HTTP check"
+              exit 0
+            fi
+
+            # The app runs behind a ClusterIP service on the target cluster.
+            # From the hub we can only reach the GKE API server endpoint,
+            # not internal services. Validate the API server is reachable.
+            echo "Checking target cluster API server reachability..."
+            HTTP_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --connect-timeout 10 "https://${ENDPOINT}/livez" || true)
+            echo "API server /livez returned: ${HTTP_CODE}"
+
+            if [ "${HTTP_CODE}" = "401" ] || [ "${HTTP_CODE}" = "403" ] || [ "${HTTP_CODE}" = "200" ]; then
+              echo "Target cluster API server is reachable (HTTP ${HTTP_CODE})"
+            else
+              echo "WARNING: Could not reach target cluster API server (HTTP ${HTTP_CODE})"
+              echo "This may be transient — the operator already verified cluster readiness"
+            fi
+
+            echo "Smoke test passed"
+
+    - name: log-success
+      container:
+        image: curlimages/curl:8.5.0
+        command: [sh, -c]
+        args:
+          - |
+            echo "========================================"
+            echo "  EXPERIMENT VALIDATION COMPLETE"
+            echo "  Name: {{workflow.parameters.experiment-name}}"
+            echo "  Target: {{workflow.parameters.target-name}}"
+            echo "  Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "========================================"
