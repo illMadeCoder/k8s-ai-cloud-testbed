@@ -1,162 +1,221 @@
 # illm-k8s-ai-lab
 
-A Kubernetes learning lab with GitOps, supply chain security, and observability. 17 hands-on experiments, 12 ADRs, and a 16-phase roadmap running on Kind, Talos (home lab), and cloud via Crossplane.
+AI-driven Kubernetes benchmarking lab. A custom operator orchestrates experiments
+across on-prem and cloud clusters, collects metrics, and publishes results — all
+from a terminal conversation with Claude.
 
-## Highlights
-
-| Category | What's Here |
-|----------|-------------|
-| **GitOps** | ArgoCD app-of-apps, sync waves, multi-source, Image Updater |
-| **Supply Chain** | SLSA Level 2: Cosign keyless signing, SBOM attestation, Kyverno admission |
-| **Observability** | Prometheus, Loki, Tempo, Grafana + Pyrra SLOs with error budgets |
-| **Platforms** | Kind (local), Talos (home lab hardware), AKS/EKS (via Crossplane) |
-| **Secrets** | OpenBao + External Secrets Operator, internal PKI |
-
-## Project Structure
+## How It Works
 
 ```
-platform/
-├── hub/                # Control plane (runs on Kind locally)
-│   ├── apps/           # ArgoCD Applications (GitOps root)
-│   ├── values/         # Helm values for hub components
-│   ├── manifests/      # Raw K8s manifests
-│   ├── cluster/        # Kind cluster provisioning
-│   └── bootstrap/      # Initial ArgoCD setup
-└── targets/            # Workload clusters managed by hub
-    └── talos/          # Home lab (N100 hardware)
+Terminal (Claude Code)
+    │
+    │  "Run the TSDB comparison experiment"
+    ▼
+┌──────────────────────────────────────────────────┐
+│  Experiment CRD applied to hub cluster           │
+│                                                  │
+│  Experiment Operator reconciles:                 │
+│    1. Crossplane  → provisions GKE cluster       │
+│    2. ArgoCD      → deploys components           │
+│    3. Workflows   → runs validation + load gen   │
+│    4. Metrics     → collects Prometheus queries   │
+│    5. Storage     → writes results to SeaweedFS  │
+└──────────────────────────────────────────────────┘
+    │
+    ▼
+Benchmark Results Site (GitHub Pages, Astro + Vega-Lite)
+```
 
-experiments/             # 17 runnable tutorials (one dir per experiment)
+```bash
+# Deploy an experiment
+kubectl create -f experiments/tsdb-comparison/experiment.yaml
 
-components/              # Reusable infra (50+ components)
-
-docs/
-├── adrs/               # Architecture Decision Records
-└── roadmap/            # 16 phases + 12 appendices
+# Watch the lifecycle
+kubectl get experiments -n experiments -w
+# NAME                    PHASE          AGE
+# tsdb-comparison-x7k2q   Provisioning   10s
+# tsdb-comparison-x7k2q   Running        9m
+# tsdb-comparison-x7k2q   Complete       25m
 ```
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                         Hub Cluster (Kind)                                   │
-│                                                                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │   ArgoCD    │  │   OpenBao   │  │  Crossplane │  │      Kyverno        │  │
-│  │   (GitOps)  │  │  (Secrets)  │  │   (Infra)   │  │ (Policy/Admission)  │  │
-│  └──────┬──────┘  └─────────────┘  └──────┬──────┘  └─────────────────────┘  │
-│         │                                 │                                  │
-│         │  ┌─────────────┐  ┌─────────────┐                                  │
-│         │  │   MetalLB   │  │ k8s_gateway │                                  │
-│         │  │ (LoadBal)   │  │    (DNS)    │                                  │
-│         │  └─────────────┘  └─────────────┘                                  │
-└─────────┼─────────────────────────────────┼──────────────────────────────────┘
-          │                                 │
-          │    Deploys workloads            │    Provisions clusters
-          │                                 │
-          └────────────┬────────────────────┴────────────────────┐
-                       │                                         │
-                       ▼                                         ▼
-┌───────────────────────────────────────────────┐  ┌───────────────────────────┐
-│            Target Cluster(s)                  │  │    Load Gen Cluster(s)    │
-│         Talos (on-prem) / AKS / EKS           │  │      Talos / AKS / EKS    │
-│                                               │  │                           │
-│  ┌─────────────────────────────────────────┐  │  │  ┌─────────────────────┐  │
-│  │            Observability                │  │  │  │    k6 / Locust      │  │
-│  │  Prometheus, Loki, Tempo, Grafana       │  │  │  │    Load Tests       │  │
-│  │  Pyrra (SLOs + error budgets)           │  │  │  │                     │  │
-│  └─────────────────────────────────────────┘  │  │  └──────────┬──────────┘  │
-│  ┌─────────────────────────────────────────┐  │  │             │             │
-│  │            Applications                 │  │  │             │             │
-│  │  Demo apps, Argo Workflows              │◄─┼──┼─────────────┘             │
-│  │  metrics, logs, traces                  │  │  │        HTTP traffic       │
-│  └─────────────────────────────────────────┘  │  │                           │
-└───────────────────────────────────────────────┘  └───────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                   Hub Cluster — Talos Linux (on-prem, N100)         │
+│                                                                     │
+│   ┌───────────────────────────────────────────────────────────┐     │
+│   │              Experiment Operator (Go, Kubebuilder)        │     │
+│   │                                                           │     │
+│   │   Drives the full lifecycle:                              │     │
+│   │   Pending → Provisioning → Ready → Running → Complete     │     │
+│   └────┬──────────────┬──────────────┬───────────────────┘     │
+│        │              │              │                         │
+│        ▼              ▼              ▼                         │
+│   Crossplane v2   ArgoCD        Argo Workflows                │
+│   (provisions     (deploys 38   (validation,                  │
+│    GKE/EKS/AKS)   apps)         load gen)                     │
+│                                                               │
+│   ┌─────────────────────────────────────────────────────┐     │
+│   │  VictoriaMetrics │ SeaweedFS S3 │ Kyverno + Cosign  │     │
+│   │  (metrics hub)   │ (results)    │ (policy + signing) │     │
+│   │  OpenBao         │ Loki / Tempo │                    │     │
+│   │  (secrets)       │ (logs/traces)│                    │     │
+│   └─────────────────────────────────────────────────────┘     │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                Crossplane provisions, ArgoCD deploys
+                                │
+              ┌─────────────────┼─────────────────┐
+              ▼                 ▼                  ▼
+     ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+     │     GKE      │  │     EKS      │  │     AKS      │
+     │  (spot/pre-  │  │  (spot)      │  │  (spot)      │
+     │   emptible)  │  │              │  │              │
+     │              │  │              │  │              │
+     │ Apps + Obs + │  │ Apps + Obs + │  │ Apps + Obs + │
+     │ Load Gen     │  │ Load Gen     │  │ Load Gen     │
+     └──────────────┘  └──────────────┘  └──────────────┘
+              │                 │                  │
+              └─────── metrics flow back ─────────┘
+                        to VictoriaMetrics
 ```
 
-## Quick Start
+## Experiment Model
 
-```bash
-# Prerequisites: Docker, kubectl, task (go-task.dev), helm
+Two custom CRDs define the experiment system:
 
-task hub:bootstrap                      # Create cluster + GitOps
-task hub:up -- prometheus-tutorial      # Deploy an experiment
-task hub:tutorial -- prometheus-tutorial # Interactive tutorial
-task hub:down -- prometheus-tutorial
-task hub:destroy
+**Experiment** (namespaced) — what to run:
+```yaml
+spec:
+  targets:
+    - name: target
+      cluster: { provider: gke, preemptible: true }
+      components:
+        - app: prometheus        # resolves to Component CRD
+        - app: hello-app
+  workflow: { template: experiment-lifecycle }
+  metrics:
+    queries:
+      - name: p99_latency
+        query: histogram_quantile(0.99, rate(http_duration_seconds_bucket[5m]))
+```
+
+**Component** (cluster-scoped) — reusable building blocks:
+```yaml
+spec:
+  sources:
+    helm: { repo: https://prometheus-community.github.io/helm-charts, chart: prometheus }
+  parameters: { retention: 24h }
+  observability: { serviceMonitor: true }
+```
+
+Lifecycle: `Pending → Provisioning → Ready → Running → Complete → Results (S3 + charts)`
+
+## Project Structure
+
+```
+operators/experiment-operator/       Custom Go operator (Kubebuilder)
+  internal/
+    controller/                      Reconciliation loop
+    crossplane/                      GKE/EKS/AKS cluster provisioning
+    argocd/                          Application lifecycle + cluster registration
+    components/                      ComponentRef → Git/Helm source resolution
+    workflow/                        Argo Workflows integration
+    metrics/                         Prometheus query collection
+    storage/                         SeaweedFS S3 results storage
+components/                          42 reusable components (8 categories)
+experiments/                         15 experiment scenarios
+platform/                            Hub cluster infra (38 ArgoCD apps)
+docs/adrs/                           17 Architecture Decision Records
+docs/roadmap/                        10 phases, ~50 target experiments
+.github/workflows/                   SLSA build pipelines
+```
+
+## Supply Chain Security — SLSA Level 2
+
+```
+GitHub Actions ──► Trivy scan ──► Syft SBOM ──► Cosign keyless sign
+                                                       │
+                   ┌───────────────────────────────────┘
+                   ▼
+     ┌──────────────────────────────┐    ┌─────────────────────────┐
+     │            GHCR              │    │         Rekor           │
+     │  ┌────────┐  ┌───────────┐  │    │   (transparency log)    │
+     │  │ Image  │  │Attestation│  │    │                         │
+     │  │        │  │ sig + SBOM│  │    │   Public record of      │
+     │  └────────┘  └───────────┘  │    │   all signatures        │
+     └──────────────┬───────────────┘    └─────────────────────────┘
+                    │
+                    ▼
+     ┌──────────────────────────────┐
+     │          Kyverno             │
+     │  Verifies Cosign signature   │
+     │  before pod admission        │
+     └──────────────────────────────┘
 ```
 
 ## Experiments
 
-Run `task hub:up -- <name>` to deploy any scenario (or `task hub:tutorial -- <name>` for interactive mode):
+**Deployable now:** hello-app, prometheus-tutorial, loki-tutorial
 
-| Scenario | What You Learn |
-|----------|----------------|
-| **prometheus-tutorial** | Custom metrics, ServiceMonitor, PromQL, RED dashboards |
-| **loki-tutorial** | LogQL queries, label indexing, Promtail pipelines |
-| **otel-tutorial** | Distributed tracing, OTLP, span correlation, TraceQL |
-| **slo-tutorial** | Error budgets, multi-burn-rate alerts, Pyrra |
-| **tsdb-comparison** | Prometheus vs Victoria Metrics (resource efficiency) |
-| **logging-comparison** | Loki vs Elasticsearch (trade-offs) |
-| **tracing-comparison** | Tempo vs Jaeger |
-| **cicd-fundamentals** | GitHub Actions + Cosign + SBOM + Image Updater |
-| **seaweedfs-tutorial** | O(1) lookups, Haystack architecture |
-| **observability-cost-tutorial** | Cardinality, log volume, retention tuning |
+**Scenarios defined:**
 
-[Full list →](experiments/)
+| Scenario | Focus |
+|----------|-------|
+| tsdb-comparison | Prometheus vs VictoriaMetrics (resource efficiency) |
+| gateway-comparison | Envoy Gateway vs Kong vs Traefik |
+| logging-comparison | Loki vs Elasticsearch (trade-offs) |
+| tracing-comparison | Tempo vs Jaeger |
+| otel-tutorial | Distributed tracing, OTLP, span correlation |
+| slo-tutorial | Error budgets, multi-burn-rate alerts, Pyrra |
+| observability-cost-tutorial | Cardinality, log volume, retention tuning |
+| seaweedfs-tutorial | O(1) lookups, Haystack architecture |
+| cicd-fundamentals | GitHub Actions + Cosign + SBOM |
 
-## Architecture Decisions
-
-12 ADRs document real trade-offs:
-
-| ADR | Decision |
-|-----|----------|
-| [007](docs/adrs/ADR-007-supply-chain-security.md) | Sigstore ecosystem for supply chain (Cosign + Syft + Rekor) |
-| [011](docs/adrs/ADR-011-observability-architecture.md) | Three-pillar observability with metric↔log↔trace correlation |
-| [012](docs/adrs/ADR-012-crossplane-experiment-abstraction.md) | Single `ExperimentCluster` CRD for all platforms |
-
-[All ADRs →](docs/adrs/)
+15 scenarios across observability, traffic, security, and cost engineering.
+Target: ~50 experiments across 10 phases.
 
 ## Roadmap
 
-16 phases from platform bootstrap to chaos engineering:
+| Phase | Topic | Status |
+|-------|-------|--------|
+| 1 | Platform Bootstrap & GitOps | Complete |
+| 2 | CI/CD & Supply Chain Security | Complete |
+| 3 | Observability | In Progress |
+| 4 | Traffic Management | In Progress |
+| 5 | Data Persistence | Planned |
+| 6 | Security & Policy | Planned |
+| 7 | Service Mesh | Planned |
+| 8 | Messaging & Events | Planned |
+| 9 | Autoscaling & Resources | Planned |
+| 10 | Performance & Cost Engineering | Planned |
 
-| Phase | Status |
-|-------|--------|
-| 1. Platform Bootstrap (ArgoCD, OpenBao, Crossplane) | Complete |
-| 2. CI/CD & Supply Chain Security | Complete |
-| 3. Observability (metrics, logs, traces, SLOs) | In Progress |
-| 4-16. Traffic, Deployments, Security, Mesh, Chaos... | Planned |
+[Full roadmap →](docs/roadmap/)
 
-[Full roadmap →](docs/roadmap.md)
+## Architecture Decisions
 
-## Supply Chain Security (SLSA Level 2)
+| ADR | Decision |
+|-----|----------|
+| [015](docs/adrs/ADR-015-experiment-operator.md) | Go operator over Crossplane XRD for experiment orchestration |
+| [017](docs/adrs/ADR-017-benchmark-results-site.md) | GitHub Pages + Astro + Vega-Lite for benchmark results site |
+| [016](docs/adrs/ADR-016-hub-metrics-backend.md) | VictoriaMetrics Single over Mimir for hub metrics backhaul |
+| [007](docs/adrs/ADR-007-supply-chain-security.md) | Sigstore ecosystem for supply chain security |
+| [013](docs/adrs/ADR-013-crossplane-v2-upgrade.md) | Crossplane v2 upgrade — Pipeline mode compositions |
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   GitHub    │     │   Trivy     │     │    Syft     │     │   Cosign    │
-│   Actions   │────►│   (scan)    │────►│   (SBOM)    │────►│   (sign)    │
-│             │     │             │     │             │     │  keyless    │
-└─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
-                                                                   │
-                    ┌──────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────┐     ┌─────────────────────────────┐
-│              GHCR                   │     │      Rekor                  │
-│  ┌───────────┐  ┌────────────────┐  │     │   (transparency log)        │
-│  │   Image   │  │  Attestations  │  │     │                             │
-│  │           │  │  - signature   │  │     │   Public record of          │
-│  │           │  │  - SBOM        │  │     │   all signatures            │
-│  └───────────┘  └────────────────┘  │     └─────────────────────────────┘
-└──────────────────┬──────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────┐     ┌─────────────────────────────┐
-│      ArgoCD Image Updater           │     │         Kyverno             │
-│                                     │     │                             │
-│   Detects new image, updates        │────►│   Verifies signature        │
-│   deployment manifests              │     │   before admission          │
-└─────────────────────────────────────┘     └─────────────────────────────┘
+17 ADRs document trade-offs with data. [All ADRs →](docs/adrs/)
+
+## Quick Start
+
+```bash
+# Deploy an experiment
+kubectl create -f experiments/hello-app/experiment.yaml
+
+# Watch: Pending → Provisioning → Ready → Running → Complete
+kubectl get experiments -n experiments -w
+
+# Check results
+kubectl get experiments -n experiments -o wide
 ```
 
 ## License
