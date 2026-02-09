@@ -4,23 +4,29 @@ interface Props {
 }
 
 const { spec } = Astro.props;
+const chartId = `vega-${Math.random().toString(36).slice(2, 10)}`;
 ---
 
 <div class="chart-container">
-  <div class="vega-chart" data-spec={JSON.stringify(spec)}></div>
+  <div id={chartId} style="width:100%;min-height:300px;"></div>
 </div>
 
-<script>
-  import vegaEmbed from 'vega-embed';
-
-  document.querySelectorAll<HTMLElement>('.vega-chart').forEach((el) => {
-    const raw = el.getAttribute('data-spec');
-    if (!raw) return;
-    try {
-      const spec = JSON.parse(raw);
-      vegaEmbed(el, spec, { actions: false, renderer: 'svg' });
-    } catch (e) {
-      el.textContent = `Chart error: ${e}`;
+<script define:vars={{ spec, chartId }} is:inline>
+  (function() {
+    function render() {
+      if (typeof vegaEmbed === 'undefined') {
+        setTimeout(render, 100);
+        return;
+      }
+      var el = document.getElementById(chartId);
+      if (!el) return;
+      vegaEmbed(el, spec, { actions: false, renderer: 'svg' })
+        .catch(function(err) { el.textContent = 'Chart error: ' + err; });
     }
-  });
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', render);
+    } else {
+      render();
+    }
+  })();
 </script>

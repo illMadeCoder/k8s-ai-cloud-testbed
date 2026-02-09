@@ -68,6 +68,11 @@ const metricEntries = experiment.metrics
     </div>
   )}
 
+  <script>
+    import vegaEmbed from 'vega-embed';
+    (window as any).vegaEmbed = vegaEmbed;
+  </script>
+
   {experiment.costEstimate && (
     <CostBreakdown cost={experiment.costEstimate} />
   )}
