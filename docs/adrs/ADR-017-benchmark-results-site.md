@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed (2026-02-08)
+Accepted (2026-02-09) — supersedes original Proposed (2026-02-08)
+
+**Amendment:** Changed from separate `illm-benchmarks` repo to monorepo (`site/` directory). Removed GitHub API publisher from operator; data is committed directly to `site/data/`. Operator auto-publish deferred to a future phase.
 
 ## Context
 
@@ -24,11 +26,11 @@ There is no public-facing way to display, analyze, or cross-reference benchmark 
 |-------------|----------|-------|
 | Public access (no auth) | Must | Portfolio piece, shareable links |
 | General-purpose metrics | Must | CPU, memory, latency, throughput, cost — not tied to specific experiment types |
-| Auto-publish on experiment completion | Must | Operator-driven, no manual steps |
 | Cross-experiment comparison | High | Overlay metrics from different runs |
 | Interactive charts | High | Filtering, selection, tooltips |
 | Zero hosting cost | High | Lab budget is $0 for static hosting |
 | Low operational complexity | Medium | No new runtime infrastructure on hub |
+| Auto-publish on experiment completion | Future | Operator-driven, no manual steps — deferred until experiment cadence justifies it |
 
 ## Options Considered
 
@@ -52,18 +54,39 @@ There is no public-facing way to display, analyze, or cross-reference benchmark 
 | **Grafana dashboards** | Excellent (native) | Via variables/templating | Must be time-series |
 | **D3.js** (low-level) | Unlimited | Yes | Yes |
 
-### Axis 3: Data Pipeline (operator → site)
+### Axis 3: Repo Structure
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Monorepo (`site/` directory)** | One PR shows everything. No cross-repo coordination. GitHub Pages deploys from same repo. No PAT/API needed for data. | Site dependencies (node_modules) in same repo. Slightly larger clone. |
+| **Separate `illm-benchmarks` repo** | Clean separation. Independent deploy cycle. | Cross-repo data push requires GitHub API + PAT. Two repos to manage. PRs split across repos. |
+
+### Axis 4: Data Pipeline (operator → site)
 
 | Approach | How data flows | Latency | Complexity |
 |----------|---------------|---------|------------|
-| **Extend experiment-operator** | On completion: push summary JSON to GitHub data branch via API → triggers Actions build | ~2-5 min | Low (add one function) |
-| **Separate publisher operator** | Watches Experiment CRs for Complete phase → reads S3 → pushes to GitHub | ~2-5 min | Medium (new operator) |
-| **Argo Workflow post-step** | Add a final workflow step that pushes results to the site repo | ~1 min | Low (WorkflowTemplate change) |
+| **Commit JSON to `site/data/`** | Copy summary from S3 → commit to repo → push triggers build | Manual (for now) | Minimal |
+| **Extend experiment-operator** | On completion: push summary JSON via GitHub API | ~2-5 min | Medium (PAT, API client) |
+| **Argo Workflow post-step** | Final workflow step commits results to repo | ~1 min | Low (WorkflowTemplate change) |
 | **Periodic GitHub Action** | Cron action pulls from S3 (via Tailscale) and rebuilds site | ~15 min | Low but requires S3 access from GH |
 
 ## Decision
 
-**GitHub Pages + Astro + Vega-Lite**, with data pushed by extending the existing experiment-operator.
+**GitHub Pages + Astro + Vega-Lite**, monorepo in `site/` directory. Experiment result JSONs committed directly to `site/data/`. Operator auto-publish deferred.
+
+### Why Monorepo Over Separate Repo
+
+| Factor | Reasoning |
+|--------|-----------|
+| **Single PR** | Experiment YAML, operator changes, and site updates are reviewable together |
+| **No cross-repo plumbing** | No GitHub API publisher in operator, no PAT to manage or rotate |
+| **Simpler data flow** | Commit JSON to `site/data/`, push, GitHub Actions builds and deploys |
+| **GitHub Pages supports it** | Deploy from a directory in the same repo — no second repo needed |
+| **Split later if needed** | If experiment cadence grows to dozens per day, extract to a separate repo then. Not now. |
+
+### Why Not Git LFS for `site/data/`
+
+Experiment summary JSONs are small text files (1-50 KB each). Even at 200 runs, total data is under 10 MB. Git's built-in delta compression handles similar JSON structures efficiently. LFS would add bandwidth quotas (GitHub free tier: 1 GB/month), extra tooling for cloners, and complexity — all for a problem that doesn't exist at this scale.
 
 ### Why This Combination
 
@@ -71,7 +94,6 @@ There is no public-facing way to display, analyze, or cross-reference benchmark 
 |--------|-----------|
 | **Free public hosting** | GitHub Pages — zero cost, global CDN |
 | **General-purpose** | Vega-Lite specs handle any JSON shape — not locked to specific metric types |
-| **Operator integration** | Extend `collectAndStoreResults()` to also push JSON to a GitHub data branch — minimal new code |
 | **Interactive** | Vega-Lite provides filtering, selection, tooltips, cross-experiment comparison |
 | **Static** | No runtime infrastructure (no DB, no server process on hub) |
 | **Portfolio value** | Public site doubles as a portfolio piece showing real benchmark methodology |
@@ -85,71 +107,65 @@ There is no public-facing way to display, analyze, or cross-reference benchmark 
 | **Grafana Cloud** | Must structure everything as time-series. Public dashboard snapshots are ephemeral (auto-expire). Free tier limited to 10k series. |
 | **Self-hosted** | Unnecessary complexity when GitHub Pages is free and always-on. Adds a process to monitor on the hub. |
 | **D3.js** | Maximum flexibility but requires writing chart logic from scratch. Vega-Lite gets 90% of the value declaratively. |
-| **Separate publisher operator** | Extra Go binary to build, deploy, and maintain. The experiment-operator already has S3 access and completion hooks. |
-| **Periodic cron** | 15-min latency, requires Tailscale access from GitHub Actions runners (network complexity). |
 
 ### Pipeline Architecture
 
 ```
+Phase 1 (now): Manual data commit
+──────────────────────────────────
+Experiment completes
+        │
+        ▼
+S3: summary.json, metrics-snapshot.json
+        │
+        ▼ (manual: copy from S3, commit to repo)
+site/data/<experiment>.json
+        │
+        ▼
+GitHub Actions (on push to site/**)
+        │
+        ▼
+Astro build → GitHub Pages (public, CDN-served)
+
+
+Phase 2 (future): Operator auto-publish
+────────────────────────────────────────
 Experiment CR (phase: Complete)
         │
         ▼
-experiment-operator
-  collectAndStoreResults()
+experiment-operator collectAndStoreResults()
         │
-        ├──► SeaweedFS S3       (summary.json, metrics-snapshot.json)
-        │    [existing path]
+        ├──► SeaweedFS S3 (existing)
         │
-        └──► GitHub API          (push JSON to illm-benchmarks repo, data/ branch)
-             [new: ~50 lines]
+        └──► git commit + push to site/data/ (new)
                 │
                 ▼
-        GitHub Actions trigger   (on push to data/**)
-                │
-                ▼
-        Astro build              (reads data/*.json, generates Vega-Lite pages)
-                │
-                ▼
-        GitHub Pages             (public, CDN-served)
+        GitHub Actions → Astro build → GitHub Pages
 ```
-
-### Operator Change
-
-The `collectAndStoreResults()` function in `internal/controller/experiment_controller.go` currently uploads to S3 and sets `status.resultsURL`. The change adds one call after the S3 upload:
-
-```go
-// After S3 upload succeeds:
-if r.GitHubPublisher != nil {
-    if err := r.GitHubPublisher.Publish(ctx, summary); err != nil {
-        log.Error(err, "Failed to publish to GitHub — results are in S3, will retry")
-        // Non-fatal: S3 is the source of truth, GitHub is best-effort
-    }
-}
-```
-
-The publisher uses the GitHub Contents API (`PUT /repos/{owner}/{repo}/contents/data/{name}.json`) with a Personal Access Token stored as a Kubernetes Secret. No Git clone required.
 
 ### Site Structure
 
 ```
-illm-benchmarks/                    # Separate public repo
+site/                                  # Monorepo: same repo as operator + experiments
 ├── src/
 │   ├── pages/
-│   │   ├── index.astro             # Landing: experiment list with status cards
-│   │   └── [experiment].astro      # Per-experiment detail page
+│   │   ├── index.astro                # Landing: experiment list with status cards
+│   │   └── experiments/
+│   │       └── [slug].astro           # Per-experiment detail page
 │   ├── components/
-│   │   ├── VegaChart.astro         # Reusable Vega-Lite chart island
-│   │   ├── ComparisonTable.astro   # Side-by-side metric comparison
-│   │   └── CostBreakdown.astro     # Cost estimate visualization
+│   │   ├── VegaChart.astro            # Reusable Vega-Lite chart island
+│   │   ├── ComparisonTable.astro      # Side-by-side metric comparison
+│   │   └── MetricCard.astro           # Summary metric display
 │   └── layouts/
 │       └── Base.astro
-├── data/                           # Auto-populated by operator via GitHub API
+├── data/                              # Experiment result JSONs (committed)
 │   ├── hello-app-x7k2q.json
 │   ├── tsdb-comparison-a1b2.json
 │   └── ...
+├── public/
 ├── astro.config.mjs
-└── .github/workflows/
-    └── deploy.yaml                 # On push to data/** → build + deploy to Pages
+├── package.json
+└── tsconfig.json
 ```
 
 ### Vega-Lite Example
@@ -173,52 +189,54 @@ The spec is generated at build time from the JSON shape — any metric field in 
 
 ## Implementation Phases
 
-### Phase 1: Operator Publisher (~50 LOC)
+### Phase 1: Static Site Scaffold
 
-- Add `GitHubPublisher` interface to experiment-operator
-- Implement GitHub Contents API client
-- Store PAT as K8s Secret (`github-publisher-token`)
-- Push `summary.json` to `illm-benchmarks` repo `data/` directory on experiment completion
-- Non-fatal: log error and continue if publish fails (S3 remains source of truth)
-
-### Phase 2: Static Site Scaffold
-
-- Create `illm-benchmarks` repo with Astro + Vega-Lite
-- GitHub Actions workflow: on push to `data/**` → `astro build` → deploy to Pages
+- Create `site/` directory with Astro + Vega-Lite
+- GitHub Actions workflow: on push to `site/**` → `astro build` → deploy to Pages
 - Landing page: reads `data/*.json`, renders experiment cards (name, phase, duration, date)
 - Detail page: per-experiment Vega-Lite charts for all numeric fields
+- Seed `site/data/` with sample experiment JSONs from S3
 
-### Phase 3: Cross-Experiment Comparison
+### Phase 2: Cross-Experiment Comparison
 
 - Comparison view: select 2+ experiments, overlay metrics
 - Filter by experiment type (TSDB, logging, gateway)
 - Tag-based grouping from `ExperimentSummary` metadata
+
+### Phase 3: Operator Auto-Publish (future)
+
+- Extend `collectAndStoreResults()` to commit JSON to `site/data/` and push
+- Requires Git credentials as K8s Secret (deploy key or PAT)
+- Non-fatal: log error and continue if publish fails (S3 remains source of truth)
 
 ## Consequences
 
 ### Positive
 
 - Public benchmark portfolio at zero hosting cost
-- Operator-driven pipeline — experiments auto-publish on completion, no manual steps
+- Monorepo keeps everything reviewable in one PR
+- No cross-repo coordination, no PAT for data publishing (Phase 1)
 - Vega-Lite specs are declarative JSON — add new chart types without code changes
 - Cross-experiment comparison (overlay metrics from different runs)
 - `ExperimentSummary` JSON is the only contract — site works with any experiment type
 - Static site has no runtime to monitor or restart
+- Data committed as plain JSON — Git delta compression handles it efficiently, no LFS needed
 
 ### Negative
 
-- GitHub API dependency in operator (needs PAT or GitHub App token as K8s Secret)
-- Astro build step adds ~30s latency to publishing (total: ~2-5 min end-to-end)
+- Site node_modules in same repo (mitigate: `.gitignore`, only `site/` touches npm)
+- Manual data pipeline until Phase 3 (copy from S3, commit, push)
 - Vega-Lite has a learning curve vs raw Chart.js for custom interactions
 - Site design/layout requires frontend work upfront
-- PAT rotation is a manual toil item (mitigate with GitHub App in future)
+- GitHub Pages build adds ~30s to deploy on every push to `site/`
 
 ### Future
 
+- Phase 3: Operator auto-publish removes manual data copy step
 - Add Bencher.dev integration for regression detection once experiment cadence increases
 - Embed Grafana panel links for live experiment monitoring (VictoriaMetrics dashboards)
 - Add experiment metadata tags to `ExperimentSummary` for richer filtering
-- Migrate from PAT to GitHub App for token management
+- If data volume grows beyond ~500 files, evaluate extracting to a separate repo
 
 ## References
 
@@ -229,5 +247,4 @@ The spec is generated at build time from the JSON shape — any metric field in 
 - [Astro Documentation](https://docs.astro.build/)
 - [Vega-Lite Documentation](https://vega.github.io/vega-lite/)
 - [GitHub Pages Documentation](https://docs.github.com/en/pages)
-- [GitHub Contents API](https://docs.github.com/en/rest/repos/contents)
 - Operator source: `operators/experiment-operator/internal/controller/experiment_controller.go`
