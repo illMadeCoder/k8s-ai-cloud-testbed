@@ -11,3 +11,8 @@ vault-keys.json
 # Credential auto-restore directory
 .secrets/
 .plans/
+
+# Site
+node_modules/
+site/dist/
+site/.astro/

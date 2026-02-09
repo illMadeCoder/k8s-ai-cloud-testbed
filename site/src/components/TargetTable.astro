@@ -1,0 +1,35 @@
+---
+import type { TargetSummary } from '../types';
+
+interface Props {
+  targets: TargetSummary[];
+}
+
+const { targets } = Astro.props;
+---
+
+<div class="section">
+  <h2 class="section-title">Targets</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Cluster Type</th>
+        <th>Machine Type</th>
+        <th>Nodes</th>
+        <th>Components</th>
+      </tr>
+    </thead>
+    <tbody>
+      {targets.map((t) => (
+        <tr>
+          <td><code>{t.name}</code></td>
+          <td>{t.clusterType}</td>
+          <td>{t.machineType ?? '—'}</td>
+          <td>{t.nodeCount ?? '—'}</td>
+          <td>{t.components?.join(', ') ?? '—'}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>

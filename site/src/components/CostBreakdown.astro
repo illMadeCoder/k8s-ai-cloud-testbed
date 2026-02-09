@@ -1,0 +1,48 @@
+---
+import type { CostEstimate } from '../types';
+import { formatCost } from '../lib/format';
+
+interface Props {
+  cost: CostEstimate;
+}
+
+const { cost } = Astro.props;
+const targets = Object.entries(cost.perTarget ?? {});
+---
+
+<div class="section">
+  <h2 class="section-title">Cost Estimate</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Target</th>
+        <th>Cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      {targets.map(([name, usd]) => (
+        <tr>
+          <td><code>{name}</code></td>
+          <td>{formatCost(usd)}</td>
+        </tr>
+      ))}
+      <tr class="total-row">
+        <td><strong>Total</strong></td>
+        <td><strong>{formatCost(cost.totalUSD)}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="cost-note">{cost.note}</p>
+</div>
+
+<style>
+  .total-row td {
+    border-top: 2px solid var(--border);
+  }
+  .cost-note {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+</style>

@@ -1,0 +1,65 @@
+---
+import type { ExperimentSummary } from '../types';
+import { formatDuration, formatDate, formatCost } from '../lib/format';
+import { getExperimentSlug } from '../lib/experiments';
+
+interface Props {
+  experiment: ExperimentSummary;
+}
+
+const { experiment } = Astro.props;
+const slug = getExperimentSlug(experiment);
+const base = import.meta.env.BASE_URL;
+
+const badgeClass = experiment.phase === 'Complete'
+  ? 'badge-complete'
+  : experiment.phase === 'Failed'
+    ? 'badge-failed'
+    : 'badge-running';
+---
+
+<a href={`${base}experiments/${slug}/`} class="card card-link">
+  <div class="card-header">
+    <span class={`badge ${badgeClass}`}>{experiment.phase}</span>
+    <span class="card-date">{formatDate(experiment.createdAt)}</span>
+  </div>
+  <h3 class="card-title">{experiment.name}</h3>
+  <p class="card-desc">{experiment.description}</p>
+  <div class="card-meta">
+    <span>Duration: {formatDuration(experiment.durationSeconds)}</span>
+    <span>Targets: {experiment.targets.length}</span>
+    {experiment.costEstimate && <span>Cost: {formatCost(experiment.costEstimate.totalUSD)}</span>}
+  </div>
+</a>
+
+<style>
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+  .card-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-mono);
+    word-break: break-all;
+  }
+  .card-desc {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+  .card-meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+</style>

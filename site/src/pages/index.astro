@@ -1,0 +1,41 @@
+---
+import Base from '../layouts/Base.astro';
+import ExperimentCard from '../components/ExperimentCard.astro';
+import { loadAllExperiments } from '../lib/experiments';
+
+const experiments = loadAllExperiments();
+---
+
+<Base title="K8s AI Lab Benchmarks">
+  <h1>Benchmark Results</h1>
+  <p class="subtitle">Automated experiment results from the K8s AI Lab — comparing observability stacks, gateways, and infrastructure tools on GKE.</p>
+
+  {experiments.length === 0 ? (
+    <p class="empty">No experiments found. Add JSON files to <code>site/data/</code>.</p>
+  ) : (
+    <div class="grid grid-3">
+      {experiments.map((exp) => (
+        <ExperimentCard experiment={exp} />
+      ))}
+    </div>
+  )}
+</Base>
+
+<style>
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+  .subtitle {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+    max-width: 700px;
+    line-height: 1.6;
+  }
+  .empty {
+    text-align: center;
+    padding: 4rem 0;
+    color: var(--text-muted);
+  }
+</style>

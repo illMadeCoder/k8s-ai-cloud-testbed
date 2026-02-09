@@ -1,0 +1,91 @@
+---
+import Base from '../../layouts/Base.astro';
+import MetricCard from '../../components/MetricCard.astro';
+import VegaChart from '../../components/VegaChart.astro';
+import TargetTable from '../../components/TargetTable.astro';
+import CostBreakdown from '../../components/CostBreakdown.astro';
+import { loadAllExperiments, getExperimentSlug } from '../../lib/experiments';
+import { formatDuration, formatDate, formatCost } from '../../lib/format';
+import { buildSpec } from '../../lib/vega-specs';
+import type { ExperimentSummary } from '../../types';
+
+export function getStaticPaths() {
+  const experiments = loadAllExperiments();
+  return experiments.map((exp) => ({
+    params: { slug: getExperimentSlug(exp) },
+    props: { experiment: exp },
+  }));
+}
+
+interface Props {
+  experiment: ExperimentSummary;
+}
+
+const { experiment } = Astro.props;
+
+const badgeClass = experiment.phase === 'Complete'
+  ? 'badge-complete'
+  : experiment.phase === 'Failed'
+    ? 'badge-failed'
+    : 'badge-running';
+
+const metricEntries = experiment.metrics
+  ? Object.entries(experiment.metrics.queries).filter(([, qr]) => !qr.error)
+  : [];
+---
+
+<Base title={`${experiment.name} — K8s AI Lab Benchmarks`} description={experiment.description}>
+  <div class="detail-header">
+    <div>
+      <span class={`badge ${badgeClass}`}>{experiment.phase}</span>
+      <h1>{experiment.name}</h1>
+      <p class="description">{experiment.description}</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <MetricCard label="Created" value={formatDate(experiment.createdAt)} />
+    <MetricCard label="Duration" value={formatDuration(experiment.durationSeconds)} />
+    <MetricCard label="Targets" value={String(experiment.targets.length)} />
+    {experiment.costEstimate && (
+      <MetricCard label="Est. Cost" value={formatCost(experiment.costEstimate.totalUSD)} />
+    )}
+    <MetricCard label="Workflow" value={experiment.workflow.phase} />
+  </div>
+
+  <TargetTable targets={experiment.targets} />
+
+  {metricEntries.length > 0 && (
+    <div class="section">
+      <h2 class="section-title">Metrics</h2>
+      <div class="grid grid-2">
+        {metricEntries.map(([name, qr]) => (
+          <div class="card">
+            <VegaChart spec={buildSpec(name, qr)} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {experiment.costEstimate && (
+    <CostBreakdown cost={experiment.costEstimate} />
+  )}
+</Base>
+
+<style>
+  .detail-header {
+    margin-bottom: 2rem;
+  }
+  .detail-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0.5rem 0 0.25rem;
+    font-family: var(--font-mono);
+    word-break: break-all;
+  }
+  .description {
+    color: var(--text-muted);
+    max-width: 700px;
+  }
+</style>

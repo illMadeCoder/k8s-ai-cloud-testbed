@@ -1,0 +1,143 @@
+{
+  "name": "tsdb-comparison-a1b2c3",
+  "namespace": "experiments",
+  "description": "TSDB comparison - Prometheus vs VictoriaMetrics resource efficiency and query performance",
+  "createdAt": "2026-02-01T10:00:00Z",
+  "completedAt": "2026-02-01T11:30:00Z",
+  "durationSeconds": 5400,
+  "phase": "Complete",
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "tsdb-comparison-a1b2c3-app",
+      "clusterType": "gke",
+      "machineType": "e2-standard-4",
+      "nodeCount": 3,
+      "components": [
+        "kube-prometheus-stack",
+        "victoria-metrics",
+        "mimir",
+        "minio",
+        "cardinality-generator"
+      ]
+    }
+  ],
+  "workflow": {
+    "name": "tsdb-comparison-a1b2c3-validation",
+    "template": "tsdb-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-01T10:05:00Z",
+    "finishedAt": "2026-02-01T11:28:00Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-01T11:29:00Z",
+    "timeRange": {
+      "start": "2026-02-01T10:00:00Z",
+      "end": "2026-02-01T11:30:00Z",
+      "duration": "1h30m0s",
+      "stepSeconds": 60
+    },
+    "queries": {
+      "memory_peak": {
+        "query": "max_over_time(container_memory_working_set_bytes{experiment=\"tsdb-comparison-a1b2c3\"}[1h30m])",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Peak memory usage per TSDB",
+        "data": [
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:30:00Z", "value": 1073741824 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:30:00Z", "value": 419430400 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:30:00Z", "value": 838860800 }
+        ]
+      },
+      "cpu_avg": {
+        "query": "avg_over_time(rate(container_cpu_usage_seconds_total{experiment=\"tsdb-comparison-a1b2c3\"}[5m])[1h30m:])",
+        "type": "instant",
+        "unit": "cores",
+        "description": "Average CPU usage per TSDB",
+        "data": [
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:30:00Z", "value": 0.85 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:30:00Z", "value": 0.32 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:30:00Z", "value": 0.71 }
+        ]
+      },
+      "ingestion_rate": {
+        "query": "rate(prometheus_tsdb_head_samples_appended_total{experiment=\"tsdb-comparison-a1b2c3\"}[5m])",
+        "type": "range",
+        "unit": "samples/s",
+        "description": "Sample ingestion rate over time",
+        "data": [
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:10:00Z", "value": 12500 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:20:00Z", "value": 13200 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:30:00Z", "value": 13800 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:40:00Z", "value": 14100 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:50:00Z", "value": 14300 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:00:00Z", "value": 14200 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:10:00Z", "value": 14400 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:20:00Z", "value": 14100 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:30:00Z", "value": 14000 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:10:00Z", "value": 12500 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:20:00Z", "value": 14800 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:30:00Z", "value": 16200 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:40:00Z", "value": 17500 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:50:00Z", "value": 18100 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:00:00Z", "value": 18400 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:10:00Z", "value": 18600 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:20:00Z", "value": 18500 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:30:00Z", "value": 18300 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:10:00Z", "value": 12500 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:20:00Z", "value": 13600 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:30:00Z", "value": 14800 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:40:00Z", "value": 15400 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:50:00Z", "value": 15800 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:00:00Z", "value": 16000 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:10:00Z", "value": 16200 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:20:00Z", "value": 16100 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:30:00Z", "value": 15900 }
+        ]
+      },
+      "query_latency_p99": {
+        "query": "histogram_quantile(0.99, rate(prometheus_engine_query_duration_seconds_bucket{experiment=\"tsdb-comparison-a1b2c3\"}[5m]))",
+        "type": "range",
+        "unit": "seconds",
+        "description": "P99 query latency over time",
+        "data": [
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:10:00Z", "value": 0.45 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:20:00Z", "value": 0.52 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:30:00Z", "value": 0.61 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:40:00Z", "value": 0.58 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T10:50:00Z", "value": 0.63 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:00:00Z", "value": 0.67 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:10:00Z", "value": 0.72 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:20:00Z", "value": 0.69 },
+          { "labels": { "target": "prometheus" }, "timestamp": "2026-02-01T11:30:00Z", "value": 0.71 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:10:00Z", "value": 0.12 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:20:00Z", "value": 0.14 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:30:00Z", "value": 0.13 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:40:00Z", "value": 0.15 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T10:50:00Z", "value": 0.14 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:00:00Z", "value": 0.16 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:10:00Z", "value": 0.15 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:20:00Z", "value": 0.17 },
+          { "labels": { "target": "victoria-metrics" }, "timestamp": "2026-02-01T11:30:00Z", "value": 0.16 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:10:00Z", "value": 0.31 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:20:00Z", "value": 0.35 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:30:00Z", "value": 0.38 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:40:00Z", "value": 0.36 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T10:50:00Z", "value": 0.39 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:00:00Z", "value": 0.41 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:10:00Z", "value": 0.40 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:20:00Z", "value": 0.42 },
+          { "labels": { "target": "mimir" }, "timestamp": "2026-02-01T11:30:00Z", "value": 0.41 }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.60,
+    "durationHours": 1.5,
+    "perTarget": {
+      "app": 0.60
+    },
+    "note": "Rough estimate based on on-demand GCE pricing (e2-standard-4 x3 nodes, preemptible); actual cost may differ."
+  }
+}

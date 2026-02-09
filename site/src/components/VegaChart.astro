@@ -1,0 +1,29 @@
+---
+interface Props {
+  spec: object;
+}
+
+const { spec } = Astro.props;
+---
+
+<div class="chart-container">
+  <div class="vega-chart" data-spec={JSON.stringify(spec)}></div>
+</div>
+
+<script>
+  async function renderCharts() {
+    const { default: vegaEmbed } = await import('vega-embed');
+
+    document.querySelectorAll<HTMLElement>('.vega-chart').forEach(async (el) => {
+      const raw = el.getAttribute('data-spec');
+      if (!raw) return;
+      const spec = JSON.parse(raw);
+      await vegaEmbed(el, spec, {
+        actions: false,
+        renderer: 'svg',
+      });
+    });
+  }
+
+  renderCharts();
+</script>

@@ -1,0 +1,121 @@
+{
+  "name": "logging-comparison-d4e5f6",
+  "namespace": "experiments",
+  "description": "Loki vs Elasticsearch logging comparison - architecture, resource usage, query performance",
+  "createdAt": "2026-02-03T14:00:00Z",
+  "completedAt": "2026-02-03T16:00:00Z",
+  "durationSeconds": 7200,
+  "phase": "Complete",
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "logging-comparison-d4e5f6-app",
+      "clusterType": "gke",
+      "machineType": "e2-standard-4",
+      "nodeCount": 3,
+      "components": [
+        "loki",
+        "promtail",
+        "elasticsearch",
+        "kibana",
+        "fluent-bit",
+        "kube-prometheus-stack",
+        "log-generator"
+      ]
+    }
+  ],
+  "workflow": {
+    "name": "logging-comparison-d4e5f6-validation",
+    "template": "logging-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-03T14:08:00Z",
+    "finishedAt": "2026-02-03T15:55:00Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-03T15:58:00Z",
+    "timeRange": {
+      "start": "2026-02-03T14:00:00Z",
+      "end": "2026-02-03T16:00:00Z",
+      "duration": "2h0m0s",
+      "stepSeconds": 60
+    },
+    "queries": {
+      "ingest_rate": {
+        "query": "rate(log_lines_ingested_total{experiment=\"logging-comparison-d4e5f6\"}[5m])",
+        "type": "range",
+        "unit": "lines/s",
+        "description": "Log ingest rate over time",
+        "data": [
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T14:15:00Z", "value": 8500 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T14:30:00Z", "value": 9200 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T14:45:00Z", "value": 9800 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T15:00:00Z", "value": 10100 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T15:15:00Z", "value": 10300 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T15:30:00Z", "value": 10200 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T15:45:00Z", "value": 10400 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T16:00:00Z", "value": 10100 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T14:15:00Z", "value": 8500 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T14:30:00Z", "value": 11200 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T14:45:00Z", "value": 12800 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T15:00:00Z", "value": 13500 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T15:15:00Z", "value": 13800 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T15:30:00Z", "value": 14000 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T15:45:00Z", "value": 13900 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T16:00:00Z", "value": 13700 }
+        ]
+      },
+      "query_latency_p99": {
+        "query": "histogram_quantile(0.99, rate(log_query_duration_seconds_bucket{experiment=\"logging-comparison-d4e5f6\"}[5m]))",
+        "type": "range",
+        "unit": "seconds",
+        "description": "P99 query latency over time",
+        "data": [
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T14:15:00Z", "value": 0.82 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T14:30:00Z", "value": 0.91 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T14:45:00Z", "value": 0.95 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T15:00:00Z", "value": 1.02 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T15:15:00Z", "value": 1.08 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T15:30:00Z", "value": 1.12 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T15:45:00Z", "value": 1.05 },
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T16:00:00Z", "value": 1.10 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T14:15:00Z", "value": 0.25 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T14:30:00Z", "value": 0.28 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T14:45:00Z", "value": 0.31 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T15:00:00Z", "value": 0.33 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T15:15:00Z", "value": 0.35 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T15:30:00Z", "value": 0.37 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T15:45:00Z", "value": 0.34 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T16:00:00Z", "value": 0.36 }
+        ]
+      },
+      "memory_usage": {
+        "query": "container_memory_working_set_bytes{experiment=\"logging-comparison-d4e5f6\"}",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Memory usage per logging backend",
+        "data": [
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T16:00:00Z", "value": 314572800 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T16:00:00Z", "value": 2147483648 }
+        ]
+      },
+      "disk_usage": {
+        "query": "container_fs_usage_bytes{experiment=\"logging-comparison-d4e5f6\"}",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Disk usage per logging backend",
+        "data": [
+          { "labels": { "target": "loki" }, "timestamp": "2026-02-03T16:00:00Z", "value": 1073741824 },
+          { "labels": { "target": "elasticsearch" }, "timestamp": "2026-02-03T16:00:00Z", "value": 5368709120 }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.80,
+    "durationHours": 2.0,
+    "perTarget": {
+      "app": 0.80
+    },
+    "note": "Rough estimate based on on-demand GCE pricing (e2-standard-4 x3 nodes, preemptible); actual cost may differ."
+  }
+}
