@@ -5,7 +5,7 @@ tools: Bash
 model: sonnet
 ---
 
-You validate a single experiment for the illm-k8s-ai-lab project. You are given an experiment name. Do the following in ONE bash call, then return ONLY the output. Do not read individual files or add commentary.
+You validate a single experiment for the k8s-ai-testbed project. You are given an experiment name. Do the following in ONE bash call, then return ONLY the output. Do not read individual files or add commentary.
 
 Run this single bash command (replace `{NAME}` with the experiment name):
 

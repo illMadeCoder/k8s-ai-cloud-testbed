@@ -130,7 +130,7 @@ type ResolvedSource struct {
 ```go
 // Hardcoded path
 source := map[string]interface{}{
-    "repoURL": "https://github.com/illMadeCoder/illm-k8s-ai-labs.git",
+    "repoURL": "https://github.com/illMadeCoder/k8s-ai-testbed.git",
     "path":    fmt.Sprintf("components/apps/%s", component.App),
 }
 ```
@@ -203,13 +203,13 @@ spec:
 1. Resolver looks up Component CR `custom-app`
 2. Not found! Use fallback
 3. Generate conventional path: `components/apps/custom-app`
-4. Use default repo: `https://github.com/illMadeCoder/illm-k8s-ai-labs.git`
+4. Use default repo: `https://github.com/illMadeCoder/k8s-ai-testbed.git`
 
 **ArgoCD Application:**
 ```yaml
 spec:
   sources:
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/apps/custom-app
 ```
@@ -412,7 +412,7 @@ metadata:
 spec:
   type: workflow
   sources:
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       path: components/workflows/k6-loadgen/workflow.yaml
   parameters:
     - name: targetUrl

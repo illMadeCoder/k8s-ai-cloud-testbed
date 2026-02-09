@@ -1,4 +1,4 @@
-# illm-k8s-ai-lab Roadmap
+# k8s-ai-testbed Roadmap
 
 A **benchmarking-focused** Kubernetes experiment lab for **Cloud Architect**, **Platform Architect**, and **Solutions Architect** roles. Deploy, measure, cost-attribute each technology in the ecosystem.
 

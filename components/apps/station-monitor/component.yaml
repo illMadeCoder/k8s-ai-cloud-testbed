@@ -6,7 +6,7 @@ spec:
   type: app
   description: "Station monitoring app for Prometheus tutorial (Sector 12 mystery)"
   sources:
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/apps/station-monitor/k8s
   observability:

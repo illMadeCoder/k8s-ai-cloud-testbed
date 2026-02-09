@@ -60,7 +60,7 @@ Container supply chain attacks are increasing. We need a defense-in-depth strate
 │  - Matches: ghcr.io/illmadecoder/*                               │
 │  - Verifies: Cosign keyless signature                            │
 │  - Issuer: https://token.actions.githubusercontent.com           │
-│  - Subject: https://github.com/illMadeCoder/illm-k8s-ai-labs/*   │
+│  - Subject: https://github.com/illMadeCoder/k8s-ai-testbed/*   │
 │  - Mode: Audit (logs warnings, future: Enforce)                  │
 │                                                                   │
 └─────────────────────────────────────────────────────────────────┘
@@ -254,7 +254,7 @@ spec:
           attestors:
             - entries:
                 - keyless:
-                    subject: "https://github.com/illMadeCoder/illm-k8s-ai-labs/*"
+                    subject: "https://github.com/illMadeCoder/k8s-ai-testbed/*"
                     issuer: "https://token.actions.githubusercontent.com"
 ```
 
@@ -264,7 +264,7 @@ spec:
 # Verify signature
 cosign verify \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  --certificate-identity-regexp="github.com/illMadeCoder/illm-k8s-ai-labs" \
+  --certificate-identity-regexp="github.com/illMadeCoder/k8s-ai-testbed" \
   ghcr.io/illmadecoder/hello-app:latest
 
 # Verify SLSA provenance
@@ -274,7 +274,7 @@ gh attestation verify ghcr.io/illmadecoder/hello-app:latest --owner illMadeCoder
 cosign verify-attestation \
   --type spdxjson \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  --certificate-identity-regexp="github.com/illMadeCoder/illm-k8s-ai-labs" \
+  --certificate-identity-regexp="github.com/illMadeCoder/k8s-ai-testbed" \
   ghcr.io/illmadecoder/hello-app:latest
 ```
 

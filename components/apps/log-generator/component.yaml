@@ -6,7 +6,7 @@ spec:
   type: app
   description: "Generates structured logs for logging pipeline tutorials (Loki, ELK)"
   sources:
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/apps/log-generator/k8s
   parameters:

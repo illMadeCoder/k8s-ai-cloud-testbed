@@ -1,4 +1,4 @@
-# illm-k8s-ai-lab
+# k8s-ai-testbed
 
 AI-driven Kubernetes benchmarking lab. A custom operator orchestrates experiments
 across on-prem and cloud clusters, collects metrics, and publishes results — all

@@ -16,7 +16,7 @@ spec:
         parameters:
           - name: alloy.configMap.content
             value: ""
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/observability/metrics-agent
   parameters:

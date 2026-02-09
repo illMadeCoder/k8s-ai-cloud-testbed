@@ -6,6 +6,6 @@ spec:
   type: config
   description: "Tailscale egress service to hub VictoriaMetrics — creates observability namespace and ExternalName service"
   sources:
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/observability/metrics-egress/k8s

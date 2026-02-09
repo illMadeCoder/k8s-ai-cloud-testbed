@@ -1,0 +1,29 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Component
+metadata:
+  name: tailscale-operator
+spec:
+  type: app
+  description: "Tailscale Kubernetes operator for mesh networking and egress services"
+  sources:
+    - repoURL: https://pkgs.tailscale.com/helmcharts
+      targetRevision: "1.82.0"
+      chart: tailscale-operator
+      helm:
+        releaseName: tailscale-operator
+        parameters:
+          - name: oauth.clientId
+            value: ""
+          - name: oauth.clientSecret
+            value: ""
+  parameters:
+    - name: oauth.clientId
+      type: string
+      description: "Tailscale OAuth client ID"
+    - name: oauth.clientSecret
+      type: string
+      description: "Tailscale OAuth client secret"
+  observability:
+    serviceMonitor: false
+    podLabels:
+      app.kubernetes.io/name: tailscale-operator

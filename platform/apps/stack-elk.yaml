@@ -14,7 +14,7 @@ spec:
   project: default
   sources:
     # Logs - ECK Operator (manages Elasticsearch)
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/observability/eck-operator
       directory:
@@ -22,7 +22,7 @@ spec:
         include: 'eck-operator.yaml'
 
     # Logs - ELK Stack (Elasticsearch, Kibana, Filebeat)
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/observability/elk-stack
       directory:

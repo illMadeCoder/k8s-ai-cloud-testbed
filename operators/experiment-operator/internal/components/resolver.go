@@ -129,7 +129,7 @@ func (r *Resolver) resolveFromCR(component *experimentsv1alpha1.Component, param
 // fallbackComponent creates a fallback component when CR is not found
 func (r *Resolver) fallbackComponent(name string, componentType string, params map[string]string) (*ResolvedComponent, error) {
 	// Default repository
-	defaultRepo := "https://github.com/illMadeCoder/illm-k8s-ai-labs.git"
+	defaultRepo := "https://github.com/illMadeCoder/k8s-ai-testbed.git"
 
 	// Construct path based on type
 	var path string

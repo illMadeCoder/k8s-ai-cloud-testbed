@@ -6,7 +6,7 @@ spec:
   type: app
   description: "Simple hello world app for load testing and deployment tutorials"
   sources:
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/apps/hello-app/k8s
   parameters:

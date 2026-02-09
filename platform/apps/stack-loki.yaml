@@ -14,7 +14,7 @@ spec:
   project: default
   sources:
     # Logs - Loki
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/observability/loki
       directory:
@@ -22,7 +22,7 @@ spec:
         include: 'loki.yaml'
 
     # Logs - Promtail (log shipper for Loki)
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/observability/promtail
       directory:

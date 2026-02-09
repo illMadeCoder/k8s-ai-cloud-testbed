@@ -6,7 +6,7 @@ spec:
   type: app
   description: "Multi-service OTel demo app (user-service, order-service, payment-service)"
   sources:
-    - repoURL: https://github.com/illMadeCoder/illm-k8s-ai-labs.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
       targetRevision: HEAD
       path: components/apps/otel-demo/k8s
   observability:
