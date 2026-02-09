@@ -1,0 +1,57 @@
+{
+  "name": "hello-app-pg55f",
+  "namespace": "experiments",
+  "description": "Simple hello world app with k6 load generation",
+  "createdAt": "2026-02-09T22:58:36Z",
+  "completedAt": "2026-02-09T23:10:07.733171535Z",
+  "durationSeconds": 691.733171535,
+  "phase": "Complete",
+  "tags": [
+    "demo"
+  ],
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "hello-app-pg55f-app",
+      "clusterType": "gke"
+    }
+  ],
+  "workflow": {
+    "name": "hello-app-pg55f-validation",
+    "template": "hello-app-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-09T23:09:37Z",
+    "finishedAt": "2026-02-09T23:09:57Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-09T23:10:07.733179028Z",
+    "timeRange": {
+      "start": "2026-02-09T22:58:36Z",
+      "end": "2026-02-09T23:10:07.733171535Z",
+      "duration": "11m31.733171535s",
+      "stepSeconds": 60
+    },
+    "queries": {
+      "cpu_usage": {
+        "query": "sum(rate(container_cpu_usage_seconds_total{experiment=\"hello-app-pg55f\"}[1m]))",
+        "type": "range",
+        "unit": "cores",
+        "description": "Total CPU usage"
+      },
+      "memory_usage": {
+        "query": "sum(container_memory_working_set_bytes{experiment=\"hello-app-pg55f\"})",
+        "type": "range",
+        "unit": "bytes",
+        "description": "Total memory working set"
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.0038429620640833342,
+    "durationHours": 0.19214810320416667,
+    "perTarget": {
+      "app": 0.0038429620640833342
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
