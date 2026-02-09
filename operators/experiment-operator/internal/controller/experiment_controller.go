@@ -223,11 +223,11 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 	summary := metrics.CollectSummary(exp)
 
 	// Collect metrics snapshot (best-effort)
-	metricsData, err := metrics.CollectMetricsSnapshot(ctx, r.MetricsURL, exp.Name, exp)
+	metricsResult, err := metrics.CollectMetricsSnapshot(ctx, r.MetricsURL, exp)
 	if err != nil {
 		log.Error(err, "Metrics snapshot failed — continuing without metrics")
 	}
-	summary.MimirMetrics = metricsData
+	summary.Metrics = metricsResult
 
 	// Estimate cost
 	summary.CostEstimate = metrics.EstimateCost(exp)
@@ -238,8 +238,8 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 	}
 
 	// Upload metrics snapshot separately for easier tooling consumption
-	if metricsData != nil {
-		if err := r.S3Client.PutJSON(ctx, prefix+"/metrics-snapshot.json", metricsData); err != nil {
+	if metricsResult != nil {
+		if err := r.S3Client.PutJSON(ctx, prefix+"/metrics-snapshot.json", metricsResult); err != nil {
 			log.Error(err, "Failed to upload metrics-snapshot.json — non-fatal")
 		}
 	}

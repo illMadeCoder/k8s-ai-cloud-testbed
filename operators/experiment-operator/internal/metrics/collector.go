@@ -5,13 +5,66 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	experimentsv1alpha1 "github.com/illmadecoder/experiment-operator/api/v1alpha1"
 )
+
+// MetricsResult is the top-level container for all collected metrics.
+type MetricsResult struct {
+	CollectedAt time.Time              `json:"collectedAt"`
+	TimeRange   TimeRange              `json:"timeRange"`
+	Queries     map[string]QueryResult `json:"queries"`
+}
+
+// TimeRange captures the experiment time window used for queries.
+type TimeRange struct {
+	Start    time.Time `json:"start"`
+	End      time.Time `json:"end"`
+	Duration string    `json:"duration"`
+	StepSec  int       `json:"stepSeconds"`
+}
+
+// QueryResult holds the result of a single PromQL query, flattened for Vega-Lite.
+type QueryResult struct {
+	Query       string      `json:"query"`
+	Type        string      `json:"type"`
+	Unit        string      `json:"unit,omitempty"`
+	Description string      `json:"description,omitempty"`
+	Error       string      `json:"error,omitempty"`
+	Data        []DataPoint `json:"data,omitempty"`
+}
+
+// DataPoint is a single row in the flat tabular output.
+// Instant queries: one DataPoint per series (one label-set).
+// Range queries: one DataPoint per (series, timestamp) pair.
+type DataPoint struct {
+	Labels    map[string]string `json:"labels,omitempty"`
+	Timestamp time.Time         `json:"timestamp"`
+	Value     float64           `json:"value"`
+}
+
+// promResponse models the Prometheus HTTP API response.
+type promResponse struct {
+	Status string   `json:"status"`
+	Data   promData `json:"data"`
+}
+
+type promData struct {
+	ResultType string       `json:"resultType"`
+	Result     []promResult `json:"result"`
+}
+
+type promResult struct {
+	Metric map[string]string    `json:"metric"`
+	Value  [2]json.RawMessage   `json:"value,omitempty"`
+	Values [][2]json.RawMessage `json:"values,omitempty"`
+}
 
 // ExperimentSummary is the top-level results object stored in S3.
 type ExperimentSummary struct {
@@ -24,7 +77,7 @@ type ExperimentSummary struct {
 	Phase        string          `json:"phase"`
 	Targets      []TargetSummary `json:"targets"`
 	Workflow     WorkflowSummary `json:"workflow"`
-	MimirMetrics map[string]any  `json:"mimirMetrics,omitempty"`
+	Metrics      *MetricsResult  `json:"metrics,omitempty"`
 	CostEstimate *CostEstimate   `json:"costEstimate,omitempty"`
 }
 
@@ -49,24 +102,24 @@ type WorkflowSummary struct {
 
 // CostEstimate provides a rough GCP cost estimate for the experiment.
 type CostEstimate struct {
-	TotalUSD     float64           `json:"totalUSD"`
-	DurationHrs  float64           `json:"durationHours"`
-	PerTarget    map[string]float64 `json:"perTarget,omitempty"`
-	Note         string            `json:"note"`
+	TotalUSD    float64            `json:"totalUSD"`
+	DurationHrs float64           `json:"durationHours"`
+	PerTarget   map[string]float64 `json:"perTarget,omitempty"`
+	Note        string             `json:"note"`
 }
 
 // GCP on-demand hourly rates (USD) for common machine types.
 var gcpHourlyRates = map[string]float64{
-	"e2-medium":    0.0335,
-	"e2-standard-2": 0.0670,
-	"e2-standard-4": 0.1340,
-	"e2-standard-8": 0.2680,
-	"n1-standard-1": 0.0475,
-	"n1-standard-2": 0.0950,
-	"n1-standard-4": 0.1900,
-	"n2-standard-2": 0.0971,
-	"n2-standard-4": 0.1942,
-	"n2-standard-8": 0.3884,
+	"e2-medium":      0.0335,
+	"e2-standard-2":  0.0670,
+	"e2-standard-4":  0.1340,
+	"e2-standard-8":  0.2680,
+	"n1-standard-1":  0.0475,
+	"n1-standard-2":  0.0950,
+	"n1-standard-4":  0.1900,
+	"n2-standard-2":  0.0971,
+	"n2-standard-4":  0.1942,
+	"n2-standard-8":  0.3884,
 }
 
 // preemptibleDiscount is applied when preemptible/spot is enabled.
@@ -122,10 +175,54 @@ func CollectSummary(exp *experimentsv1alpha1.Experiment) *ExperimentSummary {
 	return s
 }
 
-// CollectMetricsSnapshot queries VictoriaMetrics for key container metrics over the
-// experiment lifetime and returns the raw Prometheus query_range response.
-// The experimentName parameter is used to filter metrics by the experiment external label.
-func CollectMetricsSnapshot(ctx context.Context, metricsURL string, experimentName string, exp *experimentsv1alpha1.Experiment) (map[string]any, error) {
+// defaultQueries returns the built-in metrics queries used when spec.metrics is empty.
+func defaultQueries() []experimentsv1alpha1.MetricsQuery {
+	return []experimentsv1alpha1.MetricsQuery{
+		{Name: "cpu_usage", Query: `sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT"}[1m]))`, Type: "range", Unit: "cores", Description: "Total CPU usage"},
+		{Name: "memory_usage", Query: `sum(container_memory_working_set_bytes{experiment="$EXPERIMENT"})`, Type: "range", Unit: "bytes", Description: "Total memory working set"},
+	}
+}
+
+// substituteVars replaces $EXPERIMENT, $NAMESPACE, and $DURATION placeholders in a query.
+func substituteVars(query string, vars map[string]string) string {
+	for k, v := range vars {
+		query = strings.ReplaceAll(query, k, v)
+	}
+	return query
+}
+
+// promDuration converts a Go duration to a Prometheus-compatible duration string (e.g., "15m", "2h30m").
+func promDuration(d time.Duration) string {
+	if d < 0 {
+		d = -d
+	}
+	if d < time.Second {
+		return "0s"
+	}
+
+	var parts []string
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+
+	if h > 0 {
+		parts = append(parts, fmt.Sprintf("%dh", h))
+	}
+	if m > 0 {
+		parts = append(parts, fmt.Sprintf("%dm", m))
+	}
+	if s > 0 {
+		parts = append(parts, fmt.Sprintf("%ds", s))
+	}
+	if len(parts) == 0 {
+		return "0s"
+	}
+	return strings.Join(parts, "")
+}
+
+// CollectMetricsSnapshot queries VictoriaMetrics for metrics defined in the experiment
+// spec (or defaults) and returns structured, chart-ready results.
+func CollectMetricsSnapshot(ctx context.Context, metricsURL string, exp *experimentsv1alpha1.Experiment) (*MetricsResult, error) {
 	if metricsURL == "" {
 		return nil, nil
 	}
@@ -138,32 +235,119 @@ func CollectMetricsSnapshot(ctx context.Context, metricsURL string, experimentNa
 		end = time.Now()
 	}
 
+	duration := end.Sub(start)
+
 	// Don't query if duration is trivially short
-	if end.Sub(start) < 30*time.Second {
+	if duration < 30*time.Second {
 		return nil, nil
 	}
 
-	queries := map[string]string{
-		"cpu":    fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment=%q}[1m]))`, experimentName),
-		"memory": fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment=%q})`, experimentName),
+	stepStr := selectStep(duration)
+	stepSec, _ := strconv.Atoi(strings.TrimSuffix(stepStr, "s"))
+
+	// Pick queries: spec.metrics or defaults
+	queries := exp.Spec.Metrics
+	if len(queries) == 0 {
+		queries = defaultQueries()
 	}
 
-	result := make(map[string]any)
-	for name, query := range queries {
-		data, err := queryMetricsRange(ctx, metricsURL, query, start, end)
-		if err != nil {
-			// Non-fatal: include the error in the result
-			result[name] = map[string]any{"error": err.Error()}
-			continue
+	// Build substitution variables
+	vars := map[string]string{
+		"$EXPERIMENT": exp.Name,
+		"$NAMESPACE":  exp.Namespace,
+		"$DURATION":   promDuration(duration),
+	}
+
+	result := &MetricsResult{
+		CollectedAt: time.Now().UTC(),
+		TimeRange: TimeRange{
+			Start:    start,
+			End:      end,
+			Duration: duration.String(),
+			StepSec:  stepSec,
+		},
+		Queries: make(map[string]QueryResult),
+	}
+
+	for _, mq := range queries {
+		resolvedQuery := substituteVars(mq.Query, vars)
+		queryType := mq.Type
+		if queryType == "" {
+			queryType = "instant"
 		}
-		result[name] = data
+
+		qr := QueryResult{
+			Query:       resolvedQuery,
+			Type:        queryType,
+			Unit:        mq.Unit,
+			Description: mq.Description,
+		}
+
+		var data []DataPoint
+		var err error
+
+		switch queryType {
+		case "instant":
+			data, err = queryMetricsInstant(ctx, metricsURL, resolvedQuery, end)
+		case "range":
+			data, err = queryMetricsRange(ctx, metricsURL, resolvedQuery, start, end)
+		default:
+			err = fmt.Errorf("unknown query type: %s", queryType)
+		}
+
+		if err != nil {
+			qr.Error = err.Error()
+		} else {
+			qr.Data = data
+		}
+
+		result.Queries[mq.Name] = qr
 	}
 
 	return result, nil
 }
 
-// queryMetricsRange executes a Prometheus-compatible range query against VictoriaMetrics.
-func queryMetricsRange(ctx context.Context, metricsURL, query string, start, end time.Time) (any, error) {
+// queryMetricsInstant executes a Prometheus-compatible instant query.
+func queryMetricsInstant(ctx context.Context, metricsURL, query string, evalTime time.Time) ([]DataPoint, error) {
+	u, err := url.Parse(metricsURL + "/api/v1/query")
+	if err != nil {
+		return nil, fmt.Errorf("parse metrics URL: %w", err)
+	}
+	q := u.Query()
+	q.Set("query", query)
+	q.Set("time", strconv.FormatInt(evalTime.Unix(), 10))
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("metrics query: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read metrics response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("metrics server returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var pr promResponse
+	if err := json.Unmarshal(body, &pr); err != nil {
+		return nil, fmt.Errorf("unmarshal metrics response: %w", err)
+	}
+
+	return flattenInstantResult(pr.Data.Result)
+}
+
+// queryMetricsRange executes a Prometheus-compatible range query and returns flat DataPoints.
+func queryMetricsRange(ctx context.Context, metricsURL, query string, start, end time.Time) ([]DataPoint, error) {
 	step := selectStep(end.Sub(start))
 
 	u, err := url.Parse(metricsURL + "/api/v1/query_range")
@@ -197,11 +381,92 @@ func queryMetricsRange(ctx context.Context, metricsURL, query string, start, end
 		return nil, fmt.Errorf("metrics server returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	var data any
-	if err := json.Unmarshal(body, &data); err != nil {
+	var pr promResponse
+	if err := json.Unmarshal(body, &pr); err != nil {
 		return nil, fmt.Errorf("unmarshal metrics response: %w", err)
 	}
-	return data, nil
+
+	return flattenRangeResult(pr.Data.Result)
+}
+
+// flattenInstantResult converts Prometheus instant query results to flat DataPoints.
+func flattenInstantResult(results []promResult) ([]DataPoint, error) {
+	var points []DataPoint
+	for _, r := range results {
+		if len(r.Value) < 2 {
+			continue
+		}
+		ts, val, err := parseTimestampValue(r.Value[0], r.Value[1])
+		if err != nil {
+			continue // skip NaN/Inf
+		}
+		points = append(points, DataPoint{
+			Labels:    copyLabels(r.Metric),
+			Timestamp: ts,
+			Value:     val,
+		})
+	}
+	return points, nil
+}
+
+// flattenRangeResult converts Prometheus range query results to flat DataPoints.
+func flattenRangeResult(results []promResult) ([]DataPoint, error) {
+	var points []DataPoint
+	for _, r := range results {
+		labels := copyLabels(r.Metric)
+		for _, pair := range r.Values {
+			ts, val, err := parseTimestampValue(pair[0], pair[1])
+			if err != nil {
+				continue // skip NaN/Inf
+			}
+			points = append(points, DataPoint{
+				Labels:    labels,
+				Timestamp: ts,
+				Value:     val,
+			})
+		}
+	}
+	return points, nil
+}
+
+// parseTimestampValue parses a Prometheus [timestamp, value] pair.
+// Returns error for NaN/Inf values which should be skipped.
+func parseTimestampValue(rawTS, rawVal json.RawMessage) (time.Time, float64, error) {
+	var tsFloat float64
+	if err := json.Unmarshal(rawTS, &tsFloat); err != nil {
+		return time.Time{}, 0, fmt.Errorf("parse timestamp: %w", err)
+	}
+
+	var valStr string
+	if err := json.Unmarshal(rawVal, &valStr); err != nil {
+		return time.Time{}, 0, fmt.Errorf("parse value: %w", err)
+	}
+
+	val, err := strconv.ParseFloat(valStr, 64)
+	if err != nil {
+		return time.Time{}, 0, fmt.Errorf("parse float: %w", err)
+	}
+	if math.IsNaN(val) || math.IsInf(val, 0) {
+		return time.Time{}, 0, fmt.Errorf("non-finite value: %s", valStr)
+	}
+
+	sec := int64(tsFloat)
+	nsec := int64((tsFloat - float64(sec)) * 1e9)
+	ts := time.Unix(sec, nsec).UTC()
+
+	return ts, val, nil
+}
+
+// copyLabels returns a copy of the label map, or nil if empty.
+func copyLabels(m map[string]string) map[string]string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // selectStep picks a reasonable step size for the query duration.

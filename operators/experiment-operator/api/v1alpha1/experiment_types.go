@@ -47,6 +47,41 @@ type ExperimentSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=365
 	TTLDays int `json:"ttlDays,omitempty"`
+
+	// Metrics defines PromQL queries to execute at experiment completion.
+	// Results are stored in summary.json for the benchmark site.
+	// If omitted, default CPU and memory queries are collected.
+	// +optional
+	Metrics []MetricsQuery `json:"metrics,omitempty"`
+}
+
+// MetricsQuery defines a PromQL query to execute at experiment completion.
+type MetricsQuery struct {
+	// Name is the key for this metric in output JSON (e.g., "cpu_peak", "p99_latency").
+	// +required
+	// +kubebuilder:validation:Pattern=`^[a-z][a-z0-9_]*$`
+	Name string `json:"name"`
+
+	// Query is a PromQL expression. Variable substitution:
+	//   $EXPERIMENT — experiment name
+	//   $NAMESPACE  — experiment namespace
+	//   $DURATION   — experiment duration as Prometheus duration (e.g., "15m", "2h")
+	// +required
+	Query string `json:"query"`
+
+	// Type: "instant" (single value for bar charts) or "range" (time-series for line charts).
+	// +optional
+	// +kubebuilder:validation:Enum=instant;range
+	// +kubebuilder:default="instant"
+	Type string `json:"type,omitempty"`
+
+	// Unit is a display hint for chart axis labels (e.g., "bytes", "cores", "req/s").
+	// +optional
+	Unit string `json:"unit,omitempty"`
+
+	// Description is a human-readable chart title.
+	// +optional
+	Description string `json:"description,omitempty"`
 }
 
 // TutorialSpec defines tutorial configuration for interactive experiments
