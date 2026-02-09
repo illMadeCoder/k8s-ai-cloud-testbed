@@ -21,15 +21,18 @@ import (
 	"fmt"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -60,6 +63,8 @@ type ExperimentReconciler struct {
 	S3Client       *storage.Client
 	GitClient      *ghclient.Client
 	MetricsURL     string
+	AnalyzerImage  string
+	S3Endpoint     string
 }
 
 // +kubebuilder:rbac:groups=experiments.illm.io,resources=experiments,verbs=get;list;watch;create;update;patch;delete
@@ -73,6 +78,7 @@ type ExperimentReconciler struct {
 // +kubebuilder:rbac:groups=argoproj.io,resources=workflowtemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=experiments.illm.io,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=illm.io,resources=gkeclusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;get;list;watch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -259,6 +265,127 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 		}
 	}
 
+	// Launch AI analysis Job (best-effort, non-fatal).
+	// Only analyze Complete experiments. Requires analyzer image and GitClient for repo path.
+	if r.AnalyzerImage != "" && r.GitClient != nil && exp.Status.Phase == experimentsv1alpha1.PhaseComplete {
+		if err := r.createAnalysisJob(ctx, exp); err != nil {
+			log.Error(err, "Failed to create analysis Job — non-fatal")
+		}
+	}
+
+	return nil
+}
+
+// createAnalysisJob creates a Kubernetes Job that runs the experiment analyzer
+// (Claude Code CLI) to generate AI analysis of the experiment results.
+func (r *ExperimentReconciler) createAnalysisJob(ctx context.Context, exp *experimentsv1alpha1.Experiment) error {
+	log := logf.FromContext(ctx)
+
+	// Truncate job name to 63 chars (K8s name limit)
+	jobName := fmt.Sprintf("experiment-analyzer-%s", exp.Name)
+	if len(jobName) > 63 {
+		jobName = jobName[:63]
+	}
+
+	namespace := "experiment-operator-system"
+
+	// Check if job already exists
+	existing := &batchv1.Job{}
+	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: namespace}, existing); err == nil {
+		log.Info("Analysis Job already exists", "job", jobName)
+		return nil
+	}
+
+	s3Endpoint := r.S3Endpoint
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app":        "experiment-analyzer",
+				"experiment": exp.Name,
+			},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit:            int32Ptr(1),
+			TTLSecondsAfterFinished: int32Ptr(3600),
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":        "experiment-analyzer",
+						"experiment": exp.Name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						{
+							Name:  "analyzer",
+							Image: r.AnalyzerImage,
+							Env: []corev1.EnvVar{
+								{
+									Name:  "EXPERIMENT_NAME",
+									Value: exp.Name,
+								},
+								{
+									Name:  "S3_ENDPOINT",
+									Value: s3Endpoint,
+								},
+								{
+									Name: "CLAUDE_CODE_OAUTH_TOKEN",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "claude-auth",
+											},
+											Key: "token",
+										},
+									},
+								},
+								{
+									Name: "GITHUB_TOKEN",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "github-api-token",
+											},
+											Key: "token",
+										},
+									},
+								},
+								{
+									Name:  "GITHUB_REPO",
+									Value: r.GitClient.RepoPath(),
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("512Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Set owner reference so the Job is garbage collected with the Experiment
+	if err := controllerutil.SetOwnerReference(exp, job, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference on analysis Job")
+		// Non-fatal: job will just not be garbage collected automatically
+	}
+
+	if err := r.Create(ctx, job); err != nil {
+		return fmt.Errorf("create analysis Job %s: %w", jobName, err)
+	}
+
+	log.Info("Created analysis Job", "job", jobName, "image", r.AnalyzerImage)
 	return nil
 }
 
@@ -1012,6 +1139,11 @@ func bootstrapClusterRBAC(ctx context.Context, kubeconfig []byte, gcpServiceAcco
 
 	log.Info("Created ClusterRoleBinding for client user on target cluster")
 	return nil
+}
+
+// int32Ptr returns a pointer to an int32 value.
+func int32Ptr(i int32) *int32 {
+	return &i
 }
 
 // SetupWithManager sets up the controller with the Manager.

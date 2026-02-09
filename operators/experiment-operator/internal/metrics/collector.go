@@ -80,6 +80,7 @@ type ExperimentSummary struct {
 	Workflow     WorkflowSummary `json:"workflow"`
 	Metrics      *MetricsResult  `json:"metrics,omitempty"`
 	CostEstimate *CostEstimate   `json:"costEstimate,omitempty"`
+	Analysis     *AnalysisResult `json:"analysis,omitempty"`
 }
 
 // TargetSummary captures per-target metadata.
@@ -107,6 +108,15 @@ type CostEstimate struct {
 	DurationHrs float64           `json:"durationHours"`
 	PerTarget   map[string]float64 `json:"perTarget,omitempty"`
 	Note        string             `json:"note"`
+}
+
+// AnalysisResult holds AI-generated analysis of experiment results.
+type AnalysisResult struct {
+	Summary         string            `json:"summary"`
+	MetricInsights  map[string]string `json:"metricInsights"`
+	Recommendations []string          `json:"recommendations,omitempty"`
+	GeneratedAt     time.Time         `json:"generatedAt"`
+	Model           string            `json:"model"`
 }
 
 // GCP on-demand hourly rates (USD) for common machine types.

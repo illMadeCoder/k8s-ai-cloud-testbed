@@ -160,7 +160,32 @@ git add site/data/${EXP_NAME}.json && git commit -m "data: Add ${EXP_NAME} resul
 The file must conform to the `ExperimentSummary` JSON shape (see `operators/experiment-operator/internal/metrics/collector.go`).
 Site types mirror Go structs in `site/src/types.ts`.
 
-### 6. SeaweedFS bucket / credential updates
+### 6. AI experiment analysis
+
+On experiment completion, the operator creates an analyzer Job (`experiment-analyzer-{name}`)
+that uses Claude Code CLI to generate AI analysis (summary, per-metric insights, recommendations).
+The analysis is merged into `summary.json` and committed to the benchmark site.
+
+**Setup: Store Claude Code token in OpenBao**
+
+```bash
+# Generate a long-lived token (uses Max subscription, ~1 year lifespan)
+claude setup-token
+
+# Store in OpenBao
+bao kv put secret/experiment-operator/claude-auth token="<token from setup-token>"
+
+# ESO syncs it to K8s Secret automatically via:
+#   platform/manifests/external-secrets-config/claude-auth-secret.yaml
+
+# Restart operator to pick up new env (if needed)
+kubectl rollout restart deployment/experiment-operator-controller-manager \
+  -n experiment-operator-system
+```
+
+Analyzer image: `ghcr.io/illmadecoder/experiment-analyzer` (built by CI on changes to `operators/experiment-analyzer/`).
+
+### 7. SeaweedFS bucket / credential updates
 
 ```bash
 # Re-create bucket job

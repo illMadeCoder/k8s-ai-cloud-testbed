@@ -118,5 +118,21 @@
       "app": 0.80
     },
     "note": "Rough estimate based on on-demand GCE pricing (e2-standard-4 x3 nodes, preemptible); actual cost may differ."
+  },
+  "analysis": {
+    "summary": "Elasticsearch ingested 35% more logs (13.7k vs 10.1k lines/s) and delivered 3x faster queries (0.36s vs 1.10s P99) than Loki, but at enormous resource cost: 7x more memory (2GB vs 300MB) and 5x more disk (5GB vs 1GB). Loki is the clear winner for cost-efficient logging where query latency under 2 seconds is acceptable.",
+    "metricInsights": {
+      "ingest_rate": "Elasticsearch sustained 13.7k lines/s versus Loki's 10.1k. The gap widened over time as Elasticsearch's in-memory indexing accelerated ingestion, while Loki's chunk-based approach stayed more consistent.",
+      "query_latency_p99": "Loki P99 latency climbed from 0.82s to 1.10s as data volume grew, while Elasticsearch held steady at 0.25-0.37s. Elasticsearch's inverted index provides fundamentally faster ad-hoc queries at the cost of higher resource consumption.",
+      "memory_usage": "Elasticsearch consumed 2GB versus Loki's 300MB — a 7x difference. This reflects Elasticsearch's aggressive in-memory caching of field data and segment structures for fast queries.",
+      "disk_usage": "Elasticsearch used 5GB of disk versus Loki's 1GB. Loki's label-based indexing with compressed chunks achieves dramatically better storage efficiency for structured log data."
+    },
+    "recommendations": [
+      "Use Loki for standard application logging where 1-2 second query latency is acceptable — it reduces memory by 85% and disk by 80% compared to Elasticsearch.",
+      "Reserve Elasticsearch for use cases requiring sub-second log search, full-text indexing, or complex aggregation queries that Loki's LogQL cannot efficiently serve.",
+      "Consider running Loki with S3-compatible object storage (SeaweedFS) instead of local disk to further reduce per-node storage costs in production."
+    ],
+    "generatedAt": "2026-02-09T12:00:00Z",
+    "model": "claude-opus-4-6"
   }
 }

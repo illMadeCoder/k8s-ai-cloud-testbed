@@ -13,6 +13,7 @@ export interface ExperimentSummary {
   workflow: WorkflowSummary;
   metrics?: MetricsResult;
   costEstimate?: CostEstimate;
+  analysis?: AnalysisResult;
 }
 
 export interface TargetSummary {
@@ -65,4 +66,12 @@ export interface CostEstimate {
   durationHours: number;
   perTarget?: Record<string, number>;
   note: string;
+}
+
+export interface AnalysisResult {
+  summary: string;
+  metricInsights: Record<string, string>;
+  recommendations?: string[];
+  generatedAt: string;
+  model: string;
 }

@@ -127,5 +127,21 @@
       "app": 0.25
     },
     "note": "Rough estimate based on on-demand GCE pricing (e2-standard-2 x3 nodes, preemptible); actual cost may differ."
+  },
+  "analysis": {
+    "summary": "Envoy Gateway delivered the highest throughput (7.15k req/s) with the lowest P99 latency (7ms), outperforming NGINX Ingress (5.35k req/s, 10ms) and Traefik (4.55k req/s, 16ms). However, Envoy used 31% more CPU (0.55 vs 0.42 cores) and 56% more memory (200MB vs 128MB) than NGINX. Traefik was the most resource-efficient but had the lowest throughput.",
+    "metricInsights": {
+      "throughput": "Envoy sustained 7.15k req/s at steady state, 34% higher than NGINX Ingress (5.35k) and 57% higher than Traefik (4.55k). All three gateways showed stable throughput after initial warmup, indicating no degradation under sustained load.",
+      "p99_latency": "Envoy maintained P99 latency at 5-7ms throughout the test, while NGINX ranged 8-12ms and Traefik 12-17ms. The latency gap between Envoy and competitors widened slightly under load, suggesting Envoy's event loop handles concurrency more efficiently.",
+      "cpu_usage": "Envoy used 0.55 cores versus NGINX's 0.42 and Traefik's 0.38. When normalized by throughput, Envoy processes 13k req/s per core compared to NGINX's 12.7k and Traefik's 12k — making Envoy slightly more CPU-efficient per request.",
+      "memory_usage": "Envoy's 200MB memory footprint is higher than NGINX (128MB) and Traefik (100MB), reflecting its richer filter chain and xDS configuration model. For environments with strict memory budgets, Traefik offers the smallest footprint."
+    },
+    "recommendations": [
+      "Choose Envoy Gateway for high-throughput, latency-sensitive workloads where its superior performance justifies the additional resource overhead.",
+      "Use NGINX Ingress for general-purpose ingress where broad ecosystem support and moderate resource usage are priorities over peak performance.",
+      "Consider Traefik for development or low-traffic environments where auto-discovery features and minimal resource consumption outweigh raw performance."
+    ],
+    "generatedAt": "2026-02-09T12:00:00Z",
+    "model": "claude-opus-4-6"
   }
 }

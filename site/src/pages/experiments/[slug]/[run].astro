@@ -55,6 +55,13 @@ const metricEntries = experiment.metrics
     </div>
   </div>
 
+  {experiment.analysis?.summary && (
+    <div class="analysis-box">
+      <h3 class="analysis-title">AI Analysis</h3>
+      <p>{experiment.analysis.summary}</p>
+    </div>
+  )}
+
   <div class="stats-row">
     <MetricCard label="Created" value={formatDate(experiment.createdAt)} />
     <MetricCard label="Duration" value={formatDuration(experiment.durationSeconds)} />
@@ -74,6 +81,9 @@ const metricEntries = experiment.metrics
         {metricEntries.map(([name, qr]) => (
           <div class="card">
             <VegaChart spec={buildSpec(name, qr)} />
+            {experiment.analysis?.metricInsights?.[name] && (
+              <p class="metric-insight">{experiment.analysis.metricInsights[name]}</p>
+            )}
           </div>
         ))}
       </div>
@@ -84,6 +94,15 @@ const metricEntries = experiment.metrics
     import vegaEmbed from 'vega-embed';
     (window as any).vegaEmbed = vegaEmbed;
   </script>
+
+  {experiment.analysis?.recommendations && experiment.analysis.recommendations.length > 0 && (
+    <div class="section">
+      <h2 class="section-title">Recommendations</h2>
+      <ul class="recommendations">
+        {experiment.analysis.recommendations.map((rec) => <li>{rec}</li>)}
+      </ul>
+    </div>
+  )}
 
   {experiment.costEstimate && (
     <CostBreakdown cost={experiment.costEstimate} />

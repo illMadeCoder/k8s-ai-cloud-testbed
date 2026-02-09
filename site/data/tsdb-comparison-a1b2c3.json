@@ -140,5 +140,21 @@
       "app": 0.60
     },
     "note": "Rough estimate based on on-demand GCE pricing (e2-standard-4 x3 nodes, preemptible); actual cost may differ."
+  },
+  "analysis": {
+    "summary": "VictoriaMetrics dominated this comparison, using 61% less memory (400MB vs 1GB) and 62% less CPU (0.32 vs 0.85 cores) than Prometheus while sustaining 30% higher ingestion rates (18.3k vs 14k samples/s). Mimir landed between the two on resource usage but added object storage complexity. Query latency strongly favored VictoriaMetrics at 0.16s P99 compared to 0.71s for Prometheus and 0.41s for Mimir.",
+    "metricInsights": {
+      "memory_peak": "VictoriaMetrics peaked at 400MB, less than half of Mimir (800MB) and under 40% of Prometheus (1GB). For resource-constrained environments, VictoriaMetrics offers a significantly smaller memory footprint.",
+      "cpu_avg": "VictoriaMetrics averaged 0.32 cores, roughly a third of Prometheus (0.85 cores). Mimir's 0.71 cores reflects its distributed architecture overhead even in single-node mode.",
+      "ingestion_rate": "VictoriaMetrics ramped up to 18.3k samples/s and stabilized, while Prometheus plateaued around 14k. Mimir reached 16k, showing its horizontal scaling potential even on a single node.",
+      "query_latency_p99": "VictoriaMetrics maintained consistently low P99 latency (0.12-0.17s) throughout the test. Prometheus latency degraded from 0.45s to 0.71s as data accumulated, suggesting index pressure under growing cardinality."
+    },
+    "recommendations": [
+      "Consider VictoriaMetrics as the primary TSDB for cost-sensitive deployments — it delivers better performance at roughly one-third the resource cost of Prometheus.",
+      "If Prometheus ecosystem compatibility is required, evaluate VictoriaMetrics as a remote-write target to get storage efficiency while keeping Prometheus for collection and alerting.",
+      "Mimir should be re-tested in a multi-node configuration to evaluate its horizontal scaling benefits, which are not visible in this single-node comparison."
+    ],
+    "generatedAt": "2026-02-09T12:00:00Z",
+    "model": "claude-opus-4-6"
   }
 }

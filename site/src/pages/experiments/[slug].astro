@@ -54,6 +54,13 @@ const metricEntries = latest.metrics
     </div>
   </div>
 
+  {latest.analysis?.summary && (
+    <div class="analysis-box">
+      <h3 class="analysis-title">AI Analysis</h3>
+      <p>{latest.analysis.summary}</p>
+    </div>
+  )}
+
   {group.runs.length > 1 && (
     <div class="section">
       <h2 class="section-title">Run History ({group.runs.length} runs)</h2>
@@ -116,6 +123,9 @@ const metricEntries = latest.metrics
         {metricEntries.map(([name, qr]) => (
           <div class="card">
             <VegaChart spec={buildSpec(name, qr)} />
+            {latest.analysis?.metricInsights?.[name] && (
+              <p class="metric-insight">{latest.analysis.metricInsights[name]}</p>
+            )}
           </div>
         ))}
       </div>
@@ -126,6 +136,15 @@ const metricEntries = latest.metrics
     import vegaEmbed from 'vega-embed';
     (window as any).vegaEmbed = vegaEmbed;
   </script>
+
+  {latest.analysis?.recommendations && latest.analysis.recommendations.length > 0 && (
+    <div class="section">
+      <h2 class="section-title">Recommendations</h2>
+      <ul class="recommendations">
+        {latest.analysis.recommendations.map((rec) => <li>{rec}</li>)}
+      </ul>
+    </div>
+  )}
 
   {latest.costEstimate && (
     <CostBreakdown cost={latest.costEstimate} />

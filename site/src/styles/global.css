@@ -220,3 +220,59 @@ code {
 .tag-link:hover {
   text-decoration: none;
 }
+
+.analysis-box {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.analysis-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}
+
+.analysis-box p {
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.metric-insight {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.recommendations {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recommendations li {
+  padding: 0.75rem 1rem 0.75rem 2.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  position: relative;
+  line-height: 1.55;
+}
+
+.recommendations li::before {
+  content: "\2192";
+  position: absolute;
+  left: 0.85rem;
+  color: var(--accent);
+  font-weight: 600;
+}

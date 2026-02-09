@@ -212,6 +212,8 @@ func main() {
 		setupLog.Info("GITHUB_TOKEN not set — site auto-publish disabled")
 	}
 
+	analyzerImage := getEnvOrDefault("ANALYZER_IMAGE", "ghcr.io/illmadecoder/experiment-analyzer:latest")
+
 	if err := (&controller.ExperimentReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
@@ -221,6 +223,8 @@ func main() {
 		S3Client:       s3Client,
 		GitClient:      gitClient,
 		MetricsURL:     metricsURL,
+		AnalyzerImage:  analyzerImage,
+		S3Endpoint:     s3Endpoint,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Experiment")
 		os.Exit(1)
