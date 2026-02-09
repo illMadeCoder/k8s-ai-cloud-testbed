@@ -72,6 +72,8 @@ spec:
               name: github-api-token
               key: token
               optional: true
+        - name: METRICS_URL
+          value: "http://victoria-metrics-victoria-metrics-single-server.observability.svc:8428"
         ports: []
         securityContext:
           readOnlyRootFilesystem: true
