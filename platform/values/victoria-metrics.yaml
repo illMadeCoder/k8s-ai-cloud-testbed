@@ -12,5 +12,5 @@ server:
       memory: 512Mi
   persistentVolume:
     enabled: true
-    storageClass: local-path
+    storageClassName: local-path
     size: 10Gi
