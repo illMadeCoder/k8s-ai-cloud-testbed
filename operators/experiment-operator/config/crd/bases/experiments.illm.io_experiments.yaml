@@ -142,6 +142,11 @@ spec:
                   - name
                   type: object
                 type: array
+              tags:
+                description: Tags for categorization on the benchmark site.
+                items:
+                  type: string
+                type: array
               ttlDays:
                 default: 1
                 description: TTL in days - experiment will be auto-deleted after this

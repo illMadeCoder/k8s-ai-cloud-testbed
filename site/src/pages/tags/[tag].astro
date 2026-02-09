@@ -1,0 +1,73 @@
+---
+import Base from '../../layouts/Base.astro';
+import ExperimentGroupCard from '../../components/ExperimentGroupCard.astro';
+import { loadAllExperiments, groupExperiments, getAllTags } from '../../lib/experiments';
+
+export function getStaticPaths() {
+  const experiments = loadAllExperiments();
+  const tags = getAllTags(experiments);
+  const groups = groupExperiments(experiments);
+
+  return tags.map((tag) => ({
+    params: { tag },
+    props: {
+      tag,
+      groups: groups.filter((g) => g.tags.includes(tag)),
+      allTags: tags,
+    },
+  }));
+}
+
+interface Props {
+  tag: string;
+  groups: import('../../lib/experiments').ExperimentGroup[];
+  allTags: string[];
+}
+
+const { tag, groups, allTags } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<Base title={`${tag} — K8s AI Lab Benchmarks`}>
+  <div class="tag-header">
+    <a href={base}>&larr; All Experiments</a>
+    <h1>Tag: {tag}</h1>
+    <p class="tag-count">{groups.length} experiment{groups.length !== 1 ? 's' : ''}</p>
+  </div>
+
+  <div class="tag-nav">
+    {allTags.map((t) => (
+      <a href={`${base}tags/${t}/`} class:list={['tag', { 'tag-active': t === tag }]}>{t}</a>
+    ))}
+  </div>
+
+  <div class="grid grid-3">
+    {groups.map((group) => (
+      <ExperimentGroupCard group={group} />
+    ))}
+  </div>
+</Base>
+
+<style>
+  .tag-header {
+    margin-bottom: 1rem;
+  }
+  .tag-header a {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+  .tag-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0.25rem 0;
+  }
+  .tag-count {
+    color: var(--text-muted);
+  }
+  .tag-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 1.5rem;
+  }
+</style>

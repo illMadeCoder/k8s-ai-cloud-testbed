@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "SLO tutorial - Pyrra SLO management, error budgets, multi-burn-rate alerting"
+  tags: ["tutorial", "observability", "slo"]
   ttlDays: 7
 
   targets:

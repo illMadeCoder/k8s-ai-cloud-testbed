@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "Gateway comparison - NGINX Ingress vs Traefik vs Envoy Gateway feature and performance analysis"
+  tags: ["comparison", "networking", "gateway"]
   ttlDays: 7
 
   targets:

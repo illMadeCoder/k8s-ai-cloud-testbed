@@ -53,6 +53,10 @@ type ExperimentSpec struct {
 	// If omitted, default CPU and memory queries are collected.
 	// +optional
 	Metrics []MetricsQuery `json:"metrics,omitempty"`
+
+	// Tags for categorization on the benchmark site (e.g., "observability", "networking").
+	// +optional
+	Tags []string `json:"tags,omitempty"`
 }
 
 // MetricsQuery defines a PromQL query to execute at experiment completion.

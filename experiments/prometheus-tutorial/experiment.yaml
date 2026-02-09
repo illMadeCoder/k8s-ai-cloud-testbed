@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "Prometheus metrics collection tutorial with Grafana dashboards"
+  tags: ["tutorial", "observability", "metrics"]
   ttlDays: 7
 
   targets:

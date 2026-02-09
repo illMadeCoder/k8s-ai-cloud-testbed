@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "Loki vs Elasticsearch logging comparison - architecture, resource usage, query performance"
+  tags: ["comparison", "observability", "logging"]
   ttlDays: 7
 
   targets:

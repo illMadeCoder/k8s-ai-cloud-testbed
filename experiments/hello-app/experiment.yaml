@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "Simple hello world app with k6 load generation"
+  tags: ["demo"]
   ttlDays: 1
 
   targets:

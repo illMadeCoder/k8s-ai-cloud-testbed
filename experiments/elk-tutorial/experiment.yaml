@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "ELK stack tutorial - Elasticsearch, Kibana, Fluent Bit log analytics"
+  tags: ["tutorial", "observability", "logging"]
   ttlDays: 7
 
   targets:

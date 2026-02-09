@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "Loki log aggregation tutorial with LogQL learning"
+  tags: ["tutorial", "observability", "logging"]
   ttlDays: 7
 
   targets:

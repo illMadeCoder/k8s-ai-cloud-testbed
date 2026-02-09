@@ -75,6 +75,7 @@ type ExperimentSummary struct {
 	CompletedAt  time.Time       `json:"completedAt"`
 	DurationSec  float64         `json:"durationSeconds"`
 	Phase        string          `json:"phase"`
+	Tags         []string        `json:"tags,omitempty"`
 	Targets      []TargetSummary `json:"targets"`
 	Workflow     WorkflowSummary `json:"workflow"`
 	Metrics      *MetricsResult  `json:"metrics,omitempty"`
@@ -133,6 +134,7 @@ func CollectSummary(exp *experimentsv1alpha1.Experiment) *ExperimentSummary {
 		Description: exp.Spec.Description,
 		CreatedAt:   exp.CreationTimestamp.Time,
 		Phase:       string(exp.Status.Phase),
+		Tags:        exp.Spec.Tags,
 	}
 
 	if exp.Status.CompletedAt != nil {

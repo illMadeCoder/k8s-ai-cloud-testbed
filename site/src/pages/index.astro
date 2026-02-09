@@ -1,24 +1,60 @@
 ---
 import Base from '../layouts/Base.astro';
-import ExperimentCard from '../components/ExperimentCard.astro';
-import { loadAllExperiments } from '../lib/experiments';
+import ExperimentGroupCard from '../components/ExperimentGroupCard.astro';
+import { loadAllExperiments, groupExperiments, getAllTags } from '../lib/experiments';
 
 const experiments = loadAllExperiments();
+const groups = groupExperiments(experiments);
+const allTags = getAllTags(experiments);
 ---
 
 <Base title="K8s AI Lab Benchmarks">
   <h1>Recent Experiments</h1>
 
-  {experiments.length === 0 ? (
+  {allTags.length > 0 && (
+    <div class="tag-filter-bar">
+      <button class="tag tag-active" data-tag="all">All</button>
+      {allTags.map((tag) => (
+        <button class="tag" data-tag={tag}>{tag}</button>
+      ))}
+    </div>
+  )}
+
+  {groups.length === 0 ? (
     <p class="empty">No experiments found. Add JSON files to <code>site/data/</code>.</p>
   ) : (
-    <div class="grid grid-3">
-      {experiments.map((exp) => (
-        <ExperimentCard experiment={exp} />
+    <div class="grid grid-3" id="experiment-grid">
+      {groups.map((group) => (
+        <ExperimentGroupCard group={group} />
       ))}
     </div>
   )}
 </Base>
+
+<script is:inline>
+  (function () {
+    var buttons = document.querySelectorAll('.tag-filter-bar .tag');
+    var cards = document.querySelectorAll('#experiment-grid .card-link');
+    if (!buttons.length) return;
+
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var tag = btn.getAttribute('data-tag');
+        buttons.forEach(function (b) { b.classList.remove('tag-active'); });
+        btn.classList.add('tag-active');
+
+        cards.forEach(function (card) {
+          if (tag === 'all') {
+            card.style.display = '';
+            return;
+          }
+          var cardTags = (card.getAttribute('data-tags') || '').split(',');
+          card.style.display = cardTags.indexOf(tag) !== -1 ? '' : 'none';
+        });
+      });
+    });
+  })();
+</script>
 
 <style>
   h1 {
@@ -26,11 +62,11 @@ const experiments = loadAllExperiments();
     font-weight: 700;
     margin-bottom: 0.5rem;
   }
-  .subtitle {
-    color: var(--text-muted);
-    margin-bottom: 2rem;
-    max-width: 700px;
-    line-height: 1.6;
+  .tag-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 1.5rem;
   }
   .empty {
     text-align: center;

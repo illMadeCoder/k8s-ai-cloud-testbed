@@ -6,6 +6,7 @@
   "completedAt": "2026-02-03T16:00:00Z",
   "durationSeconds": 7200,
   "phase": "Complete",
+  "tags": ["observability", "comparison", "logging"],
   "targets": [
     {
       "name": "app",

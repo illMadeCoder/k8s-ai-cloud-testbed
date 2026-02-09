@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "Tempo vs Jaeger tracing comparison - architecture, query languages, features"
+  tags: ["comparison", "observability", "tracing"]
   ttlDays: 7
 
   targets:

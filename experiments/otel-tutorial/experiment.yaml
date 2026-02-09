@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "OpenTelemetry distributed tracing tutorial - OTel Collector, Tempo, TraceQL"
+  tags: ["tutorial", "observability", "tracing"]
   ttlDays: 7
 
   targets:

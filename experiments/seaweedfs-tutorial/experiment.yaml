@@ -5,6 +5,7 @@ metadata:
   namespace: experiments
 spec:
   description: "SeaweedFS object storage tutorial - S3 API, volume packing, LOSF problem"
+  tags: ["tutorial", "storage"]
   ttlDays: 7
 
   targets:

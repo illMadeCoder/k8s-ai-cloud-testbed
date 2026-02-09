@@ -4,56 +4,110 @@ import MetricCard from '../../components/MetricCard.astro';
 import VegaChart from '../../components/VegaChart.astro';
 import TargetTable from '../../components/TargetTable.astro';
 import CostBreakdown from '../../components/CostBreakdown.astro';
-import { loadAllExperiments, getExperimentSlug } from '../../lib/experiments';
+import { loadAllExperiments, groupExperiments, getBaseName } from '../../lib/experiments';
 import { formatDuration, formatDate, formatCost } from '../../lib/format';
 import { buildSpec } from '../../lib/vega-specs';
 import type { ExperimentSummary } from '../../types';
+import type { ExperimentGroup } from '../../lib/experiments';
 
 export function getStaticPaths() {
   const experiments = loadAllExperiments();
-  return experiments.map((exp) => ({
-    params: { slug: getExperimentSlug(exp) },
-    props: { experiment: exp },
+  const groups = groupExperiments(experiments);
+  return groups.map((group) => ({
+    params: { slug: group.baseName },
+    props: { group },
   }));
 }
 
 interface Props {
-  experiment: ExperimentSummary;
+  group: ExperimentGroup;
 }
 
-const { experiment } = Astro.props;
+const { group } = Astro.props;
+const { latest } = group;
+const base = import.meta.env.BASE_URL;
 
-const badgeClass = experiment.phase === 'Complete'
+const badgeClass = latest.phase === 'Complete'
   ? 'badge-complete'
-  : experiment.phase === 'Failed'
+  : latest.phase === 'Failed'
     ? 'badge-failed'
     : 'badge-running';
 
-const metricEntries = experiment.metrics
-  ? Object.entries(experiment.metrics.queries).filter(([, qr]) => !qr.error)
+const metricEntries = latest.metrics
+  ? Object.entries(latest.metrics.queries).filter(([, qr]) => !qr.error)
   : [];
 ---
 
-<Base title={`${experiment.name} — K8s AI Lab Benchmarks`} description={experiment.description}>
+<Base title={`${group.baseName} — K8s AI Lab Benchmarks`} description={latest.description}>
   <div class="detail-header">
     <div>
-      <span class={`badge ${badgeClass}`}>{experiment.phase}</span>
-      <h1>{experiment.name}</h1>
-      <p class="description">{experiment.description}</p>
+      <span class={`badge ${badgeClass}`}>{latest.phase}</span>
+      <h1>{group.baseName}</h1>
+      <p class="description">{latest.description}</p>
+      {group.tags.length > 0 && (
+        <div class="detail-tags">
+          {group.tags.map((tag) => (
+            <a href={`${base}tags/${tag}/`} class="tag tag-link">{tag}</a>
+          ))}
+        </div>
+      )}
     </div>
   </div>
 
-  <div class="stats-row">
-    <MetricCard label="Created" value={formatDate(experiment.createdAt)} />
-    <MetricCard label="Duration" value={formatDuration(experiment.durationSeconds)} />
-    <MetricCard label="Targets" value={String(experiment.targets.length)} />
-    {experiment.costEstimate && (
-      <MetricCard label="Est. Cost" value={formatCost(experiment.costEstimate.totalUSD)} />
-    )}
-    <MetricCard label="Workflow" value={experiment.workflow.phase} />
+  {group.runs.length > 1 && (
+    <div class="section">
+      <h2 class="section-title">Run History ({group.runs.length} runs)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Phase</th>
+            <th>Date</th>
+            <th>Duration</th>
+            <th>Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {group.runs.map((run) => {
+            const runBadge = run.phase === 'Complete'
+              ? 'badge-complete'
+              : run.phase === 'Failed'
+                ? 'badge-failed'
+                : 'badge-running';
+            return (
+              <tr>
+                <td>
+                  <a href={`${base}experiments/${group.baseName}/${run.name}/`}>
+                    <code>{run.name}</code>
+                  </a>
+                </td>
+                <td><span class={`badge ${runBadge}`}>{run.phase}</span></td>
+                <td>{formatDate(run.createdAt)}</td>
+                <td>{formatDuration(run.durationSeconds)}</td>
+                <td>{run.costEstimate ? formatCost(run.costEstimate.totalUSD) : '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  )}
+
+  <div class="section">
+    <h2 class="section-title">Latest Run: <code>{latest.name}</code></h2>
   </div>
 
-  <TargetTable targets={experiment.targets} />
+  <div class="stats-row">
+    <MetricCard label="Created" value={formatDate(latest.createdAt)} />
+    <MetricCard label="Duration" value={formatDuration(latest.durationSeconds)} />
+    <MetricCard label="Targets" value={String(latest.targets.length)} />
+    {latest.costEstimate && (
+      <MetricCard label="Est. Cost" value={formatCost(latest.costEstimate.totalUSD)} />
+    )}
+    <MetricCard label="Workflow" value={latest.workflow.phase} />
+  </div>
+
+  <TargetTable targets={latest.targets} />
 
   {metricEntries.length > 0 && (
     <div class="section">
@@ -73,8 +127,8 @@ const metricEntries = experiment.metrics
     (window as any).vegaEmbed = vegaEmbed;
   </script>
 
-  {experiment.costEstimate && (
-    <CostBreakdown cost={experiment.costEstimate} />
+  {latest.costEstimate && (
+    <CostBreakdown cost={latest.costEstimate} />
   )}
 </Base>
 
@@ -92,5 +146,11 @@ const metricEntries = experiment.metrics
   .description {
     color: var(--text-muted);
     max-width: 700px;
+    margin-bottom: 0.75rem;
+  }
+  .detail-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
   }
 </style>

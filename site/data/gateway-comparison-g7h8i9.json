@@ -6,6 +6,7 @@
   "completedAt": "2026-02-05T10:15:00Z",
   "durationSeconds": 4500,
   "phase": "Complete",
+  "tags": ["networking", "comparison", "gateway"],
   "targets": [
     {
       "name": "app",

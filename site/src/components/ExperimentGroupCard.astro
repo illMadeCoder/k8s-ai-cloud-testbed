@@ -1,0 +1,95 @@
+---
+import type { ExperimentGroup } from '../lib/experiments';
+import { formatDuration, formatDate, formatCost } from '../lib/format';
+
+interface Props {
+  group: ExperimentGroup;
+}
+
+const { group } = Astro.props;
+const { latest } = group;
+const base = import.meta.env.BASE_URL;
+
+const badgeClass = latest.phase === 'Complete'
+  ? 'badge-complete'
+  : latest.phase === 'Failed'
+    ? 'badge-failed'
+    : 'badge-running';
+---
+
+<a href={`${base}experiments/${group.baseName}/`} class="card card-link" data-tags={group.tags.join(',')}>
+  <div class="card-header">
+    <div class="card-header-left">
+      <span class={`badge ${badgeClass}`}>{latest.phase}</span>
+      {group.runs.length > 1 && (
+        <span class="run-count">{group.runs.length} runs</span>
+      )}
+    </div>
+    <span class="card-date">{formatDate(latest.createdAt)}</span>
+  </div>
+  <h3 class="card-title">{group.baseName}</h3>
+  <p class="card-desc">{latest.description}</p>
+  {group.tags.length > 0 && (
+    <div class="card-tags">
+      {group.tags.map((tag) => (
+        <span class="tag">{tag}</span>
+      ))}
+    </div>
+  )}
+  <div class="card-meta">
+    <span>Duration: {formatDuration(latest.durationSeconds)}</span>
+    <span>Targets: {latest.targets.length}</span>
+    {latest.costEstimate && <span>Cost: {formatCost(latest.costEstimate.totalUSD)}</span>}
+  </div>
+</a>
+
+<style>
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+  .card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .run-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+  }
+  .card-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-mono);
+    word-break: break-all;
+  }
+  .card-desc {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+  }
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 0.75rem;
+  }
+  .card-meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+</style>

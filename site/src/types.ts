@@ -8,6 +8,7 @@ export interface ExperimentSummary {
   completedAt: string;
   durationSeconds: number;
   phase: string;
+  tags?: string[];
   targets: TargetSummary[];
   workflow: WorkflowSummary;
   metrics?: MetricsResult;
