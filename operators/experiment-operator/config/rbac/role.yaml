@@ -49,6 +49,14 @@ rules:
   - update
   - watch
 - apiGroups:
+  - argoproj.io
+  resources:
+  - workflowtemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - experiments.illm.io
   resources:
   - components

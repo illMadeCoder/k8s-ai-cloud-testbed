@@ -1,0 +1,26 @@
+# SeaweedFS S3 authentication config
+# Allows clients (Argo Workflows, experiment-operator) to use
+# AWS Signature V4 signed requests.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: seaweedfs-s3-config
+  namespace: seaweedfs
+type: Opaque
+stringData:
+  seaweedfs_s3_config: |
+    {
+      "identities": [
+        {
+          "name": "argo",
+          "credentials": [
+            {"accessKey": "any", "secretKey": "any"}
+          ],
+          "actions": ["Read", "Write", "List", "Tagging", "Admin"]
+        },
+        {
+          "name": "anonymous",
+          "actions": ["Read", "List"]
+        }
+      ]
+    }

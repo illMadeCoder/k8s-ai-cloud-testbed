@@ -62,9 +62,9 @@ filer:
   s3:
     enabled: true
     port: 8333
-    # Allow anonymous access for internal services
-    # In production, configure IAM/authentication
     allowEmptyFolder: true
+    enableAuth: true
+    existingConfigSecret: seaweedfs-s3-config
 
 # S3 gateway
 s3:
@@ -78,3 +78,7 @@ s3:
       cpu: 100m
   logs:
     type: emptyDir
+  # S3 authentication — allows Argo Workflows (and other clients) to use
+  # AWS Signature V4 signed requests against SeaweedFS.
+  enableAuth: true
+  existingConfigSecret: seaweedfs-s3-config
