@@ -33,10 +33,10 @@ spec:
         releaseName: kube-prometheus-stack
         valueFiles:
           - $values/components/observability/prometheus-stack/values.yaml
-    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
       targetRevision: HEAD
       ref: values
-    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
       targetRevision: HEAD
       path: components/observability/prometheus-stack
       directory:

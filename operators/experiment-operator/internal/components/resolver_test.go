@@ -101,7 +101,7 @@ func TestFallbackComponent_DefaultRepo(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expectedRepo := "https://github.com/illMadeCoder/k8s-ai-testbed.git"
+	expectedRepo := "https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git"
 	if resolved.Sources[0].RepoURL != expectedRepo {
 		t.Errorf("expected repo %s, got %s", expectedRepo, resolved.Sources[0].RepoURL)
 	}

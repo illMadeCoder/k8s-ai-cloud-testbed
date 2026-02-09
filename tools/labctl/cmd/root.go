@@ -7,7 +7,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "labctl",
 	Short: "Lab control tool for experiment-driven learning",
-	Long: `labctl provides interactive tutorial experiences for k8s-ai-testbed experiments.
+	Long: `labctl provides interactive tutorial experiences for k8s-ai-cloud-testbed experiments.
 
 It reads Experiment CRs from the hub cluster, extracts kubeconfigs and service
 endpoints, and renders rich terminal tutorials using bubbletea.`,

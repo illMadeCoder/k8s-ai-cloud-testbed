@@ -6,7 +6,7 @@ spec:
   type: app
   description: "Generates high-cardinality Prometheus metrics for cost analysis experiments"
   sources:
-    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
       targetRevision: HEAD
       path: components/apps/cardinality-generator/k8s
   observability:

@@ -113,7 +113,7 @@ annotations:
 # Verify Cosign signature
 cosign verify \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  --certificate-identity-regexp="github.com/illMadeCoder/k8s-ai-testbed" \
+  --certificate-identity-regexp="github.com/illMadeCoder/k8s-ai-cloud-testbed" \
   ghcr.io/illmadecoder/hello-app:latest
 
 # Verify SLSA provenance
@@ -124,7 +124,7 @@ gh attestation verify ghcr.io/illmadecoder/hello-app:latest \
 cosign verify-attestation \
   --type spdxjson \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  --certificate-identity-regexp="github.com/illMadeCoder/k8s-ai-testbed" \
+  --certificate-identity-regexp="github.com/illMadeCoder/k8s-ai-cloud-testbed" \
   ghcr.io/illmadecoder/hello-app:latest
 ```
 

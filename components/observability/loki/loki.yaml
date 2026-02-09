@@ -16,10 +16,10 @@ spec:
         releaseName: loki
         valueFiles:
           - $values/components/observability/loki/values.yaml
-    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
       targetRevision: HEAD
       ref: values
-    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
       targetRevision: HEAD
       path: components/observability/loki
       directory:

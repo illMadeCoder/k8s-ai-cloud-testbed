@@ -25,7 +25,7 @@ spec:
       helm:
         valueFiles:
           - $values/platform/values/victoria-metrics.yaml
-    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
       targetRevision: HEAD
       ref: values
   destination:

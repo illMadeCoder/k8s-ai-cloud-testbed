@@ -142,7 +142,7 @@ spec:
           namespace: argocd
         spec:
           source:
-            repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
+            repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
           destination:
             name: ""  # Patched to cluster name
       patches:

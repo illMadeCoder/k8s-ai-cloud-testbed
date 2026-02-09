@@ -16,7 +16,7 @@ spec:
         releaseName: rabbitmq
         valueFiles:
           - $values/components/messaging/rabbitmq/values.yaml
-    - repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
       targetRevision: HEAD
       ref: values
   destination:

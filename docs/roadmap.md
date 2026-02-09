@@ -1,4 +1,4 @@
-# k8s-ai-testbed Roadmap
+# k8s-ai-cloud-testbed Roadmap
 
 A **benchmarking-focused** Kubernetes experiment lab for **Cloud Architect**, **Platform Architect**, and **Solutions Architect** roles. Deploy, measure, cost-attribute each technology in the ecosystem.
 

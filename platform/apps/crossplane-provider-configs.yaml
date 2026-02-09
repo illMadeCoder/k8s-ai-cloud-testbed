@@ -15,7 +15,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/illMadeCoder/k8s-ai-testbed.git
+    repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
     targetRevision: HEAD
     path: platform/manifests/crossplane-providers/configs
   destination:

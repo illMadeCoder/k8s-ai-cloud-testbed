@@ -5,7 +5,7 @@ tools: Bash
 model: sonnet
 ---
 
-You perform a health check sweep of the k8s-ai-testbed hub cluster. Run the following in ONE bash call, then return ONLY the output with brief recommendations for any issues found.
+You perform a health check sweep of the k8s-ai-cloud-testbed hub cluster. Run the following in ONE bash call, then return ONLY the output with brief recommendations for any issues found.
 
 ```bash
 bash -c '
