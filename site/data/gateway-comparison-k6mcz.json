@@ -1,0 +1,36 @@
+{
+  "name": "gateway-comparison-k6mcz",
+  "namespace": "experiments",
+  "description": "Gateway comparison - NGINX Ingress vs Traefik vs Envoy Gateway feature and performance analysis",
+  "createdAt": "2026-02-10T15:14:10Z",
+  "completedAt": "2026-02-10T15:26:33.056868906Z",
+  "durationSeconds": 743.056868906,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "networking",
+    "gateway"
+  ],
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "gateway-comparison-k6mcz-app",
+      "clusterType": "gke"
+    }
+  ],
+  "workflow": {
+    "name": "gateway-comparison-k6mcz-validation",
+    "template": "gateway-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-10T15:26:17Z",
+    "finishedAt": "2026-02-10T15:26:28Z"
+  },
+  "costEstimate": {
+    "totalUSD": 0.004128093716144445,
+    "durationHours": 0.2064046858072222,
+    "perTarget": {
+      "app": 0.004128093716144445
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
