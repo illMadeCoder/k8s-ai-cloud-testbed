@@ -1,0 +1,36 @@
+{
+  "name": "tracing-comparison-scwp7",
+  "namespace": "experiments",
+  "description": "Tempo vs Jaeger tracing comparison - architecture, query languages, features",
+  "createdAt": "2026-02-10T13:54:22Z",
+  "completedAt": "2026-02-10T14:47:46.88201897Z",
+  "durationSeconds": 3204.88201897,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "observability",
+    "tracing"
+  ],
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "tracing-comparison-scwp7-app",
+      "clusterType": "gke"
+    }
+  ],
+  "workflow": {
+    "name": "tracing-comparison-scwp7-validation",
+    "template": "tracing-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-10T14:47:31Z",
+    "finishedAt": "2026-02-10T14:47:41Z"
+  },
+  "costEstimate": {
+    "totalUSD": 0.01780490010538889,
+    "durationHours": 0.8902450052694444,
+    "perTarget": {
+      "app": 0.01780490010538889
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
