@@ -275,18 +275,32 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 
 		log.Info("Discovered monitoring endpoints on target", "cluster", clusterName, "count", len(endpoints))
 
-		result, err := metrics.CollectMetricsFromTarget(ctx, kubeconfig, endpoints, exp)
-		if err != nil {
-			log.Error(err, "Target metrics collection failed", "cluster", clusterName)
-			continue
-		}
+		// Retry metrics collection — Prometheus may have just started and needs
+		// a few scrape intervals before it has data.
+		const maxCollectionAttempts = 6
+		const collectionRetryInterval = 30 * time.Second
+		for attempt := 1; attempt <= maxCollectionAttempts; attempt++ {
+			result, err := metrics.CollectMetricsFromTarget(ctx, kubeconfig, endpoints, exp)
+			if err != nil {
+				log.Error(err, "Target metrics collection failed", "cluster", clusterName, "attempt", attempt)
+				break
+			}
 
-		if !metrics.AllQueriesEmpty(result) {
-			metricsResult = result
-			log.Info("Collected metrics from target cluster", "cluster", clusterName, "source", result.Source)
+			if !metrics.AllQueriesEmpty(result) {
+				metricsResult = result
+				log.Info("Collected metrics from target cluster", "cluster", clusterName, "source", result.Source)
+				break
+			}
+			if attempt < maxCollectionAttempts {
+				log.Info("Target metrics returned empty data, waiting for scrape data", "cluster", clusterName, "attempt", attempt, "nextRetry", collectionRetryInterval)
+				time.Sleep(collectionRetryInterval)
+			} else {
+				log.Info("Target metrics still empty after retries", "cluster", clusterName)
+			}
+		}
+		if metricsResult != nil {
 			break
 		}
-		log.Info("Target metrics returned empty data", "cluster", clusterName)
 	}
 
 	// Phase 2: Fall back to hub VictoriaMetrics if target collection failed or returned empty.

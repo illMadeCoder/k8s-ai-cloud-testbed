@@ -215,12 +215,9 @@ func CollectMetricsFromTarget(ctx context.Context, kubeconfig []byte, endpoints 
 	logger := log.FromContext(ctx)
 
 	start := exp.CreationTimestamp.Time
-	var end time.Time
-	if exp.Status.CompletedAt != nil {
-		end = exp.Status.CompletedAt.Time
-	} else {
-		end = time.Now()
-	}
+	// Use current time as end — resources are still running during metrics collection
+	// (cleanup happens after). This captures data Prometheus scraped after the workflow finished.
+	end := time.Now()
 
 	duration := end.Sub(start)
 	if duration < 30*time.Second {
