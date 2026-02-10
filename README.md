@@ -182,34 +182,126 @@ in SeaweedFS S3.
 
 ## Experiment Model
 
-Two custom CRDs define the experiment system:
+Two custom CRDs define the experiment system: **Experiment** (namespaced) and
+**Component** (cluster-scoped).
 
-**Experiment** (namespaced) — what to run:
-```yaml
-spec:
-  targets:
-    - name: target
-      cluster: { provider: gke, preemptible: true }
-      components:
-        - app: prometheus        # resolves to Component CRD
-        - app: hello-app
-  workflow: { template: experiment-lifecycle }
-  metrics:
-    queries:
-      - name: p99_latency
-        query: histogram_quantile(0.99, rate(http_duration_seconds_bucket[5m]))
+### Operator Lifecycle
+
+```
+kubectl create -f experiment.yaml
+         │
+         ▼
+    ┌─────────┐     Crossplane provisions    ┌──────────────┐
+    │ Pending  │ ──────────────────────────►  │ Provisioning │
+    └─────────┘     GKE/EKS/AKS cluster      └──────┬───────┘
+                                                     │
+                    ArgoCD deploys components         │
+                    + injects Alloy agent             ▼
+                                               ┌───────────┐
+                    Argo Workflows runs         │   Ready    │
+                    validation + load gen       └─────┬─────┘
+                                                      │
+                         ┌────────────────────────────┘
+                         ▼
+                    ┌───────────┐
+                    │  Running  │ ◄── manual mode: stays here until user tears down
+                    └─────┬─────┘
+                          │  workflow completes (or user deletes)
+                          ▼
+                    ┌───────────┐     1. Collect metrics (target Prometheus → hub VM fallback)
+                    │ Complete  │     2. Store summary.json → SeaweedFS S3          (always)
+                    └─────┬─────┘     3. Commit to benchmark site via GitHub API   (publish: true)
+                          │           4. Launch AI analyzer Job (Claude Code)       (publish: true)
+                          │           5. Delete cloud cluster + ArgoCD apps
+                          ▼
+                       Cleaned
 ```
 
-**Component** (cluster-scoped) — reusable building blocks:
+At any point, unrecoverable errors transition to `Failed`. Steps 3–4 are
+best-effort and non-fatal — a GitHub API or analyzer failure won't block cleanup.
+
+### Experiment Spec
+
 ```yaml
+apiVersion: experiments.illm.io/v1alpha1
+kind: Experiment
+metadata:
+  generateName: tsdb-comparison-      # K8s appends a unique suffix
+  namespace: experiments
+spec:
+  description: "Prometheus vs VictoriaMetrics"
+  tags: ["comparison", "observability", "metrics"]
+  publish: true                        # publish results to benchmark site + AI analysis
+  ttlDays: 7                           # auto-delete after N days (default: 1)
+
+  targets:
+    - name: prometheus                 # deploy target name
+      cluster:
+        type: gke                      # gke | hub
+        preemptible: true              # use preemptible/spot nodes
+        # zone: us-central1-a          # GCP zone (optional)
+        # machineType: e2-standard-4   # node machine type (optional)
+        # nodeCount: 3                 # node count (optional)
+        # diskSizeGb: 50              # disk size (optional)
+      components:
+        - app: kube-prometheus-stack    # resolves to Component CRD by name
+          params:                       # override component parameters
+            grafana.enabled: "true"
+        - app: metrics-app
+      observability:
+        enabled: true                  # inject Alloy + Tailscale for metrics backhaul
+        transport: tailscale           # tailscale | direct
+      # depends: [other-target]        # wait for another target to be ready first
+
+  workflow:
+    template: experiment-lifecycle      # Argo WorkflowTemplate name
+    completion:
+      mode: workflow                   # workflow: auto-complete | manual: stay running
+    # params:                          # extra workflow parameters
+    #   duration: "10m"
+
+  metrics:                             # custom PromQL queries (optional — defaults provided)
+    - name: p99_latency
+      query: histogram_quantile(0.99, rate(http_duration_seconds_bucket[5m]))
+      type: range                      # instant (bar chart) | range (line chart)
+      unit: seconds
+      description: "P99 request latency"
+
+  # tutorial:                          # interactive mode — exposes kubeconfig + service endpoints
+  #   exposeKubeconfig: true
+  #   services:
+  #     - name: grafana
+  #       target: prometheus
+  #       service: kube-prometheus-stack-grafana
+  #       namespace: tsdb-comparison
+```
+
+### Completion Modes
+
+| Mode | Behavior | Use case |
+|------|----------|----------|
+| `workflow` | Auto-completes when Argo Workflow finishes | Comparisons, benchmarks |
+| `manual` | Stays `Running` until user deletes the experiment | Tutorials, interactive demos |
+
+### Component CRD
+
+Reusable building blocks referenced by `spec.targets[].components[].app`:
+
+```yaml
+apiVersion: experiments.illm.io/v1alpha1
+kind: Component
+metadata:
+  name: kube-prometheus-stack          # referenced by app: field
 spec:
   sources:
-    helm: { repo: https://prometheus-community.github.io/helm-charts, chart: prometheus }
+    helm:
+      repo: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
   parameters: { retention: 24h }
   observability: { serviceMonitor: true }
 ```
 
-Lifecycle: `Pending → Provisioning → Ready → Running → Complete → Results (S3 + charts)`
+42 components across 8 categories in `components/`.
 
 ## Project Structure
 

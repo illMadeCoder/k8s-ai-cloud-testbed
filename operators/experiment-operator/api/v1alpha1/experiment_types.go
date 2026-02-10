@@ -267,6 +267,14 @@ type ExperimentStatus struct {
 	// +optional
 	ResultsURL string `json:"resultsURL,omitempty"`
 
+	// Published indicates whether results were successfully committed to the benchmark site
+	// +optional
+	Published bool `json:"published,omitempty"`
+
+	// AnalysisJobName is the name of the AI analyzer Job (empty if not launched)
+	// +optional
+	AnalysisJobName string `json:"analysisJobName,omitempty"`
+
 	// Conditions
 	// +listType=map
 	// +listMapKey=type
@@ -355,6 +363,7 @@ type WorkflowStatus struct {
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Targets",type=string,JSONPath=`.spec.targets[*].name`
 // +kubebuilder:printcolumn:name="Workflow",type=string,JSONPath=`.status.workflowStatus.phase`
+// +kubebuilder:printcolumn:name="Published",type=boolean,JSONPath=`.status.published`
 // +kubebuilder:printcolumn:name="Cleaned",type=boolean,JSONPath=`.status.resourcesCleaned`
 // +kubebuilder:printcolumn:name="Results",type=string,JSONPath=`.status.resultsURL`,priority=1
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`

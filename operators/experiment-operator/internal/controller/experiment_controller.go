@@ -314,6 +314,7 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 			if err := r.GitClient.CommitResult(ctx, exp.Name, summary); err != nil {
 				log.Error(err, "Failed to commit results to GitHub — non-fatal", "repo", r.GitClient.RepoPath())
 			} else {
+				exp.Status.Published = true
 				log.Info("Results committed to GitHub", "experiment", exp.Name, "repo", r.GitClient.RepoPath())
 			}
 		}
@@ -322,6 +323,12 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 		if r.AnalyzerImage != "" {
 			if err := r.createAnalysisJob(ctx, exp); err != nil {
 				log.Error(err, "Failed to create analysis Job — non-fatal")
+			} else {
+				jobName := fmt.Sprintf("experiment-analyzer-%s", exp.Name)
+				if len(jobName) > 63 {
+					jobName = jobName[:63]
+				}
+				exp.Status.AnalysisJobName = jobName
 			}
 		}
 	} else if !exp.Spec.Publish {
