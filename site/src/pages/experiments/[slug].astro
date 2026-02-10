@@ -35,9 +35,12 @@ const badgeClass = latest.phase === 'Complete'
     ? 'badge-failed'
     : 'badge-running';
 
-const metricEntries = latest.metrics
+const allMetricEntries = latest.metrics
   ? Object.entries(latest.metrics.queries).filter(([, qr]) => !qr.error)
   : [];
+const metricEntries = allMetricEntries.filter(([, qr]) => qr.data && qr.data.length > 0);
+const hasMetricsSection = latest.metrics != null;
+const metricsEmpty = hasMetricsSection && metricEntries.length === 0;
 ---
 
 <Base title={`${displayName} — K8s AI Lab Benchmarks`} description={latest.description}>
@@ -128,6 +131,9 @@ const metricEntries = latest.metrics
   {metricEntries.length > 0 && (
     <div class="section">
       <h2 class="section-title">Metrics</h2>
+      {latest.metrics?.source && (
+        <p class="metrics-source">Source: <code>{latest.metrics.source}</code></p>
+      )}
       <div class="grid grid-2">
         {metricEntries.map(([name, qr]) => (
           <div class="card">
@@ -137,6 +143,16 @@ const metricEntries = latest.metrics
             )}
           </div>
         ))}
+      </div>
+    </div>
+  )}
+
+  {metricsEmpty && (
+    <div class="section">
+      <h2 class="section-title">Metrics</h2>
+      <div class="empty-state">
+        <p>No metrics data collected for this experiment run.</p>
+        <p class="empty-hint">The target cluster may not have had a monitoring stack deployed, or the queries returned no results. Re-running the experiment with the latest operator will attempt to collect metrics directly from the target cluster's Prometheus.</p>
       </div>
     </div>
   )}
@@ -180,5 +196,28 @@ const metricEntries = latest.metrics
     display: flex;
     flex-wrap: wrap;
     gap: 0.375rem;
+  }
+  .metrics-source {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+  .metrics-source code {
+    color: var(--accent);
+  }
+  .empty-state {
+    padding: 2rem;
+    border: 1px dashed var(--border);
+    border-radius: 0.5rem;
+    text-align: center;
+    color: var(--text-muted);
+  }
+  .empty-state p {
+    margin: 0.5rem 0;
+  }
+  .empty-hint {
+    font-size: 0.85rem;
+    max-width: 600px;
+    margin: 0.5rem auto 0;
   }
 </style>
