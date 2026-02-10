@@ -21,11 +21,6 @@ spec:
         - app: otel-collector
         - app: tempo
         - app: jaeger
-        - app: kube-prometheus-stack
-          params:
-            prometheus.enabled: "true"
-            grafana.enabled: "true"
-            alertmanager.enabled: "false"
         - app: otel-demo
 
   workflow:

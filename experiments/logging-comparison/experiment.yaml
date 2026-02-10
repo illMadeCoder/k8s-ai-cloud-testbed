@@ -23,11 +23,6 @@ spec:
         - app: elasticsearch
         - app: kibana
         - app: fluent-bit
-        - app: kube-prometheus-stack
-          params:
-            prometheus.enabled: "false"
-            alertmanager.enabled: "false"
-            grafana.enabled: "true"
         - app: log-generator
 
   workflow:

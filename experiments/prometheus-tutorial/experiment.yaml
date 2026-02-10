@@ -22,7 +22,7 @@ spec:
         - app: station-monitor
       observability:
         enabled: true
-        transport: direct
+        transport: tailscale
 
   workflow:
     template: prometheus-validation

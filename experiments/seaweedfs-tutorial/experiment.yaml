@@ -13,6 +13,9 @@ spec:
       cluster:
         type: gke
         preemptible: true
+      observability:
+        enabled: true
+        transport: tailscale
       components:
         - app: seaweedfs
         - app: kube-prometheus-stack

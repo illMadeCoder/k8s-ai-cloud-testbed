@@ -13,6 +13,9 @@ spec:
       cluster:
         type: gke
         preemptible: true
+      observability:
+        enabled: true
+        transport: tailscale
       components:
         - app: nginx-ingress
         - app: envoy-gateway

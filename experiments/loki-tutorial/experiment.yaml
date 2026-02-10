@@ -24,7 +24,7 @@ spec:
         - app: log-generator
       observability:
         enabled: true
-        transport: direct
+        transport: tailscale
 
   workflow:
     template: loki-validation
