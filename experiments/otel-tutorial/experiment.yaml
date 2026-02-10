@@ -6,6 +6,7 @@ metadata:
 spec:
   description: "OpenTelemetry distributed tracing tutorial - OTel Collector, Tempo, TraceQL"
   tags: ["tutorial", "observability", "tracing"]
+  publish: true
   ttlDays: 7
 
   targets:

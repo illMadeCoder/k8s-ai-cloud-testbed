@@ -142,6 +142,11 @@ spec:
                   - name
                   type: object
                 type: array
+              publish:
+                description: Publish controls whether results are published to the
+                  benchmark site and whether AI analysis is generated. When false
+                  (default), results are only stored in S3.
+                type: boolean
               tags:
                 description: Tags for categorization on the benchmark site.
                 items:

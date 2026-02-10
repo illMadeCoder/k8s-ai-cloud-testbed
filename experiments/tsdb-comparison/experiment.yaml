@@ -6,6 +6,7 @@ metadata:
 spec:
   description: "TSDB comparison - Prometheus vs VictoriaMetrics vs Mimir resource efficiency and query performance"
   tags: ["comparison", "observability", "metrics"]
+  publish: true
   ttlDays: 7
 
   targets:

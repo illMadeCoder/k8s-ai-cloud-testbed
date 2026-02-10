@@ -6,6 +6,7 @@ metadata:
 spec:
   description: "Gateway comparison - NGINX Ingress vs Traefik vs Envoy Gateway feature and performance analysis"
   tags: ["comparison", "networking", "gateway"]
+  publish: true
   ttlDays: 7
 
   targets:

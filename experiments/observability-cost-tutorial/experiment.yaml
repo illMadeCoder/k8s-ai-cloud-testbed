@@ -6,6 +6,7 @@ metadata:
 spec:
   description: "Observability cost management - cardinality explosion, log volume, retention strategies"
   tags: ["tutorial", "observability", "cost"]
+  publish: true
   ttlDays: 7
 
   targets:

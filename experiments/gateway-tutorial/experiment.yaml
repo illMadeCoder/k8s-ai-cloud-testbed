@@ -6,6 +6,7 @@ metadata:
 spec:
   description: "Gateway API tutorial - Ingress basics to Gateway API migration with Envoy"
   tags: ["tutorial", "networking", "gateway"]
+  publish: true
   ttlDays: 7
 
   targets:

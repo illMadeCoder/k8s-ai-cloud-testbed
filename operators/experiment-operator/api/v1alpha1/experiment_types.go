@@ -57,6 +57,12 @@ type ExperimentSpec struct {
 	// Tags for categorization on the benchmark site (e.g., "observability", "networking").
 	// +optional
 	Tags []string `json:"tags,omitempty"`
+
+	// Publish controls whether results are published to the benchmark site and
+	// whether AI analysis is generated. When false (default), results are only
+	// stored in S3. Set to true for experiments intended for public display.
+	// +optional
+	Publish bool `json:"publish,omitempty"`
 }
 
 // MetricsQuery defines a PromQL query to execute at experiment completion.

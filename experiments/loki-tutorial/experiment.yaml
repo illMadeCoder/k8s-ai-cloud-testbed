@@ -6,6 +6,7 @@ metadata:
 spec:
   description: "Loki log aggregation tutorial with LogQL learning"
   tags: ["tutorial", "observability", "logging"]
+  publish: true
   ttlDays: 7
 
   targets:

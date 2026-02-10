@@ -256,22 +256,26 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 	exp.Status.ResultsURL = fmt.Sprintf("s3://experiment-results/%s/", prefix)
 	log.Info("Experiment results stored", "url", exp.Status.ResultsURL)
 
-	// Commit results to GitHub for benchmark site (best-effort, non-fatal).
-	// Only publish Complete experiments — Failed runs are stored in S3 but not on the site.
-	if r.GitClient != nil && exp.Status.Phase == experimentsv1alpha1.PhaseComplete {
-		if err := r.GitClient.CommitResult(ctx, exp.Name, summary); err != nil {
-			log.Error(err, "Failed to commit results to GitHub — non-fatal", "repo", r.GitClient.RepoPath())
-		} else {
-			log.Info("Results committed to GitHub", "experiment", exp.Name, "repo", r.GitClient.RepoPath())
+	// Commit results to GitHub and run AI analysis only for publishable experiments.
+	// Non-publish experiments are stored in S3 only (no site publish, no AI analysis cost).
+	if exp.Spec.Publish && exp.Status.Phase == experimentsv1alpha1.PhaseComplete {
+		// Commit results to GitHub for benchmark site (best-effort, non-fatal).
+		if r.GitClient != nil {
+			if err := r.GitClient.CommitResult(ctx, exp.Name, summary); err != nil {
+				log.Error(err, "Failed to commit results to GitHub — non-fatal", "repo", r.GitClient.RepoPath())
+			} else {
+				log.Info("Results committed to GitHub", "experiment", exp.Name, "repo", r.GitClient.RepoPath())
+			}
 		}
-	}
 
-	// Launch AI analysis Job (best-effort, non-fatal).
-	// Only analyze Complete experiments. Requires analyzer image to be configured.
-	if r.AnalyzerImage != "" && exp.Status.Phase == experimentsv1alpha1.PhaseComplete {
-		if err := r.createAnalysisJob(ctx, exp); err != nil {
-			log.Error(err, "Failed to create analysis Job — non-fatal")
+		// Launch AI analysis Job (best-effort, non-fatal).
+		if r.AnalyzerImage != "" {
+			if err := r.createAnalysisJob(ctx, exp); err != nil {
+				log.Error(err, "Failed to create analysis Job — non-fatal")
+			}
 		}
+	} else if !exp.Spec.Publish {
+		log.Info("Skipping site publish and AI analysis — spec.publish is false", "experiment", exp.Name)
 	}
 
 	return nil

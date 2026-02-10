@@ -6,6 +6,7 @@ metadata:
 spec:
   description: "Loki vs Elasticsearch logging comparison - architecture, resource usage, query performance"
   tags: ["comparison", "observability", "logging"]
+  publish: true
   ttlDays: 7
 
   targets:

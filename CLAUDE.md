@@ -115,6 +115,12 @@ Experiments are categorized by tags into domains:
 
 Experiment types derived from tags: `comparison`, `tutorial`, `demo`, `baseline`.
 
+### Publishing
+
+Experiments must have `spec.publish: true` to be published to the site and receive AI analysis.
+Without this field (or `publish: false`), results are stored in S3 only — no GitHub commit, no
+analyzer job, no API cost. The `hello-app` demo experiment is the only one left unpublished.
+
 ### Design
 
 - **Tailwind-first** with CSS custom properties for dark mode (`prefers-color-scheme: dark`)
@@ -256,7 +262,7 @@ kubectl apply -f platform/manifests/seaweedfs-config/s3-credentials.yaml
 
 - **ArgoCD apps**: Labels `experiment: {name}`, `cluster: target|loadgen`
 - **ArgoCD patterns**: Multi-source, sync waves, `ignoreDifferences` for CRDs (see `docs/gitops-patterns.md`)
-- **Experiment YAML**: Use `generateName:` prefix, `namespace: experiments`
+- **Experiment YAML**: Use `generateName:` prefix, `namespace: experiments`, `publish: true` for site-bound experiments
 - **Component refs**: `spec.targets[].components[].app` maps to `components/*/component.yaml` by `metadata.name`
 - **Metrics query names**: Must match `^[a-z][a-z0-9_]*$`
 

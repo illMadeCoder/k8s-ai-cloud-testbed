@@ -6,6 +6,7 @@ metadata:
 spec:
   description: "Tempo vs Jaeger tracing comparison - architecture, query languages, features"
   tags: ["comparison", "observability", "tracing"]
+  publish: true
   ttlDays: 7
 
   targets:
