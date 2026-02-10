@@ -233,7 +233,11 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 
 	// Phase 1: Try collecting metrics from target cluster monitoring stacks.
 	// Target clusters (GKE) often have Prometheus/VictoriaMetrics deployed as components.
+	// Retry discovery because ArgoCD may still be deploying monitoring when the workflow completes.
 	var metricsResult *metrics.MetricsResult
+	const maxDiscoveryAttempts = 6
+	const discoveryRetryInterval = 10 * time.Second
+
 	for i, target := range exp.Spec.Targets {
 		if target.Cluster.Type == "hub" {
 			continue
@@ -249,10 +253,20 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 			continue
 		}
 
-		endpoints, err := metrics.DiscoverMonitoringServices(ctx, kubeconfig, exp.Name)
-		if err != nil {
-			log.Error(err, "Monitoring discovery failed", "cluster", clusterName)
-			continue
+		var endpoints []metrics.MonitoringEndpoint
+		for attempt := 1; attempt <= maxDiscoveryAttempts; attempt++ {
+			endpoints, err = metrics.DiscoverMonitoringServices(ctx, kubeconfig, exp.Name)
+			if err != nil {
+				log.Error(err, "Monitoring discovery failed", "cluster", clusterName, "attempt", attempt)
+				break
+			}
+			if len(endpoints) > 0 {
+				break
+			}
+			if attempt < maxDiscoveryAttempts {
+				log.Info("No monitoring services found yet, retrying", "cluster", clusterName, "attempt", attempt, "nextRetry", discoveryRetryInterval)
+				time.Sleep(discoveryRetryInterval)
+			}
 		}
 		if len(endpoints) == 0 {
 			log.Info("No monitoring services found on target cluster", "cluster", clusterName)
