@@ -11,9 +11,7 @@ const { group } = Astro.props;
 const { latest } = group;
 const base = import.meta.env.BASE_URL;
 
-const contenders = latest.targets.map((t) =>
-  t.components?.join(', ') || t.name
-);
+const tags = (group.tags || []).filter((t) => t !== 'comparison');
 ---
 
 <a href={`${base}experiments/${group.baseName}/`} class="block bg-bg-card border border-border rounded p-5 shadow hover:shadow-lg transition-shadow no-underline group">
@@ -25,10 +23,10 @@ const contenders = latest.targets.map((t) =>
     {formatDisplayName(group.baseName)}
   </h3>
   <p class="text-sm text-text-muted mb-3 line-clamp-2">{latest.description}</p>
-  {contenders.length > 0 && (
+  {tags.length > 0 && (
     <div class="flex flex-wrap gap-1.5">
-      {contenders.map((c) => (
-        <span class="text-xs px-2 py-0.5 rounded-full bg-bg-surface text-text-muted border border-border font-mono">{c}</span>
+      {tags.map((tag) => (
+        <span class="text-xs px-2 py-0.5 rounded-full bg-bg-surface text-text-muted border border-border font-mono">{tag}</span>
       ))}
     </div>
   )}
