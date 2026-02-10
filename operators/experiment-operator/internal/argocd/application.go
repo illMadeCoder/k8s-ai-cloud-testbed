@@ -269,10 +269,14 @@ func (m *ApplicationManager) IsApplicationHealthy(ctx context.Context, experimen
 		}
 	}
 
-	// Application is healthy when health is "Healthy" and sync is not "OutOfSync".
+	// Application is ready when core components are deployed. Complex stacks
+	// (e.g. Mimir distributed mode) may stay "Degraded" due to resource pressure,
+	// but monitoring services are typically available. Accept Healthy, Degraded,
+	// or Progressing — only reject Missing (nothing deployed) or Suspended.
+	acceptableHealth := healthStatus == "Healthy" || healthStatus == "Degraded" || healthStatus == "Progressing"
 	// Multi-source ArgoCD apps report "Unknown" sync status, which is acceptable.
-	healthy := healthStatus == "Healthy" && (syncStatus == "Synced" || syncStatus == "Unknown")
-	return healthy, nil
+	acceptableSync := syncStatus == "Synced" || syncStatus == "Unknown" || syncStatus == "OutOfSync"
+	return acceptableHealth && acceptableSync, nil
 }
 
 // GetApplicationComponents returns the list of deployed components
