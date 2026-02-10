@@ -1,5 +1,6 @@
 ---
 import type { ExperimentGroup } from '../lib/experiments';
+import { formatDisplayName } from '../lib/experiments';
 import { formatDate } from '../lib/format';
 
 interface Props {
@@ -21,7 +22,7 @@ const contenders = latest.targets.map((t) =>
     <span class="text-xs text-text-muted">{formatDate(latest.createdAt)}</span>
   </div>
   <h3 class="text-base font-semibold font-mono text-text group-hover:text-accent transition-colors mb-2">
-    {group.baseName}
+    {formatDisplayName(group.baseName)}
   </h3>
   <p class="text-sm text-text-muted mb-3 line-clamp-2">{latest.description}</p>
   {contenders.length > 0 && (

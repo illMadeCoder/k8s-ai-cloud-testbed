@@ -5,7 +5,7 @@ import MetricCard from '../../components/MetricCard.astro';
 import VegaChart from '../../components/VegaChart.astro';
 import TargetTable from '../../components/TargetTable.astro';
 import CostBreakdown from '../../components/CostBreakdown.astro';
-import { loadAllExperiments, groupExperiments, getBaseName } from '../../lib/experiments';
+import { loadAllExperiments, groupExperiments, getBaseName, formatDisplayName } from '../../lib/experiments';
 import { formatDuration, formatDate, formatCost } from '../../lib/format';
 import { buildSpec } from '../../lib/vega-specs';
 import type { ExperimentSummary } from '../../types';
@@ -27,6 +27,7 @@ interface Props {
 const { group } = Astro.props;
 const { latest } = group;
 const base = import.meta.env.BASE_URL;
+const displayName = formatDisplayName(group.baseName);
 
 const badgeClass = latest.phase === 'Complete'
   ? 'badge-complete'
@@ -39,12 +40,12 @@ const metricEntries = latest.metrics
   : [];
 ---
 
-<Base title={`${group.baseName} — K8s AI Lab Benchmarks`} description={latest.description}>
+<Base title={`${displayName} — K8s AI Lab Benchmarks`} description={latest.description}>
   <Breadcrumb
     crumbs={[
       { label: 'Home', href: base },
       { label: 'Experiments', href: base },
-      { label: group.baseName },
+      { label: displayName },
     ]}
     slot="breadcrumb"
   />
@@ -52,7 +53,7 @@ const metricEntries = latest.metrics
   <div class="detail-header">
     <div>
       <span class={`badge ${badgeClass}`}>{latest.phase}</span>
-      <h1>{group.baseName}</h1>
+      <h1>{displayName}</h1>
       <p class="description">{latest.description}</p>
       {group.tags.length > 0 && (
         <div class="detail-tags">
@@ -71,44 +72,42 @@ const metricEntries = latest.metrics
     </div>
   )}
 
-  {group.runs.length > 1 && (
-    <div class="section">
-      <h2 class="section-title">Run History ({group.runs.length} runs)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Run</th>
-            <th>Phase</th>
-            <th>Date</th>
-            <th>Duration</th>
-            <th>Cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {group.runs.map((run) => {
-            const runBadge = run.phase === 'Complete'
-              ? 'badge-complete'
-              : run.phase === 'Failed'
-                ? 'badge-failed'
-                : 'badge-running';
-            return (
-              <tr>
-                <td>
-                  <a href={`${base}experiments/${group.baseName}/${run.name}/`}>
-                    <code>{run.name}</code>
-                  </a>
-                </td>
-                <td><span class={`badge ${runBadge}`}>{run.phase}</span></td>
-                <td>{formatDate(run.createdAt)}</td>
-                <td>{formatDuration(run.durationSeconds)}</td>
-                <td>{run.costEstimate ? formatCost(run.costEstimate.totalUSD) : '—'}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  )}
+  <div class="section">
+    <h2 class="section-title">Run History ({group.runs.length} {group.runs.length === 1 ? 'run' : 'runs'})</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Phase</th>
+          <th>Date</th>
+          <th>Duration</th>
+          <th>Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        {group.runs.map((run) => {
+          const runBadge = run.phase === 'Complete'
+            ? 'badge-complete'
+            : run.phase === 'Failed'
+              ? 'badge-failed'
+              : 'badge-running';
+          return (
+            <tr>
+              <td>
+                <a href={`${base}experiments/${group.baseName}/${run.name}/`}>
+                  <code>{run.name}</code>
+                </a>
+              </td>
+              <td><span class={`badge ${runBadge}`}>{run.phase}</span></td>
+              <td>{formatDate(run.createdAt)}</td>
+              <td>{formatDuration(run.durationSeconds)}</td>
+              <td>{run.costEstimate ? formatCost(run.costEstimate.totalUSD) : '—'}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
 
   <div class="section">
     <h2 class="section-title">Latest Run: <code>{latest.name}</code></h2>

@@ -5,7 +5,7 @@ import MetricCard from '../../../components/MetricCard.astro';
 import VegaChart from '../../../components/VegaChart.astro';
 import TargetTable from '../../../components/TargetTable.astro';
 import CostBreakdown from '../../../components/CostBreakdown.astro';
-import { loadAllExperiments, getBaseName } from '../../../lib/experiments';
+import { loadAllExperiments, getBaseName, formatDisplayName } from '../../../lib/experiments';
 import { formatDuration, formatDate, formatCost } from '../../../lib/format';
 import { buildSpec } from '../../../lib/vega-specs';
 import type { ExperimentSummary } from '../../../types';
@@ -25,6 +25,7 @@ interface Props {
 const { experiment } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const baseName = getBaseName(experiment.name);
+const displayName = formatDisplayName(baseName);
 
 const badgeClass = experiment.phase === 'Complete'
   ? 'badge-complete'
@@ -42,7 +43,7 @@ const metricEntries = experiment.metrics
     crumbs={[
       { label: 'Home', href: base },
       { label: 'Experiments', href: base },
-      { label: baseName, href: `${base}experiments/${baseName}/` },
+      { label: displayName, href: `${base}experiments/${baseName}/` },
       { label: experiment.name },
     ]}
     slot="breadcrumb"

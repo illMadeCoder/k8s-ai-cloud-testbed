@@ -35,12 +35,26 @@ export function getExperimentSlug(exp: ExperimentSummary): string {
 
 /**
  * Strip the random K8s generateName suffix.
- * Experiment names follow `{prefix}-{random}` where random is 6 lowercase alphanumeric chars.
- * E.g. "gateway-comparison-g7h8i9" → "gateway-comparison"
+ * Experiment names follow `{prefix}-{random}` where random is 5 lowercase alphanumeric chars.
+ * E.g. "gateway-comparison-qh4rc" → "gateway-comparison"
  */
 export function getBaseName(name: string): string {
-  const match = name.match(/^(.+)-[a-z0-9]{6}$/);
+  const match = name.match(/^(.+)-[a-z0-9]{5}$/);
   return match ? match[1] : name;
+}
+
+/** Well-known acronyms to preserve when formatting display names. */
+const acronyms = new Set(['tsdb', 'api', 'cpu', 'gpu', 'slo', 'sli', 'http', 'grpc', 'dns', 'tls', 'gke', 'k8s', 'vm', 'ci', 'cd']);
+
+/**
+ * Format a base name for human display.
+ * E.g. "tsdb-comparison" → "TSDB Comparison", "gateway-comparison" → "Gateway Comparison"
+ */
+export function formatDisplayName(baseName: string): string {
+  return baseName
+    .split('-')
+    .map((word) => acronyms.has(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 /**

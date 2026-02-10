@@ -1,5 +1,6 @@
 ---
 import type { ExperimentGroup } from '../lib/experiments';
+import { formatDisplayName } from '../lib/experiments';
 import { formatDuration, formatDate, formatCost } from '../lib/format';
 
 interface Props {
@@ -27,7 +28,7 @@ const badgeClass = latest.phase === 'Complete'
     </div>
     <span class="card-date">{formatDate(latest.createdAt)}</span>
   </div>
-  <h3 class="card-title">{group.baseName}</h3>
+  <h3 class="card-title">{formatDisplayName(group.baseName)}</h3>
   <p class="card-desc">{latest.description}</p>
   {group.tags.length > 0 && (
     <div class="card-tags">
