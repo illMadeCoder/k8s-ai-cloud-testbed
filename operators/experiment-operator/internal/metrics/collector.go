@@ -190,9 +190,12 @@ func CollectSummary(exp *experimentsv1alpha1.Experiment) *ExperimentSummary {
 
 // defaultQueries returns the built-in metrics queries used when spec.metrics is empty.
 func defaultQueries() []experimentsv1alpha1.MetricsQuery {
+	sysNS := `kube-system|gke-managed-system|gmp-system|gmp-public|kube-node-lease|kube-public`
 	return []experimentsv1alpha1.MetricsQuery{
-		{Name: "cpu_usage", Query: `sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT"}[1m]))`, Type: "range", Unit: "cores", Description: "Total CPU usage"},
-		{Name: "memory_usage", Query: `sum(container_memory_working_set_bytes{experiment="$EXPERIMENT"})`, Type: "range", Unit: "bytes", Description: "Total memory working set"},
+		{Name: "cpu_usage", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s"}[1m])) by (namespace)`, sysNS), Type: "range", Unit: "cores", Description: "CPU usage by namespace"},
+		{Name: "memory_usage", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s"}) by (namespace)`, sysNS), Type: "range", Unit: "bytes", Description: "Memory working set by namespace"},
+		{Name: "cpu_total", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s"}[1m]))`, sysNS), Type: "range", Unit: "cores", Description: "Total CPU usage"},
+		{Name: "memory_total", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s"})`, sysNS), Type: "range", Unit: "bytes", Description: "Total memory working set"},
 	}
 }
 

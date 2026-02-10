@@ -64,6 +64,18 @@ func DiscoverMonitoringServices(ctx context.Context, kubeconfig []byte, experime
 		}
 	}
 
+	// Fallback: search all namespaces if targeted search found nothing.
+	if len(endpoints) == 0 {
+		allSvcs, err := clientset.CoreV1().Services("").List(ctx, metav1.ListOptions{})
+		if err == nil {
+			for _, svc := range allSvcs.Items {
+				if ep, ok := matchMonitoringService(svc); ok {
+					endpoints = append(endpoints, ep)
+				}
+			}
+		}
+	}
+
 	if len(endpoints) == 0 {
 		return nil, nil
 	}
