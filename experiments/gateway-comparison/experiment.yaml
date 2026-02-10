@@ -25,20 +25,4 @@ spec:
   workflow:
     template: gateway-comparison-validation
     completion:
-      mode: manual
-
-  tutorial:
-    exposeKubeconfig: true
-    services:
-      - name: nginx-ingress
-        target: app
-        service: ingress-nginx-controller
-        namespace: gateway-comparison
-      - name: traefik
-        target: app
-        service: traefik
-        namespace: gateway-comparison
-      - name: envoy-gateway
-        target: app
-        service: envoy-gateway
-        namespace: gateway-comparison
+      mode: workflow

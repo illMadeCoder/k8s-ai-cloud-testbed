@@ -28,22 +28,4 @@ spec:
   workflow:
     template: tsdb-comparison-validation
     completion:
-      mode: manual
-
-  tutorial:
-    exposeKubeconfig: true
-    services:
-      - name: grafana
-        target: app
-        service: kube-prometheus-stack-grafana
-        namespace: tsdb-comparison
-      - name: prometheus
-        target: app
-        service: kube-prometheus-stack-prometheus
-        namespace: tsdb-comparison
-        port: 9090
-      - name: victoria-metrics
-        target: app
-        service: victoria-metrics-victoria-metrics-single-server
-        namespace: tsdb-comparison
-        port: 8428
+      mode: workflow

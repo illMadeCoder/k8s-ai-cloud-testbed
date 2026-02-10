@@ -28,22 +28,4 @@ spec:
   workflow:
     template: tracing-comparison-validation
     completion:
-      mode: manual
-
-  tutorial:
-    exposeKubeconfig: true
-    services:
-      - name: grafana
-        target: app
-        service: kube-prometheus-stack-grafana
-        namespace: tracing-comparison
-      - name: tempo
-        target: app
-        service: tempo
-        namespace: tracing-comparison
-        port: 3100
-      - name: jaeger
-        target: app
-        service: jaeger-query
-        namespace: tracing-comparison
-        port: 16686
+      mode: workflow

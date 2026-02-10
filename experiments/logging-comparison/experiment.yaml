@@ -30,26 +30,4 @@ spec:
   workflow:
     template: logging-comparison-validation
     completion:
-      mode: manual
-
-  tutorial:
-    exposeKubeconfig: true
-    services:
-      - name: grafana
-        target: app
-        service: kube-prometheus-stack-grafana
-        namespace: logging-comparison
-      - name: loki
-        target: app
-        service: loki-gateway
-        namespace: logging-comparison
-      - name: elasticsearch
-        target: app
-        service: elasticsearch-master
-        namespace: logging-comparison
-        port: 9200
-      - name: kibana
-        target: app
-        service: kibana-kibana
-        namespace: logging-comparison
-        port: 5601
+      mode: workflow
