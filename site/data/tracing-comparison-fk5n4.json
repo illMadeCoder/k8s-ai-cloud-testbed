@@ -1,0 +1,83 @@
+{
+  "name": "tracing-comparison-fk5n4",
+  "namespace": "experiments",
+  "description": "Tempo vs Jaeger tracing comparison - architecture, query languages, features",
+  "createdAt": "2026-02-10T21:28:26Z",
+  "completedAt": "2026-02-10T21:55:42.106878387Z",
+  "durationSeconds": 1636.106878387,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "observability",
+    "tracing"
+  ],
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "tracing-comparison-fk5n4-app",
+      "clusterType": "gke",
+      "components": [
+        "ConfigMap/alloy",
+        "ConfigMap/otel-collector-opentelemetry-collector",
+        "ConfigMap/tempo",
+        "Namespace/observability",
+        "Service/vm-hub",
+        "Service/alloy",
+        "Service/jaeger-agent",
+        "Service/jaeger-cassandra",
+        "Service/jaeger-collector",
+        "Service/jaeger-query",
+        "Service/order-service",
+        "Service/otel-collector-opentelemetry-collector",
+        "Service/payment-service",
+        "Service/tempo",
+        "Service/user-service",
+        "ServiceAccount/alloy",
+        "ServiceAccount/jaeger",
+        "ServiceAccount/operator",
+        "ServiceAccount/otel-collector-opentelemetry-collector",
+        "ServiceAccount/proxies",
+        "ServiceAccount/tempo",
+        "CustomResourceDefinition/connectors.tailscale.com",
+        "CustomResourceDefinition/dnsconfigs.tailscale.com",
+        "CustomResourceDefinition/podlogs.monitoring.grafana.com",
+        "CustomResourceDefinition/proxyclasses.tailscale.com",
+        "CustomResourceDefinition/proxygroups.tailscale.com",
+        "CustomResourceDefinition/recorders.tailscale.com",
+        "DaemonSet/alloy",
+        "Deployment/jaeger",
+        "Deployment/operator",
+        "Deployment/order-service",
+        "Deployment/otel-collector-opentelemetry-collector",
+        "Deployment/payment-service",
+        "Deployment/user-service",
+        "StatefulSet/jaeger-cassandra",
+        "StatefulSet/tempo",
+        "IngressClass/tailscale",
+        "ClusterRole/alloy",
+        "ClusterRole/tailscale-operator",
+        "ClusterRoleBinding/alloy",
+        "ClusterRoleBinding/tailscale-operator",
+        "Role/operator",
+        "Role/proxies",
+        "RoleBinding/operator",
+        "RoleBinding/proxies"
+      ]
+    }
+  ],
+  "workflow": {
+    "name": "tracing-comparison-fk5n4-validation",
+    "template": "tracing-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-10T21:55:27Z",
+    "finishedAt": "2026-02-10T21:55:37Z"
+  },
+  "costEstimate": {
+    "totalUSD": 0.009089482657705558,
+    "durationHours": 0.45447413288527777,
+    "perTarget": {
+      "app": 0.009089482657705558
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
