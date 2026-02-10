@@ -3,6 +3,7 @@ package argocd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -78,6 +79,20 @@ func (m *ApplicationManager) CreateApplication(ctx context.Context, experimentNa
 	// Build sources from resolved components
 	sources := []interface{}{}
 	for _, resolved := range resolvedComponents {
+		// Check if any source in this component uses $values references.
+		// If so, we need to add ref: "values" to the git source (non-chart source).
+		needsValuesRef := false
+		for _, source := range resolved.Sources {
+			if source.Helm != nil {
+				for _, vf := range source.Helm.ValuesFiles {
+					if strings.HasPrefix(vf, "$values") {
+						needsValuesRef = true
+						break
+					}
+				}
+			}
+		}
+
 		for _, source := range resolved.Sources {
 			argoSource := map[string]interface{}{
 				"repoURL":        source.RepoURL,
@@ -89,6 +104,10 @@ func (m *ApplicationManager) CreateApplication(ctx context.Context, experimentNa
 				argoSource["chart"] = source.Chart
 			} else {
 				argoSource["path"] = source.Path
+				// Add ref: "values" to git sources when another source references $values
+				if needsValuesRef {
+					argoSource["ref"] = "values"
+				}
 			}
 
 			// Add Helm configuration if present
