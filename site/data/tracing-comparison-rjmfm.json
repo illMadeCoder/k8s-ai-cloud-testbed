@@ -1,0 +1,59 @@
+{
+  "name": "tracing-comparison-rjmfm",
+  "namespace": "experiments",
+  "description": "Tempo vs Jaeger tracing comparison - architecture, query languages, features",
+  "createdAt": "2026-02-10T00:25:44Z",
+  "completedAt": "2026-02-10T02:47:54.419621211Z",
+  "durationSeconds": 8530.419621211,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "observability",
+    "tracing"
+  ],
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "tracing-comparison-rjmfm-app",
+      "clusterType": "gke"
+    }
+  ],
+  "workflow": {
+    "name": "tracing-comparison-rjmfm-validation",
+    "template": "tracing-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-10T02:45:48Z",
+    "finishedAt": "2026-02-10T02:46:40Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-10T02:47:54.419629407Z",
+    "timeRange": {
+      "start": "2026-02-10T00:25:44Z",
+      "end": "2026-02-10T02:47:54.419621211Z",
+      "duration": "2h22m10.419621211s",
+      "stepSeconds": 300
+    },
+    "queries": {
+      "cpu_usage": {
+        "query": "sum(rate(container_cpu_usage_seconds_total{experiment=\"tracing-comparison-rjmfm\"}[1m]))",
+        "type": "range",
+        "unit": "cores",
+        "description": "Total CPU usage"
+      },
+      "memory_usage": {
+        "query": "sum(container_memory_working_set_bytes{experiment=\"tracing-comparison-rjmfm\"})",
+        "type": "range",
+        "unit": "bytes",
+        "description": "Total memory working set"
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.047391220117838896,
+    "durationHours": 2.3695610058919443,
+    "perTarget": {
+      "app": 0.047391220117838896
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
