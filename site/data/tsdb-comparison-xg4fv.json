@@ -1,0 +1,59 @@
+{
+  "name": "tsdb-comparison-xg4fv",
+  "namespace": "experiments",
+  "description": "TSDB comparison - Prometheus vs VictoriaMetrics vs Mimir resource efficiency and query performance",
+  "createdAt": "2026-02-10T00:25:44Z",
+  "completedAt": "2026-02-10T02:27:43.021987178Z",
+  "durationSeconds": 7319.021987178,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "observability",
+    "metrics"
+  ],
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "tsdb-comparison-xg4fv-app",
+      "clusterType": "gke"
+    }
+  ],
+  "workflow": {
+    "name": "tsdb-comparison-xg4fv-validation",
+    "template": "tsdb-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-10T00:48:02Z",
+    "finishedAt": "2026-02-10T02:24:12Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-10T02:27:43.021993594Z",
+    "timeRange": {
+      "start": "2026-02-10T00:25:44Z",
+      "end": "2026-02-10T02:27:43.021987178Z",
+      "duration": "2h1m59.021987178s",
+      "stepSeconds": 300
+    },
+    "queries": {
+      "cpu_usage": {
+        "query": "sum(rate(container_cpu_usage_seconds_total{experiment=\"tsdb-comparison-xg4fv\"}[1m]))",
+        "type": "range",
+        "unit": "cores",
+        "description": "Total CPU usage"
+      },
+      "memory_usage": {
+        "query": "sum(container_memory_working_set_bytes{experiment=\"tsdb-comparison-xg4fv\"})",
+        "type": "range",
+        "unit": "bytes",
+        "description": "Total memory working set"
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.040661233262100006,
+    "durationHours": 2.033061663105,
+    "perTarget": {
+      "app": 0.040661233262100006
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
