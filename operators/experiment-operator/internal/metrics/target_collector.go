@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // MonitoringEndpoint describes a discovered Prometheus-compatible service on a target cluster.
@@ -80,18 +81,25 @@ func DiscoverMonitoringServices(ctx context.Context, kubeconfig []byte, experime
 		return nil, nil
 	}
 
+	logger := log.FromContext(ctx)
+	logger.Info("Matched monitoring service candidates", "count", len(endpoints))
+
 	// Probe each candidate to verify it serves the Prometheus API.
 	restClient := clientset.CoreV1().RESTClient()
 
 	var verified []MonitoringEndpoint
 	for _, ep := range endpoints {
-		if probeEndpoint(ctx, restClient, ep) {
+		if err := probeEndpoint(ctx, restClient, ep); err != nil {
+			logger.Info("Probe failed for endpoint", "service", ep.Service, "namespace", ep.Namespace, "port", ep.Port, "error", err)
+		} else {
+			logger.Info("Probe succeeded for endpoint", "service", ep.Service, "namespace", ep.Namespace, "port", ep.Port)
 			verified = append(verified, ep)
 		}
 	}
 
 	if len(verified) == 0 {
-		return endpoints, nil // return unverified as fallback
+		logger.Info("All probes failed — no verified monitoring endpoints")
+		return nil, nil
 	}
 	return verified, nil
 }
@@ -123,8 +131,12 @@ func matchMonitoringService(svc corev1.Service) (MonitoringEndpoint, bool) {
 		}, true
 	}
 
-	// Mimir
-	if strings.Contains(name, "mimir") {
+	// Mimir — only match query-capable services (query-frontend, querier, nginx gateway).
+	// Distributors, ingesters, compactors, store-gateways do NOT serve the Prometheus read API.
+	if strings.Contains(name, "mimir") &&
+		(strings.Contains(name, "query-frontend") ||
+			strings.Contains(name, "querier") ||
+			strings.Contains(name, "nginx")) {
 		return MonitoringEndpoint{
 			Service:   svc.Name,
 			Namespace: svc.Namespace,
@@ -150,7 +162,7 @@ func findPort(svc corev1.Service, defaultPort int) int {
 }
 
 // probeEndpoint checks if a monitoring endpoint serves the Prometheus API by hitting /api/v1/status/buildinfo.
-func probeEndpoint(ctx context.Context, restClient rest.Interface, ep MonitoringEndpoint) bool {
+func probeEndpoint(ctx context.Context, restClient rest.Interface, ep MonitoringEndpoint) error {
 	probeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -162,12 +174,12 @@ func probeEndpoint(ctx context.Context, restClient rest.Interface, ep Monitoring
 		Do(probeCtx)
 
 	if result.Error() != nil {
-		return false
+		return fmt.Errorf("proxy request: %w", result.Error())
 	}
 
 	raw, err := result.Raw()
 	if err != nil {
-		return false
+		return fmt.Errorf("read response: %w", err)
 	}
 
 	// Check that the response looks like a Prometheus API response.
@@ -175,9 +187,12 @@ func probeEndpoint(ctx context.Context, restClient rest.Interface, ep Monitoring
 		Status string `json:"status"`
 	}
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		return false
+		return fmt.Errorf("unmarshal response: %w (body: %.200s)", err, string(raw))
 	}
-	return resp.Status == "success"
+	if resp.Status != "success" {
+		return fmt.Errorf("unexpected status: %q", resp.Status)
+	}
+	return nil
 }
 
 // CollectMetricsFromTarget tries each discovered monitoring endpoint and collects metrics
@@ -197,6 +212,7 @@ func CollectMetricsFromTarget(ctx context.Context, kubeconfig []byte, endpoints 
 		return nil, fmt.Errorf("create clientset: %w", err)
 	}
 	restClient := clientset.CoreV1().RESTClient()
+	logger := log.FromContext(ctx)
 
 	start := exp.CreationTimestamp.Time
 	var end time.Time
@@ -217,8 +233,9 @@ func CollectMetricsFromTarget(ctx context.Context, kubeconfig []byte, endpoints 
 
 	queries := defaultTargetQueries()
 
-	// Try each endpoint until one works
-	for _, ep := range endpoints {
+	// Try each verified endpoint until one works
+	for i, ep := range endpoints {
+		logger.Info("Trying monitoring endpoint", "index", i, "service", ep.Service, "namespace", ep.Namespace, "port", ep.Port)
 		result := &MetricsResult{
 			CollectedAt: time.Now().UTC(),
 			Source:      fmt.Sprintf("target:%s/%s", ep.Namespace, ep.Service),
@@ -268,14 +285,16 @@ func CollectMetricsFromTarget(ctx context.Context, kubeconfig []byte, endpoints 
 		// If at least one query succeeded, return this result
 		if anySuccess {
 			if !anyData {
-				// Queries succeeded but returned empty — monitoring exists but has no data yet.
-				// Still return the result so the source is recorded.
+				logger.Info("Queries succeeded but returned empty data", "service", ep.Service)
+			} else {
+				logger.Info("Successfully collected metrics", "service", ep.Service, "namespace", ep.Namespace)
 			}
 			return result, nil
 		}
+		logger.Info("All queries failed for endpoint", "service", ep.Service, "namespace", ep.Namespace)
 	}
 
-	return nil, fmt.Errorf("all monitoring endpoints failed")
+	return nil, fmt.Errorf("all %d monitoring endpoints failed", len(endpoints))
 }
 
 // queryRangeViaProxy executes a range query through the K8s API server proxy.
