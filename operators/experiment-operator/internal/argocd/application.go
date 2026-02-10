@@ -100,7 +100,12 @@ func (m *ApplicationManager) CreateApplication(ctx context.Context, experimentNa
 				}
 
 				if len(source.Helm.ValuesFiles) > 0 {
-					helmConfig["valueFiles"] = source.Helm.ValuesFiles
+					// Convert []string to []interface{} for unstructured deep copy compatibility
+					vf := make([]interface{}, len(source.Helm.ValuesFiles))
+					for i, f := range source.Helm.ValuesFiles {
+						vf[i] = f
+					}
+					helmConfig["valueFiles"] = vf
 				}
 
 				if len(source.Helm.Parameters) > 0 {
