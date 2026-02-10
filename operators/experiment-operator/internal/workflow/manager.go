@@ -144,62 +144,72 @@ func (m *Manager) submitInlineWorkflow(ctx context.Context, workflowName string,
 		"experiments.illm.io/experiment": experimentName,
 	})
 
-	// Build a simple inline workflow with a suspend step
-	// This allows manual approval or automatic timeout
-	wfSpec := map[string]interface{}{
-		"serviceAccountName": "argo-workflow",
-		"entrypoint":         "experiment-lifecycle",
-		"templates": []interface{}{
+	// Build steps for the workflow
+	steps := []interface{}{
+		// Step 1: Log that experiment is ready
+		[]interface{}{
 			map[string]interface{}{
-				"name": "experiment-lifecycle",
-				"steps": []interface{}{
-					// Step 1: Log that experiment is ready
-					[]interface{}{
-						map[string]interface{}{
-							"name":     "log-ready",
-							"template": "log",
-							"arguments": map[string]interface{}{
-								"parameters": []interface{}{
-									map[string]interface{}{
-										"name":  "message",
-										"value": fmt.Sprintf("Experiment %s is running", experimentName),
-									},
-								},
-							},
-						},
-					},
-					// Step 2: Suspend (wait for manual approval or timeout)
-					[]interface{}{
-						map[string]interface{}{
-							"name":     "wait",
-							"template": "suspend-step",
-						},
-					},
-				},
-			},
-			map[string]interface{}{
-				"name": "log",
-				"inputs": map[string]interface{}{
+				"name":     "log-ready",
+				"template": "log",
+				"arguments": map[string]interface{}{
 					"parameters": []interface{}{
 						map[string]interface{}{
-							"name": "message",
+							"name":  "message",
+							"value": fmt.Sprintf("Experiment %s is running", experimentName),
 						},
 					},
-				},
-				"container": map[string]interface{}{
-					"image":   "alpine:3.19",
-					"command": []interface{}{"echo"},
-					"args":    []interface{}{"{{inputs.parameters.message}}"},
-				},
-			},
-			map[string]interface{}{
-				"name": "suspend-step",
-				"suspend": map[string]interface{}{
-					// No duration = wait for manual resume
-					// Users can: argo resume <workflow-name>
 				},
 			},
 		},
+	}
+
+	// Only add suspend step for manual completion mode
+	if spec.Completion.Mode == "manual" {
+		steps = append(steps, []interface{}{
+			map[string]interface{}{
+				"name":     "wait",
+				"template": "suspend-step",
+			},
+		})
+	}
+
+	templates := []interface{}{
+		map[string]interface{}{
+			"name":  "experiment-lifecycle",
+			"steps": steps,
+		},
+		map[string]interface{}{
+			"name": "log",
+			"inputs": map[string]interface{}{
+				"parameters": []interface{}{
+					map[string]interface{}{
+						"name": "message",
+					},
+				},
+			},
+			"container": map[string]interface{}{
+				"image":   "alpine:3.19",
+				"command": []interface{}{"echo"},
+				"args":    []interface{}{"{{inputs.parameters.message}}"},
+			},
+		},
+	}
+
+	// Only include suspend-step template when needed
+	if spec.Completion.Mode == "manual" {
+		templates = append(templates, map[string]interface{}{
+			"name": "suspend-step",
+			"suspend": map[string]interface{}{
+				// No duration = wait for manual resume
+				// Users can: argo resume <workflow-name>
+			},
+		})
+	}
+
+	wfSpec := map[string]interface{}{
+		"serviceAccountName": "argo-workflow",
+		"entrypoint":         "experiment-lifecycle",
+		"templates":          templates,
 	}
 
 	// Add parameters as arguments if provided
