@@ -410,6 +410,23 @@ func (r *ExperimentReconciler) createAnalysisJob(ctx context.Context, exp *exper
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
 					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "claude-credentials",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: "claude-auth",
+									Items: []corev1.KeyToPath{
+										{
+											Key:  "credentials.json",
+											Path: ".credentials.json",
+										},
+									},
+									DefaultMode: int32Ptr(0400),
+								},
+							},
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:  "analyzer",
@@ -430,17 +447,6 @@ func (r *ExperimentReconciler) createAnalysisJob(ctx context.Context, exp *exper
 									Value: s3Endpoint,
 								},
 								{
-									Name: "CLAUDE_CODE_OAUTH_TOKEN",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "claude-auth",
-											},
-											Key: "token",
-										},
-									},
-								},
-								{
 									Name: "GITHUB_TOKEN",
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
@@ -455,6 +461,13 @@ func (r *ExperimentReconciler) createAnalysisJob(ctx context.Context, exp *exper
 								{
 									Name:  "GITHUB_REPO",
 									Value: r.GitHubRepo,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "claude-credentials",
+									MountPath: "/home/node/.claude",
+									ReadOnly:  true,
 								},
 							},
 							Resources: corev1.ResourceRequirements{

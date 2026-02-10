@@ -226,17 +226,22 @@ On experiment completion, the operator creates an analyzer Job (`experiment-anal
 that uses Claude Code CLI to generate AI analysis (summary, per-metric insights, recommendations).
 The analysis is merged into `summary.json` and committed to the benchmark site.
 
-**Setup: Store Claude Code token in OpenBao**
+The analyzer uses the full Claude Code credentials file (`~/.claude/.credentials.json`) which
+contains a refresh token, enabling automatic token renewal. The credentials file is stored in
+OpenBao as a single JSON blob and mounted into the analyzer container via a Kubernetes Secret volume.
+
+**Setup: Store Claude Code credentials in OpenBao**
 
 ```bash
-# Generate a long-lived token (uses Max subscription, ~1 year lifespan)
-claude setup-token
-
-# Store in OpenBao
-bao kv put secret/experiment-operator/claude-auth token="<token from setup-token>"
+# Store full credentials file (contains refresh token for auto-renewal):
+bao kv put secret/experiment-operator/claude-auth credentials="$(cat ~/.claude/.credentials.json)"
 
 # ESO syncs it to K8s Secret automatically via:
 #   platform/manifests/external-secrets-config/claude-auth-secret.yaml
+
+# Force ESO refresh if needed (normally refreshes every 1h):
+kubectl annotate externalsecret claude-auth -n experiment-operator-system \
+  force-sync=$(date +%s) --overwrite
 
 # Restart operator to pick up new env (if needed)
 kubectl rollout restart deployment/experiment-operator-controller-manager \
@@ -277,7 +282,7 @@ secrets from OpenBao to K8s Secrets via `ClusterSecretStore` named `openbao`.
 
 | OpenBao Path | K8s Secret | Namespace | Purpose | ExternalSecret Manifest |
 |-------------|------------|-----------|---------|------------------------|
-| `secret/experiment-operator/claude-auth` | `claude-auth` | `experiment-operator-system` | Claude Code OAuth token for AI analysis | `platform/manifests/external-secrets-config/claude-auth-secret.yaml` |
+| `secret/experiment-operator/claude-auth` | `claude-auth` | `experiment-operator-system` | Claude Code credentials file (with refresh token) for AI analysis | `platform/manifests/external-secrets-config/claude-auth-secret.yaml` |
 | `secret/experiment-operator/github-api-token` | `github-api-token` | `experiment-operator-system` | GitHub PAT for site auto-publish + analyzer commits | `platform/manifests/external-secrets-config/github-api-token-secret.yaml` |
 
 ### Managing Secrets
@@ -286,8 +291,8 @@ secrets from OpenBao to K8s Secrets via `ClusterSecretStore` named `openbao`.
 # Read a secret
 kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN='<root_token>' bao kv get secret/experiment-operator/claude-auth"
 
-# Write/update a secret
-kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN='<root_token>' bao kv put secret/experiment-operator/claude-auth token='<value>'"
+# Write/update a secret (e.g. Claude Code credentials with refresh token)
+kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN='<root_token>' bao kv put secret/experiment-operator/claude-auth credentials='$(cat ~/.claude/.credentials.json)'"
 
 # Force ExternalSecret refresh (normally refreshes every 1h)
 kubectl annotate externalsecret <name> -n <namespace> force-sync=$(date +%s) --overwrite

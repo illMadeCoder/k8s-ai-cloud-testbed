@@ -6,7 +6,10 @@ set -euo pipefail
 #   S3_ENDPOINT      - SeaweedFS S3 endpoint (e.g. seaweedfs-s3.seaweedfs.svc.cluster.local:8333)
 #   GITHUB_TOKEN     - GitHub PAT for committing results
 #   GITHUB_REPO      - GitHub repo (e.g. illMadeCoder/k8s-ai-cloud-testbed)
-#   CLAUDE_CODE_OAUTH_TOKEN - Claude Code auth token (from claude setup-token)
+#
+# Required file mount:
+#   ~/.claude/.credentials.json - Claude Code credentials file (with refresh token),
+#     mounted from the claude-auth K8s Secret. Enables auto-refresh of expired access tokens.
 #
 # Optional:
 #   GITHUB_BRANCH    - branch to commit to (default: main)
@@ -14,7 +17,15 @@ set -euo pipefail
 
 : "${EXPERIMENT_NAME:?EXPERIMENT_NAME is required}"
 : "${S3_ENDPOINT:?S3_ENDPOINT is required}"
-: "${CLAUDE_CODE_OAUTH_TOKEN:?CLAUDE_CODE_OAUTH_TOKEN is required}"
+
+# Verify Claude Code credentials file is mounted
+CLAUDE_CREDS="${HOME}/.claude/.credentials.json"
+if [ ! -f "${CLAUDE_CREDS}" ]; then
+  echo "ERROR: Claude Code credentials file not found at ${CLAUDE_CREDS}"
+  echo "The claude-auth secret must be mounted as a volume with credentials.json"
+  exit 1
+fi
+echo "==> Claude Code credentials file found at ${CLAUDE_CREDS}"
 
 GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 GITHUB_RESULTS_PATH="${GITHUB_RESULTS_PATH:-site/data}"
