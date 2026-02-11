@@ -1,0 +1,132 @@
+{
+  "name": "gateway-comparison-fqnpn",
+  "namespace": "experiments",
+  "description": "Gateway comparison - NGINX Ingress vs Traefik vs Envoy Gateway feature and performance analysis",
+  "createdAt": "2026-02-11T18:52:26Z",
+  "completedAt": "2026-02-11T19:06:59.643627728Z",
+  "durationSeconds": 873.643627728,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "networking",
+    "gateway"
+  ],
+  "study": {
+    "hypothesis": "Envoy Gateway will have the richest feature set because it implements Gateway API natively with Envoy's extensible filter chain architecture, but this comes at higher base resource usage because it runs a separate control plane and data plane process, while NGINX Ingress will be the most resource-efficient for simple routing because its single-process model avoids the overhead of a dedicated control plane",
+    "questions": [
+      "What is the idle and loaded CPU/memory footprint of each gateway controller?",
+      "Which gateways support Gateway API natively vs. requiring translation layers?",
+      "How do configuration models compare (Ingress vs. Gateway API vs. custom CRDs)?"
+    ],
+    "focus": [
+      "resource efficiency",
+      "Gateway API conformance",
+      "configuration complexity",
+      "feature breadth"
+    ]
+  },
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "gateway-comparison-fqnpn-app",
+      "clusterType": "gke",
+      "machineType": "e2-medium",
+      "nodeCount": 1
+    }
+  ],
+  "workflow": {
+    "name": "gateway-comparison-fqnpn-validation",
+    "template": "gateway-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-11T19:06:44Z",
+    "finishedAt": "2026-02-11T19:06:54Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-11T19:06:59.82293876Z",
+    "source": "target:cadvisor",
+    "timeRange": {
+      "start": "2026-02-11T18:52:26Z",
+      "end": "2026-02-11T19:06:59.82293876Z",
+      "duration": "14m33.82293876s",
+      "stepSeconds": 0
+    },
+    "queries": {
+      "cpu_total": {
+        "query": "sum(container_cpu_usage_seconds_total) (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "Total CPU usage (cumulative seconds)",
+        "data": [
+          {
+            "timestamp": "2026-02-11T19:06:59.82293876Z",
+            "value": 6.018023
+          }
+        ]
+      },
+      "cpu_usage": {
+        "query": "container_cpu_usage_seconds_total (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "CPU usage by namespace (cumulative seconds)",
+        "data": [
+          {
+            "labels": {
+              "namespace": "gateway-comparison-fqnpn"
+            },
+            "timestamp": "2026-02-11T19:06:59.82293876Z",
+            "value": 4.700585
+          },
+          {
+            "labels": {
+              "namespace": "gke-managed-cim"
+            },
+            "timestamp": "2026-02-11T19:06:59.82293876Z",
+            "value": 1.3174379999999999
+          }
+        ]
+      },
+      "memory_total": {
+        "query": "sum(container_memory_working_set_bytes) (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Total memory working set",
+        "data": [
+          {
+            "timestamp": "2026-02-11T19:06:59.82293876Z",
+            "value": 260464640
+          }
+        ]
+      },
+      "memory_usage": {
+        "query": "container_memory_working_set_bytes (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Memory working set by namespace",
+        "data": [
+          {
+            "labels": {
+              "namespace": "gateway-comparison-fqnpn"
+            },
+            "timestamp": "2026-02-11T19:06:59.82293876Z",
+            "value": 212901888
+          },
+          {
+            "labels": {
+              "namespace": "gke-managed-cim"
+            },
+            "timestamp": "2026-02-11T19:06:59.82293876Z",
+            "value": 47562752
+          }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.004853575709600001,
+    "durationHours": 0.24267878548,
+    "perTarget": {
+      "app": 0.004853575709600001
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
