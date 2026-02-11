@@ -1,0 +1,81 @@
+---
+import type { AnalysisFeedback } from '../types';
+
+interface Props {
+  feedback: AnalysisFeedback;
+}
+
+const { feedback } = Astro.props;
+
+const hasRecommendations = feedback.recommendations && feedback.recommendations.length > 0;
+const hasDesign = feedback.experimentDesign && feedback.experimentDesign.length > 0;
+---
+
+{(hasRecommendations || hasDesign) && (
+  <div class="section">
+    <h2 class="section-title">Feedback & Recommendations</h2>
+
+    {hasRecommendations && (
+      <div class="feedback-group">
+        <h4 class="feedback-group-title">Recommendations</h4>
+        <ul class="recommendations">
+          {feedback.recommendations!.map((rec) => <li>{rec}</li>)}
+        </ul>
+      </div>
+    )}
+
+    {hasDesign && (
+      <div class="feedback-group">
+        <h4 class="feedback-group-title">Experiment Design Improvements</h4>
+        <ul class="design-suggestions">
+          {feedback.experimentDesign!.map((item) => <li>{item}</li>)}
+        </ul>
+      </div>
+    )}
+  </div>
+)}
+
+<style>
+  .feedback-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .feedback-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .feedback-group-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .design-suggestions {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .design-suggestions li {
+    padding: 0.6rem 1rem 0.6rem 2rem;
+    background: color-mix(in srgb, var(--warning) 6%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--warning) 20%, var(--border));
+    border-radius: var(--radius);
+    position: relative;
+    line-height: 1.55;
+    font-size: 0.9rem;
+  }
+
+  .design-suggestions li::before {
+    content: "\26A0";
+    position: absolute;
+    left: 0.65rem;
+    color: var(--warning);
+    font-size: 0.85rem;
+  }
+</style>

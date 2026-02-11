@@ -70,9 +70,71 @@ export interface CostEstimate {
 }
 
 export interface AnalysisResult {
+  // Backward-compatible fields
   summary: string;
   metricInsights: Record<string, string>;
   recommendations?: string[];
   generatedAt: string;
   model: string;
+
+  // Structured analysis sections
+  abstract?: string;
+  targetAnalysis?: TargetAnalysis;
+  performanceAnalysis?: PerformanceAnalysis;
+  finopsAnalysis?: FinopsAnalysis;
+  secopsAnalysis?: SecopsAnalysis;
+  capabilitiesMatrix?: CapabilitiesMatrix;
+  body?: AnalysisBody;
+  feedback?: AnalysisFeedback;
+}
+
+export interface TargetAnalysis {
+  overview: string;
+  perTarget?: Record<string, string>;
+  comparisonToBaseline?: string;
+}
+
+export interface PerformanceAnalysis {
+  overview: string;
+  findings?: string[];
+  bottlenecks?: string[];
+}
+
+export interface FinopsAnalysis {
+  overview: string;
+  costDrivers?: string[];
+  projection?: string;
+  optimizations?: string[];
+}
+
+export interface SecopsAnalysis {
+  overview: string;
+  findings?: string[];
+  supplyChain?: string;
+}
+
+export interface CapabilitiesMatrix {
+  technologies: string[];
+  categories: CapabilitiesCategory[];
+}
+
+export interface CapabilitiesCategory {
+  name: string;
+  capabilities: CapabilityEntry[];
+}
+
+export interface CapabilityEntry {
+  name: string;
+  values: Record<string, string>;
+}
+
+export interface AnalysisBody {
+  methodology: string;
+  results: string;
+  discussion: string;
+}
+
+export interface AnalysisFeedback {
+  recommendations?: string[];
+  experimentDesign?: string[];
 }

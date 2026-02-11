@@ -5,6 +5,11 @@ import MetricCard from '../../components/MetricCard.astro';
 import VegaChart from '../../components/VegaChart.astro';
 import TargetTable from '../../components/TargetTable.astro';
 import CostBreakdown from '../../components/CostBreakdown.astro';
+import AnalysisAbstract from '../../components/AnalysisAbstract.astro';
+import AnalysisSection from '../../components/AnalysisSection.astro';
+import CapabilitiesMatrix from '../../components/CapabilitiesMatrix.astro';
+import AnalysisBody from '../../components/AnalysisBody.astro';
+import AnalysisFeedback from '../../components/AnalysisFeedback.astro';
 import { loadAllExperiments, groupExperiments, getBaseName, formatDisplayName } from '../../lib/experiments';
 import { formatDuration, formatDate, formatCost } from '../../lib/format';
 import { buildSpec } from '../../lib/vega-specs';
@@ -41,6 +46,9 @@ const allMetricEntries = latest.metrics
 const metricEntries = allMetricEntries.filter(([, qr]) => qr.data && qr.data.length > 0);
 const metricsEmpty = metricEntries.length === 0;
 
+const hasRichAnalysis = !!latest.analysis?.abstract;
+const analysis = latest.analysis;
+
 ---
 
 <Base title={`${displayName} — K8s AI Lab Benchmarks`} description={latest.description}>
@@ -68,10 +76,20 @@ const metricsEmpty = metricEntries.length === 0;
     </div>
   </div>
 
-  {latest.analysis?.summary && (
+  {/* Rich analysis: abstract replaces old analysis-box */}
+  {hasRichAnalysis && analysis && (
+    <AnalysisAbstract
+      abstract={analysis.abstract!}
+      model={analysis.model}
+      generatedAt={analysis.generatedAt}
+    />
+  )}
+
+  {/* Legacy analysis: old-style summary box */}
+  {!hasRichAnalysis && analysis?.summary && (
     <div class="analysis-box">
       <h3 class="analysis-title">AI Analysis</h3>
-      <p>{latest.analysis!.summary}</p>
+      <p>{analysis.summary}</p>
     </div>
   )}
 
@@ -124,6 +142,25 @@ const metricsEmpty = metricEntries.length === 0;
 
   <TargetTable targets={latest.targets} />
 
+  {/* Rich analysis: Target Analysis section */}
+  {hasRichAnalysis && analysis?.targetAnalysis && (
+    <AnalysisSection
+      title="Target Analysis"
+      overview={analysis.targetAnalysis.overview}
+      findings={analysis.targetAnalysis.perTarget
+        ? Object.entries(analysis.targetAnalysis.perTarget).map(([name, insight]) => `${name}: ${insight}`)
+        : undefined}
+      extras={analysis.targetAnalysis.comparisonToBaseline ? [analysis.targetAnalysis.comparisonToBaseline] : undefined}
+      extrasLabel="Comparison to Baseline"
+      accent="blue"
+    />
+  )}
+
+  {/* Rich analysis: Capabilities Matrix (comparisons only) */}
+  {hasRichAnalysis && analysis?.capabilitiesMatrix && (
+    <CapabilitiesMatrix matrix={analysis.capabilitiesMatrix} />
+  )}
+
   {metricEntries.length > 0 && (
     <div class="section">
       <h2 class="section-title">Metrics</h2>
@@ -134,8 +171,8 @@ const metricsEmpty = metricEntries.length === 0;
         {metricEntries.map(([name, qr]) => (
           <div class="card">
             <VegaChart spec={buildSpec(name, qr)} />
-            {latest.analysis?.metricInsights?.[name] && (
-              <p class="metric-insight">{latest.analysis.metricInsights[name]}</p>
+            {analysis?.metricInsights?.[name] && (
+              <p class="metric-insight">{analysis.metricInsights[name]}</p>
             )}
           </div>
         ))}
@@ -158,17 +195,72 @@ const metricsEmpty = metricEntries.length === 0;
     (window as any).vegaEmbed = vegaEmbed;
   </script>
 
-  {latest.analysis?.recommendations && latest.analysis.recommendations.length > 0 && (
-    <div class="section">
-      <h2 class="section-title">Recommendations</h2>
-      <ul class="recommendations">
-        {latest.analysis.recommendations.map((rec) => <li>{rec}</li>)}
-      </ul>
+  {/* Rich analysis: Performance Analysis */}
+  {hasRichAnalysis && analysis?.performanceAnalysis && (
+    <AnalysisSection
+      title="Performance Analysis"
+      overview={analysis.performanceAnalysis.overview}
+      findings={analysis.performanceAnalysis.findings}
+      extras={analysis.performanceAnalysis.bottlenecks}
+      extrasLabel="Bottlenecks"
+      accent="blue"
+    />
+  )}
+
+  {/* Rich analysis: FinOps Analysis */}
+  {hasRichAnalysis && analysis?.finopsAnalysis && (
+    <AnalysisSection
+      title="FinOps Analysis"
+      overview={analysis.finopsAnalysis.overview}
+      findings={analysis.finopsAnalysis.costDrivers}
+      extras={analysis.finopsAnalysis.optimizations}
+      extrasLabel="Optimizations"
+      accent="green"
+    />
+  )}
+
+  {/* Rich analysis: FinOps projection inline */}
+  {hasRichAnalysis && analysis?.finopsAnalysis?.projection && (
+    <div class="section finops-projection">
+      <h4 class="projection-title">Production Cost Projection</h4>
+      <p class="projection-text">{analysis.finopsAnalysis.projection}</p>
     </div>
   )}
 
   {latest.costEstimate && (
     <CostBreakdown cost={latest.costEstimate} />
+  )}
+
+  {/* Rich analysis: SecOps Analysis */}
+  {hasRichAnalysis && analysis?.secopsAnalysis && (
+    <AnalysisSection
+      title="SecOps Analysis"
+      overview={analysis.secopsAnalysis.overview}
+      findings={analysis.secopsAnalysis.findings}
+      extras={analysis.secopsAnalysis.supplyChain ? [analysis.secopsAnalysis.supplyChain] : undefined}
+      extrasLabel="Supply Chain"
+      accent="red"
+    />
+  )}
+
+  {/* Rich analysis: Deep Dive */}
+  {hasRichAnalysis && analysis?.body && (
+    <AnalysisBody body={analysis.body} />
+  )}
+
+  {/* Rich analysis: Feedback & Recommendations */}
+  {hasRichAnalysis && analysis?.feedback && (
+    <AnalysisFeedback feedback={analysis.feedback} />
+  )}
+
+  {/* Legacy analysis: old-style recommendations */}
+  {!hasRichAnalysis && analysis?.recommendations && analysis.recommendations.length > 0 && (
+    <div class="section">
+      <h2 class="section-title">Recommendations</h2>
+      <ul class="recommendations">
+        {analysis.recommendations.map((rec) => <li>{rec}</li>)}
+      </ul>
+    </div>
   )}
 </Base>
 
@@ -198,12 +290,12 @@ const metricsEmpty = metricEntries.length === 0;
     list-style: none;
   }
   .run-history summary::before {
-    content: '▶ ';
+    content: '\25B6 ';
     font-size: 0.75em;
     color: var(--text-muted);
   }
   .run-history[open] summary::before {
-    content: '▼ ';
+    content: '\25BC ';
   }
   .run-history summary::-webkit-details-marker {
     display: none;
@@ -230,5 +322,24 @@ const metricsEmpty = metricEntries.length === 0;
     font-size: 0.85rem;
     max-width: 600px;
     margin: 0.5rem auto 0;
+  }
+  .finops-projection {
+    background: color-mix(in srgb, var(--success) 6%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--success) 20%, var(--border));
+    border-radius: var(--radius);
+    padding: 1rem 1.5rem;
+  }
+  .projection-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--success);
+    margin-bottom: 0.5rem;
+  }
+  .projection-text {
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 0.9rem;
   }
 </style>

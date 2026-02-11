@@ -113,11 +113,82 @@ type CostEstimate struct {
 
 // AnalysisResult holds AI-generated analysis of experiment results.
 type AnalysisResult struct {
+	// Backward-compatible fields
 	Summary         string            `json:"summary"`
 	MetricInsights  map[string]string `json:"metricInsights"`
 	Recommendations []string          `json:"recommendations,omitempty"`
 	GeneratedAt     time.Time         `json:"generatedAt"`
 	Model           string            `json:"model"`
+
+	// Structured analysis sections
+	Abstract            string               `json:"abstract,omitempty"`
+	TargetAnalysis      *TargetAnalysis      `json:"targetAnalysis,omitempty"`
+	PerformanceAnalysis *PerformanceAnalysis `json:"performanceAnalysis,omitempty"`
+	FinopsAnalysis      *FinopsAnalysis      `json:"finopsAnalysis,omitempty"`
+	SecopsAnalysis      *SecopsAnalysis      `json:"secopsAnalysis,omitempty"`
+	CapabilitiesMatrix  *CapabilitiesMatrix  `json:"capabilitiesMatrix,omitempty"`
+	Body                *AnalysisBody        `json:"body,omitempty"`
+	Feedback            *AnalysisFeedback    `json:"feedback,omitempty"`
+}
+
+// TargetAnalysis describes how infrastructure choices affect metrics.
+type TargetAnalysis struct {
+	Overview             string            `json:"overview"`
+	PerTarget            map[string]string `json:"perTarget,omitempty"`
+	ComparisonToBaseline string            `json:"comparisonToBaseline,omitempty"`
+}
+
+// PerformanceAnalysis presents key performance findings with data.
+type PerformanceAnalysis struct {
+	Overview    string   `json:"overview"`
+	Findings    []string `json:"findings,omitempty"`
+	Bottlenecks []string `json:"bottlenecks,omitempty"`
+}
+
+// FinopsAnalysis covers cost analysis and production projections.
+type FinopsAnalysis struct {
+	Overview      string   `json:"overview"`
+	CostDrivers   []string `json:"costDrivers,omitempty"`
+	Projection    string   `json:"projection,omitempty"`
+	Optimizations []string `json:"optimizations,omitempty"`
+}
+
+// SecopsAnalysis covers security observations and supply chain assessment.
+type SecopsAnalysis struct {
+	Overview    string   `json:"overview"`
+	Findings    []string `json:"findings,omitempty"`
+	SupplyChain string   `json:"supplyChain,omitempty"`
+}
+
+// CapabilitiesMatrix is a feature comparison table for comparison experiments.
+type CapabilitiesMatrix struct {
+	Technologies []string               `json:"technologies"`
+	Categories   []CapabilitiesCategory `json:"categories"`
+}
+
+// CapabilitiesCategory groups related capabilities for comparison.
+type CapabilitiesCategory struct {
+	Name         string            `json:"name"`
+	Capabilities []CapabilityEntry `json:"capabilities"`
+}
+
+// CapabilityEntry is a single capability with per-technology values.
+type CapabilityEntry struct {
+	Name   string            `json:"name"`
+	Values map[string]string `json:"values"`
+}
+
+// AnalysisBody contains research-paper style deep-dive sections.
+type AnalysisBody struct {
+	Methodology string `json:"methodology"`
+	Results     string `json:"results"`
+	Discussion  string `json:"discussion"`
+}
+
+// AnalysisFeedback provides actionable recommendations and experiment design improvements.
+type AnalysisFeedback struct {
+	Recommendations  []string `json:"recommendations,omitempty"`
+	ExperimentDesign []string `json:"experimentDesign,omitempty"`
 }
 
 // GCP on-demand hourly rates (USD) for common machine types.

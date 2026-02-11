@@ -1,0 +1,59 @@
+---
+import type { AnalysisBody } from '../types';
+
+interface Props {
+  body: AnalysisBody;
+}
+
+const { body } = Astro.props;
+
+const sections = [
+  { key: 'methodology', title: 'Methodology', content: body.methodology },
+  { key: 'results', title: 'Results', content: body.results },
+  { key: 'discussion', title: 'Discussion', content: body.discussion },
+].filter((s) => s.content);
+---
+
+<div class="section">
+  <h2 class="section-title">Deep Dive</h2>
+  <div class="body-sections">
+    {sections.map((section) => (
+      <div class="body-section">
+        <h4 class="body-section-title">{section.title}</h4>
+        <p class="body-section-content">{section.content}</p>
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  .body-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .body-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+  }
+
+  .body-section-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .body-section-content {
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 0.9rem;
+  }
+</style>

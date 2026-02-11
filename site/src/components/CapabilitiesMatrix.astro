@@ -1,0 +1,116 @@
+---
+import type { CapabilitiesMatrix } from '../types';
+
+interface Props {
+  matrix: CapabilitiesMatrix;
+}
+
+const { matrix } = Astro.props;
+---
+
+<div class="section">
+  <h2 class="section-title">Capabilities Matrix</h2>
+  <div class="cap-matrix-wrapper">
+    <table class="cap-matrix">
+      <thead>
+        <tr>
+          <th class="cap-matrix-category-col">Capability</th>
+          {matrix.technologies.map((tech) => (
+            <th class="cap-matrix-tech-col">{tech}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {matrix.categories.map((category) => (
+          <>
+            <tr class="cap-matrix-category-row">
+              <td colspan={matrix.technologies.length + 1}>
+                {category.name}
+              </td>
+            </tr>
+            {category.capabilities.map((cap) => (
+              <tr>
+                <td class="cap-matrix-cap-name">{cap.name}</td>
+                {matrix.technologies.map((tech) => (
+                  <td class="cap-matrix-value">{cap.values[tech] || '—'}</td>
+                ))}
+              </tr>
+            ))}
+          </>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+  .cap-matrix-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .cap-matrix {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .cap-matrix thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .cap-matrix th {
+    background: var(--bg-surface);
+    padding: 0.75rem 1rem;
+    border-bottom: 2px solid var(--border);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .cap-matrix-category-col {
+    text-align: left;
+    min-width: 180px;
+  }
+
+  .cap-matrix-tech-col {
+    text-align: center;
+    min-width: 150px;
+    color: var(--accent) !important;
+  }
+
+  .cap-matrix-category-row td {
+    background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cap-matrix-cap-name {
+    padding: 0.6rem 1rem 0.6rem 1.5rem;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cap-matrix-value {
+    padding: 0.6rem 1rem;
+    text-align: center;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    line-height: 1.4;
+  }
+
+  .cap-matrix tbody tr:nth-child(even):not(.cap-matrix-category-row) {
+    background: color-mix(in srgb, var(--bg-surface) 50%, var(--bg-card));
+  }
+</style>

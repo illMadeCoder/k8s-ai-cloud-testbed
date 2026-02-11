@@ -1,0 +1,58 @@
+---
+interface Props {
+  abstract: string;
+  model?: string;
+  generatedAt?: string;
+}
+
+const { abstract, model, generatedAt } = Astro.props;
+---
+
+<div class="analysis-abstract">
+  <div class="analysis-abstract-header">
+    <h3 class="analysis-abstract-title">AI Analysis</h3>
+    {model && (
+      <span class="analysis-meta">{model}{generatedAt ? ` · ${new Date(generatedAt).toLocaleDateString()}` : ''}</span>
+    )}
+  </div>
+  <p class="analysis-abstract-text">{abstract}</p>
+</div>
+
+<style>
+  .analysis-abstract {
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin: 1.5rem 0;
+  }
+
+  .analysis-abstract-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .analysis-abstract-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .analysis-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .analysis-abstract-text {
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 0.95rem;
+  }
+</style>

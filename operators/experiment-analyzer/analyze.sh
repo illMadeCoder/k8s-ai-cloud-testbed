@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Multi-pass AI experiment analyzer
+#
+# Produces research-paper quality analysis via 4 focused claude -p calls:
+#   Pass 1: Analysis plan (technologies, focus areas, domain context)
+#   Pass 2: Core analysis (abstract, targetAnalysis, performanceAnalysis, metricInsights)
+#   Pass 3: FinOps + SecOps analysis
+#   Pass 4: Deep dive + capabilities matrix + feedback
+#
 # Required environment variables:
 #   EXPERIMENT_NAME  - experiment name (used for S3 key and GitHub path)
 #   S3_ENDPOINT      - SeaweedFS S3 endpoint (e.g. seaweedfs-s3.seaweedfs.svc.cluster.local:8333)
@@ -33,7 +41,6 @@ GITHUB_RESULTS_PATH="${GITHUB_RESULTS_PATH:-site/data}"
 S3_URL="http://${S3_ENDPOINT}/experiment-results/${EXPERIMENT_NAME}/summary.json"
 WORK_DIR="$(mktemp -d)"
 SUMMARY_FILE="${WORK_DIR}/summary.json"
-ANALYSIS_FILE="${WORK_DIR}/analysis.json"
 ENRICHED_FILE="${WORK_DIR}/enriched.json"
 
 cleanup() { rm -rf "${WORK_DIR}"; }
@@ -47,91 +54,329 @@ fi
 
 echo "==> Summary fetched ($(wc -c < "${SUMMARY_FILE}") bytes)"
 
-# Build the analysis prompt
-PROMPT=$(cat <<'PROMPT_EOF'
-You are analyzing Kubernetes experiment benchmark results. The experiment data is a JSON object with metrics, targets, workflow info, and cost estimates.
+# --- Helper: extract JSON from claude --output-format json (JSONL) response ---
+extract_json() {
+  local raw_file="$1"
+  local out_file="$2"
 
-Your analysis will be published on the Testbed Benchmarks site (Astro + Tailwind, GitHub Pages).
-The site organizes experiments by domain (observability, networking, storage, cicd) and type
-(comparison, tutorial, demo, baseline) — derived from experiment tags. Your analysis appears on:
-- The experiment detail page (/experiments/{slug}/) as an "AI Analysis" box (summary) with
-  per-metric insights below each chart and a recommendations list at the bottom.
-- Comparison experiments are featured on the landing page and /comparisons/ index.
+  # Claude --output-format json outputs JSONL. The final "result" object has the text.
+  if RESULT_TEXT=$(jq -rs '[.[] | select(.type == "result")] | last | .result' "${raw_file}" 2>/dev/null) \
+     && [ -n "${RESULT_TEXT}" ] && [ "${RESULT_TEXT}" != "null" ]; then
+    echo "${RESULT_TEXT}" > "${out_file}"
+  elif jq -e '.[0].text' "${raw_file}" > /dev/null 2>&1; then
+    jq -r '.[0].text' "${raw_file}" > "${out_file}"
+  else
+    cp "${raw_file}" "${out_file}"
+  fi
 
-Produce a JSON object with this exact structure:
+  # Strip markdown fences if present
+  if head -1 "${out_file}" | grep -q '```'; then
+    sed -i '1d' "${out_file}"
+    if tail -1 "${out_file}" | grep -q '```'; then
+      sed -i '$d' "${out_file}"
+    fi
+  fi
+
+  # Validate JSON
+  if ! jq empty "${out_file}" 2>/dev/null; then
+    echo "ERROR: Output is not valid JSON"
+    cat "${out_file}" >&2
+    return 1
+  fi
+}
+
+# --- Helper: run a single analysis pass with retry ---
+run_pass() {
+  local pass_name="$1"
+  local prompt="$2"
+  local out_file="$3"
+  local raw_file="${WORK_DIR}/${pass_name}_raw.json"
+  local stderr_file="${WORK_DIR}/${pass_name}_stderr.log"
+
+  echo "==> Running ${pass_name}..."
+
+  local attempt
+  for attempt in 1 2; do
+    if claude -p "${prompt}" --output-format json > "${raw_file}" 2>"${stderr_file}"; then
+      if extract_json "${raw_file}" "${out_file}"; then
+        echo "==> ${pass_name} complete ($(wc -c < "${out_file}") bytes)"
+        return 0
+      fi
+    fi
+    if [ "${attempt}" -eq 1 ]; then
+      echo "WARNING: ${pass_name} attempt 1 failed, retrying..."
+      sleep 2
+    fi
+  done
+
+  echo "WARNING: ${pass_name} failed after 2 attempts — section will be null"
+  echo '{}' > "${out_file}"
+  return 1
+}
+
+SUMMARY_DATA=$(cat "${SUMMARY_FILE}")
+
+# ============================================================================
+# Pass 1: Analysis Plan
+# ============================================================================
+PASS1_PROMPT=$(cat <<'EOF'
+You are analyzing Kubernetes experiment benchmark results. Examine the experiment data and produce a JSON analysis plan.
+
+Identify:
+- The technologies being compared (if any)
+- Whether this is a comparison experiment (multiple targets with different components)
+- Key focus areas for deep analysis (e.g. resource efficiency, query languages, storage backends)
+- Relevant domain knowledge about the technologies (e.g. "Loki uses LogQL and indexes only labels, while Elasticsearch uses Lucene and full-text indexes documents")
+- The experiment domain (observability, networking, storage, cicd)
+
+Output ONLY a JSON object with this structure:
 {
-  "summary": "<2-4 sentence overview of the experiment findings>",
-  "metricInsights": {
-    "<metric_name>": "<1-2 sentence insight about what this metric shows>"
-  },
-  "recommendations": ["<optional improvement suggestion>"]
+  "technologies": ["Tech1", "Tech2"],
+  "isComparison": true,
+  "focusAreas": ["area1", "area2", "area3"],
+  "domainContext": "Brief domain knowledge paragraph relevant to interpreting results",
+  "domain": "observability"
 }
 
 Rules:
-- "summary" should describe the key findings, which target/component performed best, and any notable patterns. For comparisons, clearly state the winner and by how much.
-- "metricInsights" must have one entry per metric key in the input's metrics.queries object, using the exact same key names. Each insight appears directly below its Vega-Lite chart on the site.
-- "recommendations" should contain 1-3 actionable suggestions if there's clear room for improvement; omit or leave empty if results are already good
-- Be specific with numbers — reference actual values from the data
-- Keep language concise and technical
+- If not a comparison, set technologies to a single-element array and isComparison to false
+- focusAreas should have 2-5 entries, specific to this experiment
+- domainContext should include knowledge an expert would use to interpret the metrics
 - Output ONLY the JSON object, no markdown fences or extra text
 
 Here is the experiment data:
-PROMPT_EOF
+EOF
 )
 
-FULL_PROMPT="${PROMPT}
-$(cat "${SUMMARY_FILE}")"
+PASS1_FILE="${WORK_DIR}/pass_1.json"
+run_pass "pass_1_plan" "${PASS1_PROMPT}
+${SUMMARY_DATA}" "${PASS1_FILE}" || true
 
-echo "==> Running Claude Code analysis..."
-STDERR_FILE="${WORK_DIR}/claude_stderr.log"
-if ! claude -p "${FULL_PROMPT}" --output-format json > "${ANALYSIS_FILE}" 2>"${STDERR_FILE}"; then
-  echo "ERROR: Claude Code analysis failed"
-  echo "==> stderr:" && cat "${STDERR_FILE}" || true
-  echo "==> stdout:" && cat "${ANALYSIS_FILE}" || true
-  exit 1
+PLAN_DATA=$(cat "${PASS1_FILE}")
+echo "==> Analysis plan: $(jq -c '{technologies, isComparison, focusAreas}' "${PASS1_FILE}" 2>/dev/null || echo '{}')"
+
+# ============================================================================
+# Pass 2: Core Analysis (abstract, targetAnalysis, performanceAnalysis, metricInsights)
+# ============================================================================
+PASS2_PROMPT=$(cat <<'EOF'
+You are writing research-paper quality analysis of Kubernetes experiment benchmark results.
+You have an analysis plan and the full experiment data. Generate the core analysis sections.
+
+Your analysis will be published on the Testbed Benchmarks site. Each section appears as a
+styled card on the experiment detail page. Be specific with numbers from the data.
+
+Output ONLY a JSON object with these sections:
+
+{
+  "abstract": "<3-5 sentence executive overview. For comparisons, clearly state the winner and by how much. Reference specific metrics.>",
+
+  "targetAnalysis": {
+    "overview": "<How infrastructure choices (machine type, node count, preemptible) affect the results>",
+    "perTarget": {
+      "<target_name>": "<Analysis of this specific target's configuration and performance>"
+    },
+    "comparisonToBaseline": "<If comparison: how targets compare to each other or to baseline expectations. Null if not comparison.>"
+  },
+
+  "performanceAnalysis": {
+    "overview": "<High-level performance assessment>",
+    "findings": [
+      "<Numbered finding 1 with specific data values>",
+      "<Numbered finding 2>",
+      "<Numbered finding 3>"
+    ],
+    "bottlenecks": ["<Identified bottleneck or limitation>"]
+  },
+
+  "metricInsights": {
+    "<exact_metric_key>": "<1-2 sentence insight referencing actual values from the data. Each insight appears below its Vega-Lite chart.>"
+  }
+}
+
+Rules:
+- "abstract" is the executive overview — state the most important finding first
+- "targetAnalysis.perTarget" must have one entry per target in the experiment
+- "performanceAnalysis.findings" should have 3-6 numbered findings with actual data
+- "metricInsights" must have one entry per metric key in metrics.queries, using exact key names
+- Reference specific numbers from the data (CPU cores, memory bytes, durations)
+- Be technical and concise — this is for infrastructure engineers
+- Output ONLY the JSON object, no markdown fences or extra text
+
+ANALYSIS PLAN:
+EOF
+)
+
+PASS2_FILE="${WORK_DIR}/pass_2.json"
+run_pass "pass_2_core" "${PASS2_PROMPT}
+${PLAN_DATA}
+
+EXPERIMENT DATA:
+${SUMMARY_DATA}" "${PASS2_FILE}" || true
+
+# ============================================================================
+# Pass 3: FinOps + SecOps Analysis
+# ============================================================================
+PASS3_PROMPT=$(cat <<'EOF'
+You are writing financial and security analysis of Kubernetes experiment benchmark results.
+You have an analysis plan and the full experiment data.
+
+Output ONLY a JSON object with these sections:
+
+{
+  "finopsAnalysis": {
+    "overview": "<High-level cost assessment of the experiment>",
+    "costDrivers": [
+      "<Primary cost driver with explanation>",
+      "<Secondary cost driver>"
+    ],
+    "projection": "<Production projection: What would this cost running 24/7 on production-grade nodes (not preemptible)? Calculate monthly cost for a realistic multi-node setup. Include the math.>",
+    "optimizations": [
+      "<Specific cost optimization suggestion with expected savings>"
+    ]
+  },
+
+  "secopsAnalysis": {
+    "overview": "<Security posture assessment of the deployed components>",
+    "findings": [
+      "<Security observation about the deployment>",
+      "<Network policy or RBAC observation>",
+      "<Another security finding>"
+    ],
+    "supplyChain": "<Assessment of image provenance, signing, SBOM status for the components used>"
+  }
+}
+
+Rules:
+- finopsAnalysis.projection must include actual dollar amounts for 24/7 production operation
+- finopsAnalysis.costDrivers should reference the actual cost estimate from the data
+- secopsAnalysis should assess the components actually deployed (check the targets/components)
+- Consider: network policies, RBAC, secrets management, image trust, resource limits
+- Be specific and actionable — infrastructure engineers will act on these findings
+- Output ONLY the JSON object, no markdown fences or extra text
+
+ANALYSIS PLAN:
+EOF
+)
+
+PASS3_FILE="${WORK_DIR}/pass_3.json"
+run_pass "pass_3_finops_secops" "${PASS3_PROMPT}
+${PLAN_DATA}
+
+EXPERIMENT DATA:
+${SUMMARY_DATA}" "${PASS3_FILE}" || true
+
+# ============================================================================
+# Pass 4: Deep Dive + Capabilities Matrix + Feedback
+# ============================================================================
+IS_COMPARISON=$(jq -r '.isComparison // false' "${PASS1_FILE}" 2>/dev/null || echo "false")
+
+if [ "${IS_COMPARISON}" = "true" ]; then
+  CAP_MATRIX_INSTRUCTION=$(cat <<'EOF'
+  "capabilitiesMatrix": {
+    "technologies": ["Tech1", "Tech2"],
+    "categories": [
+      {
+        "name": "<Category name, e.g. 'Query Language', 'Storage', 'Resource Efficiency'>",
+        "capabilities": [
+          {
+            "name": "<Capability name, e.g. 'Full-text search'>",
+            "values": {"Tech1": "<Assessment>", "Tech2": "<Assessment>"}
+          }
+        ]
+      }
+    ]
+  },
+EOF
+)
+else
+  CAP_MATRIX_INSTRUCTION='"capabilitiesMatrix": null,'
 fi
 
-echo "==> Analysis produced ($(wc -c < "${ANALYSIS_FILE}") bytes)"
+PASS4_PROMPT=$(cat <<EOF
+You are writing the research-paper body and capabilities assessment for a Kubernetes experiment.
+You have an analysis plan and the full experiment data.
 
-# Claude --output-format json outputs newline-delimited JSON (JSONL).
-# The final object has type:"result" with a .result string containing the actual text.
-# Extract the result text from the JSONL stream.
-if RESULT_TEXT=$(jq -rs '[.[] | select(.type == "result")] | last | .result' "${ANALYSIS_FILE}" 2>/dev/null) && [ -n "${RESULT_TEXT}" ] && [ "${RESULT_TEXT}" != "null" ]; then
-  echo "${RESULT_TEXT}" > "${ANALYSIS_FILE}"
-elif jq -e '.[0].text' "${ANALYSIS_FILE}" > /dev/null 2>&1; then
-  # Fallback: array format [{type:"text", text:"..."}]
-  INNER_TEXT=$(jq -r '.[0].text' "${ANALYSIS_FILE}")
-  echo "${INNER_TEXT}" > "${ANALYSIS_FILE}"
-fi
+Output ONLY a JSON object with these sections:
 
-# Strip markdown fences if present
-if head -1 "${ANALYSIS_FILE}" | grep -q '```'; then
-  sed -i '1d' "${ANALYSIS_FILE}"
-  # Remove trailing fence
-  if tail -1 "${ANALYSIS_FILE}" | grep -q '```'; then
-    sed -i '$d' "${ANALYSIS_FILE}"
-  fi
-fi
+{
+  ${CAP_MATRIX_INSTRUCTION}
 
-# Validate it's valid JSON
-if ! jq empty "${ANALYSIS_FILE}" 2>/dev/null; then
-  echo "ERROR: Analysis output is not valid JSON"
-  cat "${ANALYSIS_FILE}"
-  exit 1
-fi
+  "body": {
+    "methodology": "<How the experiment was structured: what was deployed, how it was measured, what the workflow did, and any limitations of the methodology>",
+    "results": "<Key findings with specific data points. Reference actual metric values, timings, and resource usage. Structure as a narrative connecting the data points.>",
+    "discussion": "<Interpretation of results: what they mean for real-world usage, how they compare to industry expectations, limitations of this benchmark, and caveats.>"
+  },
 
-# Add generatedAt and model fields
-ANALYSIS_WITH_META=$(jq \
-  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --arg model "claude-opus-4-6" \
-  '. + {generatedAt: $ts, model: $model}' \
-  "${ANALYSIS_FILE}")
+  "feedback": {
+    "recommendations": [
+      "<Actionable next-iteration suggestion>",
+      "<Another recommendation>"
+    ],
+    "experimentDesign": [
+      "<How to improve this experiment's methodology>",
+      "<Additional metrics or tests to add>"
+    ]
+  }
+}
 
-echo "${ANALYSIS_WITH_META}" > "${ANALYSIS_FILE}"
+Rules:
+- body.methodology should describe the actual experiment structure from the data
+- body.results must reference specific metric values and timings
+- body.discussion should connect findings to real-world implications
+- capabilitiesMatrix (if comparison): 3-5 categories with 2-4 capabilities each. Values should be concise assessments (e.g., "Limited (LogQL)", "Full Lucene syntax", "~0.1 cores avg")
+- feedback.recommendations: 2-4 actionable items for the next experiment iteration
+- feedback.experimentDesign: 1-3 suggestions for improving the benchmark methodology
+- Output ONLY the JSON object, no markdown fences or extra text
+
+ANALYSIS PLAN:
+EOF
+)
+
+PASS4_FILE="${WORK_DIR}/pass_4.json"
+run_pass "pass_4_deep_dive" "${PASS4_PROMPT}
+${PLAN_DATA}
+
+EXPERIMENT DATA:
+${SUMMARY_DATA}" "${PASS4_FILE}" || true
+
+# ============================================================================
+# Assembly: Merge all passes into final AnalysisResult
+# ============================================================================
+echo "==> Assembling final analysis from 4 passes"
+
+FINAL_FILE="${WORK_DIR}/analysis.json"
+
+# Merge all pass outputs, then add backward-compat fields and metadata
+jq -s --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg model "claude-opus-4-6" '
+  # Start with pass 2 (core: abstract, targetAnalysis, performanceAnalysis, metricInsights)
+  (.[1] // {}) *
+  # Merge pass 3 (finopsAnalysis, secopsAnalysis)
+  (.[2] // {}) *
+  # Merge pass 4 (capabilitiesMatrix, body, feedback)
+  (.[3] // {}) +
+  # Add backward-compat fields + metadata
+  {
+    summary: ((.[1] // {}).abstract // "Analysis incomplete"),
+    recommendations: (((.[3] // {}).feedback // {}).recommendations // []),
+    generatedAt: $ts,
+    model: $model
+  }
+' "${PASS1_FILE}" "${PASS2_FILE}" "${PASS3_FILE}" "${PASS4_FILE}" > "${FINAL_FILE}"
+
+# Remove the plan fields from the final output (they were just for inter-pass context)
+jq 'del(.technologies, .isComparison, .focusAreas, .domainContext, .domain)' \
+  "${FINAL_FILE}" > "${FINAL_FILE}.tmp" && mv "${FINAL_FILE}.tmp" "${FINAL_FILE}"
+
+# Remove null capabilitiesMatrix for non-comparison experiments
+jq 'if .capabilitiesMatrix == null then del(.capabilitiesMatrix) else . end' \
+  "${FINAL_FILE}" > "${FINAL_FILE}.tmp" && mv "${FINAL_FILE}.tmp" "${FINAL_FILE}"
+
+echo "==> Final analysis assembled ($(wc -c < "${FINAL_FILE}") bytes)"
+echo "==> Sections present: $(jq -r 'keys | join(", ")' "${FINAL_FILE}")"
 
 # Merge analysis into summary
 echo "==> Merging analysis into summary.json"
-jq --slurpfile analysis "${ANALYSIS_FILE}" \
+jq --slurpfile analysis "${FINAL_FILE}" \
   '. + {analysis: $analysis[0]}' \
   "${SUMMARY_FILE}" > "${ENRICHED_FILE}"
 
@@ -197,4 +442,4 @@ else
   echo "==> GITHUB_TOKEN or GITHUB_REPO not set — skipping GitHub commit"
 fi
 
-echo "==> Analysis complete for ${EXPERIMENT_NAME}"
+echo "==> Analysis complete for ${EXPERIMENT_NAME} (4 passes)"
