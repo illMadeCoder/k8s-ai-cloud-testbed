@@ -10,7 +10,7 @@ spec:
   ttlDays: 7
 
   study:
-    hypothesis: "Envoy Gateway will have the richest feature set via Gateway API but higher base resource usage, while NGINX Ingress will be the most resource-efficient for simple routing"
+    hypothesis: "Envoy Gateway will have the richest feature set because it implements Gateway API natively with Envoy's extensible filter chain architecture, but this comes at higher base resource usage because it runs a separate control plane and data plane process, while NGINX Ingress will be the most resource-efficient for simple routing because its single-process model avoids the overhead of a dedicated control plane"
     questions:
       - "What is the idle and loaded CPU/memory footprint of each gateway controller?"
       - "Which gateways support Gateway API natively vs. requiring translation layers?"

@@ -10,7 +10,7 @@ spec:
   ttlDays: 7
 
   study:
-    hypothesis: "VictoriaMetrics will be the most resource-efficient for single-node deployments, while Mimir will offer superior horizontal scalability at the cost of higher base resource usage"
+    hypothesis: "VictoriaMetrics will be the most resource-efficient for single-node deployments because its merge-tree storage engine and single-binary architecture avoid the per-component overhead of distributed systems, while Mimir will offer superior horizontal scalability because its microservices architecture (ingesters, compactors, store-gateways) allows independent scaling of each concern at the cost of higher base resource usage"
     questions:
       - "What is the CPU and memory usage per ingested metric across all three TSDBs?"
       - "How does query performance compare for common dashboard-style PromQL queries?"

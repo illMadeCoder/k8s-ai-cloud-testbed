@@ -10,7 +10,7 @@ spec:
   ttlDays: 7
 
   study:
-    hypothesis: "Loki will use significantly fewer resources than Elasticsearch for equivalent log ingestion volume, but Elasticsearch will offer richer full-text query capabilities"
+    hypothesis: "Loki will use significantly fewer resources than Elasticsearch for equivalent log ingestion volume because it indexes only labels rather than full log content, but Elasticsearch will offer richer full-text query capabilities because its inverted index enables arbitrary field searches that LogQL's label-based filtering cannot match"
     questions:
       - "What is the CPU and memory overhead difference between Loki and Elasticsearch at steady-state log ingestion?"
       - "How do LogQL and Lucene/KQL compare for common operational log queries?"
