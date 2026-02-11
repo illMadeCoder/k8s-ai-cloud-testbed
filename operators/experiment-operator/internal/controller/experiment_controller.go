@@ -463,6 +463,33 @@ func (r *ExperimentReconciler) createAnalysisJob(ctx context.Context, exp *exper
 								},
 							},
 						},
+						{
+							Name: "claude-home",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:  "copy-credentials",
+							Image: "busybox:1.37",
+							Command: []string{
+								"sh", "-c",
+								"cp /claude-secret/.credentials.json /claude-home/.credentials.json && chmod 400 /claude-home/.credentials.json",
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "claude-credentials",
+									MountPath: "/claude-secret",
+									ReadOnly:  true,
+								},
+								{
+									Name:      "claude-home",
+									MountPath: "/claude-home",
+								},
+							},
+						},
 					},
 					Containers: []corev1.Container{
 						{
@@ -502,9 +529,8 @@ func (r *ExperimentReconciler) createAnalysisJob(ctx context.Context, exp *exper
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      "claude-credentials",
+									Name:      "claude-home",
 									MountPath: "/home/node/.claude",
-									ReadOnly:  true,
 								},
 							},
 							Resources: corev1.ResourceRequirements{
