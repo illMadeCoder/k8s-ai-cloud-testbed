@@ -128,5 +128,215 @@
       "app": 0.004853575709600001
     },
     "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  },
+  "analysis": {
+    "abstract": "The hypothesis is insufficient data to evaluate. The experiment deployed all three gateways into a single namespace on a single node, so cadvisor metrics are aggregated at the namespace level (gateway-comparison-fqnpn) rather than broken out per gateway controller, making it impossible to compare the resource footprints of NGINX Ingress, Traefik, and Envoy Gateway individually. The total namespace CPU consumption was 4.70 cumulative CPU-seconds and memory working set was ~203 MiB over the 14.5-minute experiment, but these figures cannot be attributed to any specific gateway. To properly evaluate the hypothesis, each gateway must run in its own namespace (or metrics must be labeled per pod/container) so that idle and loaded resource usage can be isolated per implementation. The most actionable finding is that the experiment infrastructure must be redesigned to collect per-gateway resource metrics before any comparative conclusions can be drawn.",
+    "targetAnalysis": {
+      "overview": "A single GKE cluster with one e2-medium node (2 vCPUs, 4 GiB RAM) hosted all three gateway implementations in a shared namespace. This configuration is cost-effective ($0.0049 USD for the ~14.5-minute run) but fundamentally undermines comparison: cadvisor metrics are grouped by namespace, and because all gateways share the namespace 'gateway-comparison-fqnpn', per-gateway resource isolation is lost. The e2-medium machine type is also modest enough that resource contention between three gateways plus workloads could skew results even if metrics were properly segmented.",
+      "perTarget": {
+        "app": "Single e2-medium node (2 vCPUs, 4 GiB RAM) in cluster gateway-comparison-fqnpn-app running all three gateways co-located. Total observed resource usage for the experiment namespace was 4.70 CPU-seconds cumulative and 203 MiB memory working set. The GKE-managed components (gke-managed-cim namespace) consumed an additional 1.32 CPU-seconds and 45.4 MiB. The validation workflow ran for only 10 seconds (19:06:44–19:06:54) and succeeded, confirming all gateways were deployed, but the short duration and shared namespace prevent meaningful per-gateway analysis."
+      },
+      "comparisonToBaseline": "No per-gateway comparison is possible with the collected data. The experiment intended to compare NGINX Ingress, Traefik, and Envoy Gateway, but all three were deployed into the same namespace and metrics were collected only at namespace granularity. The aggregate 4.70 CPU-seconds and 203 MiB memory across the namespace represent the combined footprint of all three gateways plus any application workloads, making it impossible to determine which gateway consumed more resources. A valid comparison would require either separate namespaces per gateway or pod-level metric queries (e.g., filtering container_cpu_usage_seconds_total by pod name or label selectors matching each gateway's controller)."
+    },
+    "performanceAnalysis": {
+      "overview": "The experiment completed successfully in 873 seconds (~14.5 minutes) with all workflows in Succeeded state, but the performance data lacks the granularity needed to answer the study questions. Only namespace-level aggregate metrics are available.",
+      "findings": [
+        "1. Total cluster CPU consumption was 6.02 cumulative CPU-seconds across all namespaces over 14.5 minutes, indicating very low average CPU utilization (~0.007 cores average), consistent with an idle or near-idle workload on the e2-medium instance.",
+        "2. The experiment namespace (gateway-comparison-fqnpn) accounted for 78.1% of total CPU usage (4.70 of 6.02 CPU-seconds) and 81.7% of total memory (203 MiB of 248 MiB), with the remaining resources consumed by GKE-managed infrastructure (gke-managed-cim).",
+        "3. Memory working set of 203 MiB for three gateway controllers plus workloads is within the 4 GiB capacity of the e2-medium node (roughly 5% utilization), suggesting none of the gateways were under memory pressure during the experiment.",
+        "4. The validation workflow executed in only 10 seconds, which is too short to capture loaded-state resource behavior or configuration reconciliation overhead — a key metric identified in the study questions.",
+        "5. Per-gateway CPU and memory breakdowns — essential for answering 'What is the idle and loaded CPU/memory footprint of each gateway controller?' — are entirely absent from the collected data because cadvisor metrics were queried at namespace granularity only.",
+        "6. No load generation or traffic metrics were collected, so the distinction between idle and loaded resource consumption cannot be assessed for any gateway."
+      ],
+      "bottlenecks": [
+        "Metric granularity: all gateways share a single namespace, and queries aggregate by namespace rather than by pod or container, eliminating the ability to attribute resource usage to individual gateways.",
+        "No load testing phase: the experiment lacks a traffic generation step, so loaded-state resource consumption, per-request overhead, and configuration reconciliation costs are unmeasured.",
+        "Single instant-type queries: cumulative CPU-seconds at a single point in time cannot distinguish between idle baseline consumption and burst activity — range queries or rate calculations are needed.",
+        "Single-node co-location: all three gateways competing for the same 2-vCPU, 4-GiB node may introduce resource contention artifacts that would not appear in isolated deployments."
+      ]
+    },
+    "metricInsights": {
+      "cpu_total": "Total cumulative CPU usage across all containers was 6.02 CPU-seconds over the 14.5-minute experiment window, translating to an average utilization of roughly 0.007 cores — effectively idle. This single aggregate value cannot differentiate between the three gateway implementations.",
+      "cpu_usage": "The experiment namespace consumed 4.70 CPU-seconds (78.1% of total), while gke-managed-cim used 1.32 CPU-seconds (21.9%). Because NGINX Ingress, Traefik, and Envoy Gateway all reside in the same namespace, it is impossible to determine individual gateway CPU costs from this metric.",
+      "memory_total": "Total memory working set across all containers was 248.5 MiB (260,464,640 bytes) at the end of the experiment, well within the 4 GiB available on the e2-medium node, indicating no memory pressure.",
+      "memory_usage": "The experiment namespace held a 203 MiB (212,901,888 bytes) working set while gke-managed-cim consumed 45.4 MiB (47,562,752 bytes). The 203 MiB figure represents the combined memory of all three gateways and cannot validate or refute the hypothesis that Envoy Gateway's two-process model incurs higher base memory than NGINX Ingress's single-process model."
+    },
+    "finopsAnalysis": {
+      "overview": "This experiment ran a single e2-medium GKE node for ~14.5 minutes comparing three gateway controllers, costing an estimated $0.0049 USD. The cost is negligible for a short-lived benchmark, but the single-node, single-machine-type topology means all three gateways competed for 2 vCPUs and 4 GB RAM, which constrains the fidelity of per-gateway resource isolation and makes production extrapolation less precise.",
+      "costDrivers": [
+        "GKE node compute is the sole cost driver at $0.0049 for 0.24 hours of a single e2-medium instance ($0.02/hr on-demand). No load balancer, persistent disk, or egress costs are visible in the data, suggesting the experiment used NodePort or HostNetwork rather than provisioning cloud LoadBalancer services for each gateway.",
+        "The experiment namespace consumed 203 MB (~78%) of the 248 MB total working set memory and 4.70 of 6.02 cumulative CPU-seconds (~78%), with the remaining resources consumed by GKE system components (gke-managed-cim). Running three gateway stacks on a single e2-medium node likely created memory pressure that could skew results."
+      ],
+      "projection": "Production projection for running all three gateways 24/7 on dedicated nodes: Each gateway in production would typically get its own node pool. Using e2-standard-4 (4 vCPU, 16 GB) as a minimum production-grade machine type at $0.134/hr on-demand in us-central1: (a) NGINX Ingress: 2 nodes for HA = 2 × $0.134 × 730 hrs/mo = $195.64/mo. (b) Traefik: 2 nodes for HA = $195.64/mo. (c) Envoy Gateway: 2 nodes for control plane + 2 for data plane (separate process model) = 4 × $0.134 × 730 = $391.28/mo. Total for all three in parallel: ~$782.56/mo. Adding GKE cluster management fee ($74.40/mo per cluster, or free for one zonal cluster) and cloud Load Balancers (~$18.26/mo each × 3 = $54.78/mo): grand total ≈ $912/mo. In practice you would run only one gateway; a single HA NGINX Ingress or Traefik deployment would cost ~$250/mo including LB, while Envoy Gateway's two-process architecture would run ~$445/mo. Using Spot/preemptible VMs (60-91% discount) could reduce compute costs to $50-100/mo per gateway but is unsuitable for production ingress paths.",
+      "optimizations": [
+        "Use e2-small or e2-medium nodes for future benchmarks instead of provisioning excess capacity; the experiment already proved a single e2-medium is sufficient for short comparison runs, keeping per-experiment cost under $0.01.",
+        "For production, run only the selected gateway (not all three) and use Horizontal Pod Autoscaler rather than fixed node counts—NGINX Ingress and Traefik can start with a single replica and scale to 2-3 under load, saving 50% on idle compute vs. a fixed 2-node HA pool.",
+        "Consider GKE Autopilot instead of Standard mode to eliminate paying for unused node capacity; billing shifts to per-pod resource requests, which is more cost-efficient for gateway workloads that are typically CPU-idle and memory-resident.",
+        "Future experiments should add per-container (not just per-namespace) metrics to isolate the cost footprint of each gateway's control plane vs. data plane, enabling more precise production cost modeling."
+      ]
+    },
+    "secopsAnalysis": {
+      "overview": "The experiment deployed all three gateway controllers into a single shared namespace on a single-node GKE cluster. This flat topology is acceptable for a short-lived benchmark but reflects a weak security posture: no namespace isolation between gateways, likely default RBAC and network policies, and no evidence of runtime security controls. The single-namespace pattern means a compromise of any gateway's control plane could pivot to the others.",
+      "findings": [
+        "Namespace isolation is absent—all three gateways (NGINX Ingress, Traefik, Envoy Gateway) share the namespace 'gateway-comparison-fqnpn'. In production, each gateway controller should run in its own namespace with dedicated ServiceAccounts and least-privilege RBAC ClusterRoles scoped to only the resource types it needs (Ingress, Gateway, HTTPRoute, etc.).",
+        "No network policies are evident in the experiment data. Each gateway's control plane should have NetworkPolicies restricting ingress to only the Kubernetes API server (for watch/list) and egress to its own data plane pods. Without these policies, any pod in the namespace can communicate with any other pod, including across gateway boundaries.",
+        "Resource limits and requests are not visible in the collected metrics (only aggregate namespace-level cadvisor data was captured). Production gateway deployments must set explicit CPU/memory requests and limits to prevent a single gateway from starving others and to enable Kubernetes admission control (LimitRange, ResourceQuota) to enforce guardrails.",
+        "The single-node topology means the Kubernetes API server, etcd, and all gateway control planes share the same failure domain. Gateway controllers with cluster-wide RBAC (ClusterRoleBindings) could read or modify resources across all namespaces if their ServiceAccount tokens are compromised. In production, use Pod Security Standards (restricted profile) and disable automountServiceAccountToken where not needed.",
+        "No TLS termination or certificate management configuration is visible in the experiment. Production gateway deployments should use cert-manager with ACME or an internal CA, and gateway listeners should enforce HTTPS-only with minimum TLS 1.2."
+      ],
+      "supplyChain": "No image provenance, signing, or SBOM data is present in the experiment output. NGINX Ingress images are published by the Kubernetes project (registry.k8s.io/ingress-nginx) with cosign signatures available since v1.9+. Traefik publishes official images on Docker Hub (traefik/traefik) with digest pinning recommended but no cosign signatures widely documented. Envoy Gateway images come from the Envoy project (docker.io/envoyproxy/gateway and envoyproxy/envoy) with SLSA provenance attestations available for Envoy proxy builds. For production, all three should be deployed with image digest pinning (not mutable tags), verified against cosign signatures or SLSA provenance where available, and scanned with a container vulnerability scanner (Trivy, Grype) in the CI/CD pipeline. No SBOM was generated or validated for any component in this experiment."
+    },
+    "capabilitiesMatrix": {
+      "technologies": [
+        "NGINX Ingress",
+        "Traefik",
+        "Envoy Gateway"
+      ],
+      "categories": [
+        {
+          "name": "Gateway API Conformance",
+          "capabilities": [
+            {
+              "name": "Native Gateway API support",
+              "values": {
+                "NGINX Ingress": "Separate controller required",
+                "Traefik": "Partial (Core channel)",
+                "Envoy Gateway": "Native, broad conformance"
+              }
+            },
+            {
+              "name": "Primary configuration surface",
+              "values": {
+                "NGINX Ingress": "Ingress + annotations",
+                "Traefik": "IngressRoute CRDs / Ingress",
+                "Envoy Gateway": "Gateway API resources"
+              }
+            },
+            {
+              "name": "Extended/Experimental features",
+              "values": {
+                "NGINX Ingress": "Via annotations only",
+                "Traefik": "Via middleware CRDs",
+                "Envoy Gateway": "Via BackendTrafficPolicy / Envoy filters"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Architecture",
+          "capabilities": [
+            {
+              "name": "Process model",
+              "values": {
+                "NGINX Ingress": "Single process (controller + NGINX)",
+                "Traefik": "Single binary, integrated proxy",
+                "Envoy Gateway": "Separate control plane + Envoy data plane"
+              }
+            },
+            {
+              "name": "Configuration reconciliation",
+              "values": {
+                "NGINX Ingress": "Template render + NGINX reload",
+                "Traefik": "Dynamic provider, no reload",
+                "Envoy Gateway": "xDS push to Envoy, no reload"
+              }
+            },
+            {
+              "name": "Extensibility mechanism",
+              "values": {
+                "NGINX Ingress": "Lua plugins, annotations",
+                "Traefik": "Middleware chain, Yaegi plugins",
+                "Envoy Gateway": "Full Envoy filter chain (Wasm, Lua, ext_authz)"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resource Efficiency",
+          "capabilities": [
+            {
+              "name": "Expected idle memory footprint",
+              "values": {
+                "NGINX Ingress": "Low (~30-60 MB typical)",
+                "Traefik": "Moderate (~50-80 MB typical)",
+                "Envoy Gateway": "Higher (~100-150 MB, two processes)"
+              }
+            },
+            {
+              "name": "CPU overhead model",
+              "values": {
+                "NGINX Ingress": "Minimal idle, spikes on reload",
+                "Traefik": "Minimal idle, smooth reconciliation",
+                "Envoy Gateway": "Higher baseline from xDS sync"
+              }
+            },
+            {
+              "name": "Measured aggregate CPU (experiment namespace)",
+              "values": {
+                "NGINX Ingress": "Not individually isolated",
+                "Traefik": "Not individually isolated",
+                "Envoy Gateway": "Not individually isolated"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feature Breadth",
+          "capabilities": [
+            {
+              "name": "L7 traffic management",
+              "values": {
+                "NGINX Ingress": "Path/host routing, basic rewrites",
+                "Traefik": "Path/host/header routing, middleware chains",
+                "Envoy Gateway": "Full L7: header matching, mirroring, fault injection"
+              }
+            },
+            {
+              "name": "Rate limiting",
+              "values": {
+                "NGINX Ingress": "Annotation-based, per-location",
+                "Traefik": "Middleware CRD, per-route",
+                "Envoy Gateway": "Global/local via BackendTrafficPolicy"
+              }
+            },
+            {
+              "name": "mTLS / TLS policy",
+              "values": {
+                "NGINX Ingress": "Annotation-driven",
+                "Traefik": "TLSOption CRD, ACME built-in",
+                "Envoy Gateway": "SecurityPolicy CRD, full SDS"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "body": {
+      "methodology": "The experiment deployed NGINX Ingress, Traefik, and Envoy Gateway into a shared single-node GKE cluster (e2-medium, 2 vCPUs, 4 GB RAM) under the namespace 'gateway-comparison-fqnpn'. The cluster ran for approximately 14 minutes and 34 seconds (873.6 s total experiment duration), during which a validation workflow ('gateway-comparison-validation') executed in the final ~10 seconds of the window (19:06:44–19:06:54 UTC). Resource consumption was captured via cadvisor instant queries at the end of the experiment window, providing cumulative CPU seconds and point-in-time memory working set, broken down by namespace. The experiment collected aggregate metrics for the experiment namespace rather than per-gateway-controller pod-level metrics, meaning all three gateways' resource usage is summed into a single namespace-level observation. The validation workflow's short 10-second execution window means the metrics primarily reflect idle and startup resource consumption rather than sustained load behavior. No dedicated load generation (e.g., wrk, hey, or k6) was applied, so per-request latency and throughput comparisons were not captured.",
+      "results": "Over the 14.5-minute experiment window, the experiment namespace consumed 4.70 cumulative CPU-seconds, which translates to an average CPU utilization of roughly 0.005 cores (4.70 s / 873.6 s) across all three gateway controllers combined. The GKE-managed infrastructure namespace (gke-managed-cim) consumed an additional 1.32 CPU-seconds. Total cluster CPU consumption was 6.02 CPU-seconds. Memory working set at the point of collection was 212.9 MB for the experiment namespace (all three gateways combined) and 47.6 MB for the GKE-managed namespace, totaling 260.5 MB. Dividing the experiment namespace memory naively by three yields approximately 71 MB per controller, though actual per-controller distribution is unknown from the available data. The validation workflow completed successfully in 10 seconds, confirming that all three gateways reached a functional state and could serve traffic. The total estimated cost for the single-node cluster was $0.0049 USD for 0.24 hours of compute time.",
+      "discussion": "The aggregate resource data confirms that all three gateways can coexist on a minimal e2-medium node (2 vCPU, 4 GB) with a combined memory footprint of ~213 MB, well within the node's capacity. However, the single most significant limitation of this experiment is the lack of per-pod or per-controller metric isolation: with all three gateways sharing one namespace, it is impossible to attribute CPU or memory consumption to any individual gateway. This means the core hypothesis—that Envoy Gateway consumes more resources due to its two-process architecture while NGINX Ingress is the most efficient—cannot be validated or refuted from this data alone. The average CPU utilization of ~0.005 cores across all controllers indicates that the system was essentially idle throughout, which is expected given no external load was applied beyond the brief 10-second validation. The 212.9 MB combined memory figure is consistent with industry expectations: assuming roughly 40-60 MB for NGINX Ingress, 50-70 MB for Traefik, and 80-120 MB for Envoy Gateway (control plane + data plane), the sum aligns with the observed total. The absence of load testing means no conclusions can be drawn about per-request overhead, tail latency, or throughput saturation points—all of which are critical for production gateway selection. The configuration complexity and Gateway API conformance dimensions were not quantitatively measured in this experiment and are assessed in the capabilities matrix based on documented behavior rather than empirical observation. For real-world selection, teams should weight the trade-off between Envoy Gateway's richer extensibility (Wasm filters, full xDS API, broad Gateway API conformance) against its higher baseline resource cost, versus NGINX Ingress's minimal footprint for straightforward routing use cases."
+    },
+    "feedback": {
+      "recommendations": [
+        "Deploy each gateway controller into a separate namespace (e.g., nginx-ingress-ns, traefik-ns, envoy-gateway-ns) so cadvisor metrics can be queried per-controller, enabling direct resource consumption comparison.",
+        "Add a load generation phase using a tool like k6 or wrk2 that sends sustained HTTP traffic (e.g., 100-1000 RPS for 5 minutes) through each gateway to measure per-request latency percentiles (p50, p95, p99) and throughput limits.",
+        "Extend the metric collection to include time-series data (range queries with 15s step intervals) rather than instant snapshots, enabling visualization of resource usage over the startup, idle, and loaded phases.",
+        "Include a Gateway API conformance test suite (e.g., the upstream kubernetes-sigs/gateway-api conformance tests) to empirically measure which conformance profiles each gateway passes."
+      ],
+      "experimentDesign": [
+        "Collect pod-level metrics (container_cpu_usage_seconds_total and container_memory_working_set_bytes filtered by pod label) rather than namespace-level aggregates to enable per-controller comparison.",
+        "Add a configuration reconciliation benchmark: measure the time from applying a new HTTPRoute or Ingress resource to the route becoming live (e.g., via repeated curl polling), capturing each gateway's control loop latency.",
+        "Include a node with more headroom (e.g., e2-standard-4) or use dedicated node pools per gateway to eliminate resource contention as a confounding variable in performance measurements."
+      ]
+    },
+    "summary": "The hypothesis is insufficient data to evaluate. The experiment deployed all three gateways into a single namespace on a single node, so cadvisor metrics are aggregated at the namespace level (gateway-comparison-fqnpn) rather than broken out per gateway controller, making it impossible to compare the resource footprints of NGINX Ingress, Traefik, and Envoy Gateway individually. The total namespace CPU consumption was 4.70 cumulative CPU-seconds and memory working set was ~203 MiB over the 14.5-minute experiment, but these figures cannot be attributed to any specific gateway. To properly evaluate the hypothesis, each gateway must run in its own namespace (or metrics must be labeled per pod/container) so that idle and loaded resource usage can be isolated per implementation. The most actionable finding is that the experiment infrastructure must be redesigned to collect per-gateway resource metrics before any comparative conclusions can be drawn.",
+    "recommendations": [
+      "Deploy each gateway controller into a separate namespace (e.g., nginx-ingress-ns, traefik-ns, envoy-gateway-ns) so cadvisor metrics can be queried per-controller, enabling direct resource consumption comparison.",
+      "Add a load generation phase using a tool like k6 or wrk2 that sends sustained HTTP traffic (e.g., 100-1000 RPS for 5 minutes) through each gateway to measure per-request latency percentiles (p50, p95, p99) and throughput limits.",
+      "Extend the metric collection to include time-series data (range queries with 15s step intervals) rather than instant snapshots, enabling visualization of resource usage over the startup, idle, and loaded phases.",
+      "Include a Gateway API conformance test suite (e.g., the upstream kubernetes-sigs/gateway-api conformance tests) to empirically measure which conformance profiles each gateway passes."
+    ],
+    "generatedAt": "2026-02-11T19:09:40Z",
+    "model": "claude-opus-4-6"
   }
 }
