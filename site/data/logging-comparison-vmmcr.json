@@ -32,5 +32,39 @@
       "app": 0.0039572100786611115
     },
     "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  },
+  "analysis": {
+    "type": "result",
+    "subtype": "error_during_execution",
+    "duration_ms": 447,
+    "duration_api_ms": 0,
+    "is_error": false,
+    "num_turns": 2,
+    "stop_reason": null,
+    "session_id": "bf91946b-ed38-467b-9e41-0d855dccf32b",
+    "total_cost_usd": 0,
+    "usage": {
+      "input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "output_tokens": 0,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 0
+      }
+    },
+    "modelUsage": {},
+    "permission_denials": [],
+    "uuid": "74b74290-39f1-4359-9c93-50c0d6313c3e",
+    "errors": [
+      "Error: ENOENT: no such file or directory, mkdir '/home/node/.claude/debug'\n    at Module.mkdirSync (node:fs:1377:26)\n    at file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:9:1838\n    at lJ (file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:8:48863)\n    at Object.mkdirSync (file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:9:1732)\n    at writeFn (file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:9:4942)\n    at $ (file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:9:4337)\n    at Object.write (file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:9:4460)\n    at h (file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:11:31)\n    at b46 (file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:502:16994)\n    at FHq (file:///usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js:5761:85)"
+    ],
+    "generatedAt": "2026-02-11T03:01:40Z",
+    "model": "claude-opus-4-6"
   }
 }
