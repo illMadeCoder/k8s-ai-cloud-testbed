@@ -77,11 +77,19 @@ type ExperimentSummary struct {
 	DurationSec  float64         `json:"durationSeconds"`
 	Phase        string          `json:"phase"`
 	Tags         []string        `json:"tags,omitempty"`
+	Study        *StudyContext   `json:"study,omitempty"`
 	Targets      []TargetSummary `json:"targets"`
 	Workflow     WorkflowSummary `json:"workflow"`
 	Metrics      *MetricsResult  `json:"metrics,omitempty"`
 	CostEstimate *CostEstimate   `json:"costEstimate,omitempty"`
 	Analysis     *AnalysisResult `json:"analysis,omitempty"`
+}
+
+// StudyContext captures the experiment's goals for AI analysis.
+type StudyContext struct {
+	Hypothesis string   `json:"hypothesis,omitempty"`
+	Questions  []string `json:"questions,omitempty"`
+	Focus      []string `json:"focus,omitempty"`
 }
 
 // TargetSummary captures per-target metadata.
@@ -217,6 +225,15 @@ func CollectSummary(exp *experimentsv1alpha1.Experiment) *ExperimentSummary {
 		CreatedAt:   exp.CreationTimestamp.Time,
 		Phase:       string(exp.Status.Phase),
 		Tags:        exp.Spec.Tags,
+	}
+
+	// Study context — pass through to summary for AI analyzer
+	if exp.Spec.Study != nil {
+		s.Study = &StudyContext{
+			Hypothesis: exp.Spec.Study.Hypothesis,
+			Questions:  exp.Spec.Study.Questions,
+			Focus:      exp.Spec.Study.Focus,
+		}
 	}
 
 	if exp.Status.CompletedAt != nil {

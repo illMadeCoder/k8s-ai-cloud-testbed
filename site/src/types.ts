@@ -9,11 +9,18 @@ export interface ExperimentSummary {
   durationSeconds: number;
   phase: string;
   tags?: string[];
+  study?: StudyContext;
   targets: TargetSummary[];
   workflow: WorkflowSummary;
   metrics?: MetricsResult;
   costEstimate?: CostEstimate;
   analysis?: AnalysisResult;
+}
+
+export interface StudyContext {
+  hypothesis?: string;
+  questions?: string[];
+  focus?: string[];
 }
 
 export interface TargetSummary {

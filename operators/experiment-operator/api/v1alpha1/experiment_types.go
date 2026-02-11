@@ -63,6 +63,31 @@ type ExperimentSpec struct {
 	// stored in S3. Set to true for experiments intended for public display.
 	// +optional
 	Publish bool `json:"publish,omitempty"`
+
+	// Study provides context about what the experiment is trying to learn.
+	// This is passed to the AI analyzer to produce focused, goal-aware analysis.
+	// +optional
+	Study *StudySpec `json:"study,omitempty"`
+}
+
+// StudySpec describes the goals and hypotheses of an experiment so the AI
+// analyzer can produce focused analysis aligned with the experimenter's intent.
+type StudySpec struct {
+	// Hypothesis states the expected outcome or claim being tested.
+	// Example: "Loki will use fewer resources than Elasticsearch but offer
+	// weaker full-text search capabilities."
+	// +optional
+	Hypothesis string `json:"hypothesis,omitempty"`
+
+	// Questions are specific things the experiment should answer.
+	// Example: "What is the CPU overhead difference at 1000 logs/sec?"
+	// +optional
+	Questions []string `json:"questions,omitempty"`
+
+	// Focus lists key areas for deep analysis.
+	// Example: ["resource efficiency", "query capability", "operational complexity"]
+	// +optional
+	Focus []string `json:"focus,omitempty"`
 }
 
 // MetricsQuery defines a PromQL query to execute at experiment completion.

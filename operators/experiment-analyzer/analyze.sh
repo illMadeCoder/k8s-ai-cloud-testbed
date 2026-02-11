@@ -116,6 +116,27 @@ run_pass() {
 
 SUMMARY_DATA=$(cat "${SUMMARY_FILE}")
 
+# Extract study context if present (hypothesis, questions, focus from experiment spec)
+STUDY_CONTEXT=""
+if jq -e '.study' "${SUMMARY_FILE}" > /dev/null 2>&1; then
+  STUDY_HYPOTHESIS=$(jq -r '.study.hypothesis // empty' "${SUMMARY_FILE}")
+  STUDY_QUESTIONS=$(jq -r '.study.questions // [] | join("; ")' "${SUMMARY_FILE}")
+  STUDY_FOCUS=$(jq -r '.study.focus // [] | join(", ")' "${SUMMARY_FILE}")
+
+  STUDY_CONTEXT="
+STUDY CONTEXT (from the experimenter — use this to guide your analysis):
+"
+  [ -n "${STUDY_HYPOTHESIS}" ] && STUDY_CONTEXT="${STUDY_CONTEXT}Hypothesis: ${STUDY_HYPOTHESIS}
+"
+  [ -n "${STUDY_QUESTIONS}" ] && STUDY_CONTEXT="${STUDY_CONTEXT}Questions to answer: ${STUDY_QUESTIONS}
+"
+  [ -n "${STUDY_FOCUS}" ] && STUDY_CONTEXT="${STUDY_CONTEXT}Focus areas: ${STUDY_FOCUS}
+"
+  echo "==> Study context found: hypothesis=$(echo "${STUDY_HYPOTHESIS}" | head -c 80)..."
+else
+  echo "==> No study context in experiment spec — analyzer will infer intent"
+fi
+
 # ============================================================================
 # Pass 1: Analysis Plan
 # ============================================================================
@@ -128,6 +149,11 @@ Identify:
 - Key focus areas for deep analysis (e.g. resource efficiency, query languages, storage backends)
 - Relevant domain knowledge about the technologies (e.g. "Loki uses LogQL and indexes only labels, while Elasticsearch uses Lucene and full-text indexes documents")
 - The experiment domain (observability, networking, storage, cicd)
+
+IMPORTANT: If a "STUDY CONTEXT" section is provided below the data, the experimenter has stated
+their hypothesis and questions. Your analysis plan MUST prioritize these. The focusAreas should
+align with the study's focus, and your domainContext should include knowledge relevant to
+evaluating the hypothesis.
 
 Output ONLY a JSON object with this structure:
 {
@@ -150,7 +176,8 @@ EOF
 
 PASS1_FILE="${WORK_DIR}/pass_1.json"
 run_pass "pass_1_plan" "${PASS1_PROMPT}
-${SUMMARY_DATA}" "${PASS1_FILE}" || true
+${SUMMARY_DATA}
+${STUDY_CONTEXT}" "${PASS1_FILE}" || true
 
 PLAN_DATA=$(cat "${PASS1_FILE}")
 echo "==> Analysis plan: $(jq -c '{technologies, isComparison, focusAreas}' "${PASS1_FILE}" 2>/dev/null || echo '{}')"
@@ -195,8 +222,10 @@ Output ONLY a JSON object with these sections:
 
 Rules:
 - "abstract" is the executive overview — state the most important finding first
+- If a study hypothesis exists, the abstract MUST evaluate whether the data supports it
 - "targetAnalysis.perTarget" must have one entry per target in the experiment
 - "performanceAnalysis.findings" should have 3-6 numbered findings with actual data
+- If study questions exist, findings should directly answer as many as possible
 - "metricInsights" must have one entry per metric key in metrics.queries, using exact key names
 - Reference specific numbers from the data (CPU cores, memory bytes, durations)
 - Be technical and concise — this is for infrastructure engineers
@@ -209,7 +238,7 @@ EOF
 PASS2_FILE="${WORK_DIR}/pass_2.json"
 run_pass "pass_2_core" "${PASS2_PROMPT}
 ${PLAN_DATA}
-
+${STUDY_CONTEXT}
 EXPERIMENT DATA:
 ${SUMMARY_DATA}" "${PASS2_FILE}" || true
 

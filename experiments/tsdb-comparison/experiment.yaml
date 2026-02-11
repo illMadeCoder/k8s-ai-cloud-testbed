@@ -9,6 +9,18 @@ spec:
   publish: true
   ttlDays: 7
 
+  study:
+    hypothesis: "VictoriaMetrics will be the most resource-efficient for single-node deployments, while Mimir will offer superior horizontal scalability at the cost of higher base resource usage"
+    questions:
+      - "What is the CPU and memory usage per ingested metric across all three TSDBs?"
+      - "How does query performance compare for common dashboard-style PromQL queries?"
+      - "What are the operational trade-offs between Prometheus' pull model, VM's fork optimizations, and Mimir's microservices architecture?"
+    focus:
+      - "resource efficiency per metric"
+      - "query performance"
+      - "horizontal scalability"
+      - "operational complexity"
+
   targets:
     - name: app
       cluster:

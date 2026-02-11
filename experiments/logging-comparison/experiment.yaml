@@ -9,6 +9,18 @@ spec:
   publish: true
   ttlDays: 7
 
+  study:
+    hypothesis: "Loki will use significantly fewer resources than Elasticsearch for equivalent log ingestion volume, but Elasticsearch will offer richer full-text query capabilities"
+    questions:
+      - "What is the CPU and memory overhead difference between Loki and Elasticsearch at steady-state log ingestion?"
+      - "How do LogQL and Lucene/KQL compare for common operational log queries?"
+      - "Which stack is more cost-effective for a small-to-medium Kubernetes cluster?"
+    focus:
+      - "resource efficiency"
+      - "query capability"
+      - "storage architecture"
+      - "operational complexity"
+
   targets:
     - name: app
       cluster:

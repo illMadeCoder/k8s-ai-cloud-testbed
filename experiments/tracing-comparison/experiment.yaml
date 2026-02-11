@@ -9,6 +9,18 @@ spec:
   publish: true
   ttlDays: 7
 
+  study:
+    hypothesis: "Tempo will use fewer resources than Jaeger due to its object-storage-native architecture, while Jaeger will provide a more mature query UI and wider ecosystem integration"
+    questions:
+      - "What is the resource overhead of each tracing backend under equivalent trace volume?"
+      - "How do TraceQL and Jaeger's query API compare for operational debugging workflows?"
+      - "What are the storage architecture trade-offs (object storage vs. Elasticsearch/Cassandra)?"
+    focus:
+      - "resource efficiency"
+      - "query capability"
+      - "storage backend architecture"
+      - "OTLP ingestion compatibility"
+
   targets:
     - name: app
       cluster:
