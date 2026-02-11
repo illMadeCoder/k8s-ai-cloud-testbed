@@ -1,0 +1,36 @@
+{
+  "name": "logging-comparison-bw8bz",
+  "namespace": "experiments",
+  "description": "Loki vs Elasticsearch logging comparison - architecture, resource usage, query performance",
+  "createdAt": "2026-02-11T02:24:40Z",
+  "completedAt": "2026-02-11T02:36:46.533749517Z",
+  "durationSeconds": 726.533749517,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "observability",
+    "logging"
+  ],
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "logging-comparison-bw8bz-app",
+      "clusterType": "gke"
+    }
+  ],
+  "workflow": {
+    "name": "logging-comparison-bw8bz-validation",
+    "template": "logging-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-11T02:36:31Z",
+    "finishedAt": "2026-02-11T02:36:41Z"
+  },
+  "costEstimate": {
+    "totalUSD": 0.0040362986084277784,
+    "durationHours": 0.2018149304213889,
+    "perTarget": {
+      "app": 0.0040362986084277784
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
