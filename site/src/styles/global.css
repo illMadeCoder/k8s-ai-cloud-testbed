@@ -240,7 +240,7 @@ details.section > details.section:last-of-type {
 
 details.section > details.section > summary.section-title {
   font-size: 0.95rem;
-  padding: 0.5rem 1rem;
+  padding: 1rem 1rem;
 }
 
 details.section > details.section > summary.section-title code {

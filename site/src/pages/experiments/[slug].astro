@@ -187,9 +187,6 @@ const analysis = latest.analysis;
   {metricEntries.length > 0 && (
     <details class="section">
       <summary class="section-title">Metrics ({metricEntries.length})</summary>
-      {latest.metrics?.source && (
-        <p class="metrics-source">Source: <code>{latest.metrics.source}</code></p>
-      )}
       {metricEntries.map(([name, qr]) => (
         <details class="section metric-detail">
           <summary class="section-title"><code>{name}</code></summary>
@@ -301,14 +298,6 @@ const analysis = latest.analysis;
     display: flex;
     flex-wrap: wrap;
     gap: 0.125rem;
-  }
-  .metrics-source {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
-  }
-  .metrics-source code {
-    color: var(--accent);
   }
   .empty-state {
     padding: 2rem;
