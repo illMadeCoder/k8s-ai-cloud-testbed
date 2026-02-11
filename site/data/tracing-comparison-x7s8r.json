@@ -1,0 +1,132 @@
+{
+  "name": "tracing-comparison-x7s8r",
+  "namespace": "experiments",
+  "description": "Tempo vs Jaeger tracing comparison - architecture, query languages, features",
+  "createdAt": "2026-02-11T18:52:26Z",
+  "completedAt": "2026-02-11T19:05:14.436806542Z",
+  "durationSeconds": 768.436806542,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "observability",
+    "tracing"
+  ],
+  "study": {
+    "hypothesis": "Tempo will use fewer resources than Jaeger because it writes traces directly to object storage without an indexing layer, avoiding the CPU and memory overhead of Elasticsearch or Cassandra that Jaeger requires, while Jaeger will provide a more mature query UI because its longer ecosystem tenure has produced richer search, comparison, and dependency graph tooling",
+    "questions": [
+      "What is the resource overhead of each tracing backend under equivalent trace volume?",
+      "How do TraceQL and Jaeger's query API compare for operational debugging workflows?",
+      "What are the storage architecture trade-offs (object storage vs. Elasticsearch/Cassandra)?"
+    ],
+    "focus": [
+      "resource efficiency",
+      "query capability",
+      "storage backend architecture",
+      "OTLP ingestion compatibility"
+    ]
+  },
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "tracing-comparison-x7s8r-app",
+      "clusterType": "gke",
+      "machineType": "e2-medium",
+      "nodeCount": 1
+    }
+  ],
+  "workflow": {
+    "name": "tracing-comparison-x7s8r-validation",
+    "template": "tracing-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-11T19:04:59Z",
+    "finishedAt": "2026-02-11T19:05:09Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-11T19:05:14.534032436Z",
+    "source": "target:cadvisor",
+    "timeRange": {
+      "start": "2026-02-11T18:52:26Z",
+      "end": "2026-02-11T19:05:14.534032436Z",
+      "duration": "12m48.534032436s",
+      "stepSeconds": 0
+    },
+    "queries": {
+      "cpu_total": {
+        "query": "sum(container_cpu_usage_seconds_total) (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "Total CPU usage (cumulative seconds)",
+        "data": [
+          {
+            "timestamp": "2026-02-11T19:05:14.534032436Z",
+            "value": 8.107315
+          }
+        ]
+      },
+      "cpu_usage": {
+        "query": "container_cpu_usage_seconds_total (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "CPU usage by namespace (cumulative seconds)",
+        "data": [
+          {
+            "labels": {
+              "namespace": "tracing-comparison-x7s8r"
+            },
+            "timestamp": "2026-02-11T19:05:14.534032436Z",
+            "value": 7.595179
+          },
+          {
+            "labels": {
+              "namespace": "gke-managed-cim"
+            },
+            "timestamp": "2026-02-11T19:05:14.534032436Z",
+            "value": 0.512136
+          }
+        ]
+      },
+      "memory_total": {
+        "query": "sum(container_memory_working_set_bytes) (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Total memory working set",
+        "data": [
+          {
+            "timestamp": "2026-02-11T19:05:14.534032436Z",
+            "value": 2489495552
+          }
+        ]
+      },
+      "memory_usage": {
+        "query": "container_memory_working_set_bytes (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Memory working set by namespace",
+        "data": [
+          {
+            "labels": {
+              "namespace": "tracing-comparison-x7s8r"
+            },
+            "timestamp": "2026-02-11T19:05:14.534032436Z",
+            "value": 2457743360
+          },
+          {
+            "labels": {
+              "namespace": "gke-managed-cim"
+            },
+            "timestamp": "2026-02-11T19:05:14.534032436Z",
+            "value": 31752192
+          }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.004269093369677779,
+    "durationHours": 0.2134546684838889,
+    "perTarget": {
+      "app": 0.004269093369677779
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
