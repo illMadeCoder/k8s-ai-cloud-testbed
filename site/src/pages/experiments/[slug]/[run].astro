@@ -171,11 +171,6 @@ const analysis = experiment.analysis;
     </details>
   )}
 
-  <script>
-    import vegaEmbed from 'vega-embed';
-    (window as any).vegaEmbed = vegaEmbed;
-  </script>
-
   {/* Rich analysis: Performance Analysis */}
   {hasRichAnalysis && analysis?.performanceAnalysis && (
     <AnalysisSection
@@ -239,6 +234,11 @@ const analysis = experiment.analysis;
       </ul>
     </details>
   )}
+
+  <script>
+    import vegaEmbed from 'vega-embed';
+    (window as any).vegaEmbed = vegaEmbed;
+  </script>
 </Base>
 
 <style>
