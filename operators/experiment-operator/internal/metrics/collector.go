@@ -153,16 +153,16 @@ func CollectSummary(exp *experimentsv1alpha1.Experiment) *ExperimentSummary {
 		s.DurationSec = exp.Status.CompletedAt.Time.Sub(exp.CreationTimestamp.Time).Seconds()
 	}
 
-	// Targets
+	// Targets — read effective values from status (single source of truth)
 	for i, target := range exp.Spec.Targets {
 		ts := TargetSummary{
 			Name:        target.Name,
 			ClusterType: target.Cluster.Type,
-			MachineType: target.Cluster.MachineType,
-			NodeCount:   target.Cluster.NodeCount,
 		}
 		if i < len(exp.Status.Targets) {
 			ts.ClusterName = exp.Status.Targets[i].ClusterName
+			ts.MachineType = exp.Status.Targets[i].MachineType
+			ts.NodeCount = exp.Status.Targets[i].NodeCount
 			ts.Components = exp.Status.Targets[i].Components
 		}
 		s.Targets = append(s.Targets, ts)

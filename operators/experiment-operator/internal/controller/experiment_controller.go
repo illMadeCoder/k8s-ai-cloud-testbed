@@ -639,8 +639,11 @@ func (r *ExperimentReconciler) reconcilePending(ctx context.Context, exp *experi
 			continue
 		}
 
-		// Update target status
+		// Update target status with effective (defaulted) cluster config
+		machineType, nodeCount := crossplane.EffectiveClusterConfig(target.Cluster)
 		exp.Status.Targets[i].ClusterName = clusterName
+		exp.Status.Targets[i].MachineType = machineType
+		exp.Status.Targets[i].NodeCount = nodeCount
 		exp.Status.Targets[i].Phase = "Provisioning"
 		log.Info("Created cluster", "target", target.Name, "cluster", clusterName)
 	}

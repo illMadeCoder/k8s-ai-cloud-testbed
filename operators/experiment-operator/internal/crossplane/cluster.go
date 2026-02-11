@@ -198,6 +198,20 @@ func (m *ClusterManager) GetClusterKubeconfig(ctx context.Context, clusterName s
 	return kubeconfig, nil
 }
 
+// EffectiveClusterConfig returns the cluster spec with defaults applied,
+// matching what Crossplane actually provisions.
+func EffectiveClusterConfig(spec experimentsv1alpha1.ClusterSpec) (machineType string, nodeCount int) {
+	machineType = spec.MachineType
+	if machineType == "" {
+		machineType = "e2-medium"
+	}
+	nodeCount = spec.NodeCount
+	if nodeCount == 0 {
+		nodeCount = 1
+	}
+	return
+}
+
 // DeleteCluster deletes a cluster resource
 func (m *ClusterManager) DeleteCluster(ctx context.Context, clusterName string, clusterType string) error {
 	log := log.FromContext(ctx)

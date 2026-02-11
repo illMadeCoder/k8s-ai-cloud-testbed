@@ -335,6 +335,14 @@ type TargetStatus struct {
 	// +optional
 	Endpoint string `json:"endpoint,omitempty"`
 
+	// MachineType is the effective machine type (with defaults applied)
+	// +optional
+	MachineType string `json:"machineType,omitempty"`
+
+	// NodeCount is the effective node count (with defaults applied)
+	// +optional
+	NodeCount int `json:"nodeCount,omitempty"`
+
 	// +optional
 	Components []string `json:"components,omitempty"`
 

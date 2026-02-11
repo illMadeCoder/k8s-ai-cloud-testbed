@@ -363,8 +363,16 @@ spec:
                       description: KubeconfigSecret is the name of the secret containing
                         the kubeconfig for this target
                       type: string
+                    machineType:
+                      description: MachineType is the effective machine type (with
+                        defaults applied)
+                      type: string
                     name:
                       type: string
+                    nodeCount:
+                      description: NodeCount is the effective node count (with defaults
+                        applied)
+                      type: integer
                     phase:
                       type: string
                   required:
