@@ -236,7 +236,7 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 	// Combined discover+collect retry loop: re-discovers endpoints on each attempt so that
 	// newly ready services (e.g., Prometheus pods starting up) are found.
 	var metricsResult *metrics.MetricsResult
-	const maxMetricsAttempts = 8
+	const maxMetricsAttempts = 16
 	const metricsRetryInterval = 30 * time.Second
 
 	for i, target := range exp.Spec.Targets {
