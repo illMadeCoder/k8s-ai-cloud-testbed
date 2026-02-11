@@ -17,8 +17,9 @@ interface VegaDataPoint {
 }
 
 function extractSeriesLabel(dp: DataPoint): string {
-  if (!dp.labels) return 'unknown';
-  return dp.labels['target'] ?? dp.labels['pod'] ?? dp.labels['instance'] ?? Object.values(dp.labels)[0] ?? 'unknown';
+  if (!dp.labels || Object.keys(dp.labels).length === 0) return 'Total';
+  return dp.labels['target'] ?? dp.labels['pod'] ?? dp.labels['instance']
+    ?? dp.labels['scope'] ?? Object.values(dp.labels)[0] ?? 'Total';
 }
 
 function transformValue(value: number, unit?: string): number {
@@ -52,15 +53,24 @@ export function buildBarSpec(name: string, qr: QueryResult): VegaLiteSpec {
   const yUnit = displayUnit(qr.unit);
   const yTitle = yUnit ? `${qr.description ?? name} (${yUnit})` : (qr.description ?? name);
 
+  const seriesCount = values.length;
+  const hasLongLabels = values.some((v) => v.series.length > 15);
+  const needsAngle = seriesCount > 3 || hasLongLabels;
+  const height = Math.min(500, Math.max(250, 200 + seriesCount * 40));
+
   return {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
     width: 'container',
-    height: 300,
+    height,
     title: qr.description ?? name,
     data: { values },
     mark: { type: 'bar', tooltip: true, cornerRadiusEnd: 4 },
     encoding: {
-      x: { field: 'series', type: 'nominal', title: null, axis: { labelAngle: 0 } },
+      x: {
+        field: 'series', type: 'nominal', title: null,
+        sort: { field: 'value', order: 'descending' as const },
+        axis: { labelAngle: needsAngle ? -45 : 0, labelLimit: 200 },
+      },
       y: { field: 'value', type: 'quantitative', title: yTitle },
       color: { field: 'series', type: 'nominal', title: 'Target', legend: null },
     },

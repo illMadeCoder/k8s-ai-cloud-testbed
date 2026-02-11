@@ -513,6 +513,7 @@ func CollectCadvisorMetrics(ctx context.Context, kubeconfig []byte, exp *experim
 		Unit:        "cores",
 		Description: "Total CPU usage (cumulative seconds)",
 		Data: []DataPoint{{
+			Labels:    map[string]string{"scope": "total"},
 			Timestamp: now,
 			Value:     cpuTotal,
 		}},
@@ -542,6 +543,7 @@ func CollectCadvisorMetrics(ctx context.Context, kubeconfig []byte, exp *experim
 		Unit:        "bytes",
 		Description: "Total memory working set",
 		Data: []DataPoint{{
+			Labels:    map[string]string{"scope": "total"},
 			Timestamp: now,
 			Value:     memTotal,
 		}},
