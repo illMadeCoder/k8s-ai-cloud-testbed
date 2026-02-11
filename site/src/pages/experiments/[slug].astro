@@ -85,8 +85,8 @@ const analysis = latest.analysis;
     {latest.costEstimate && (
       <CostBreakdown cost={latest.costEstimate} />
     )}
-    <div class="section run-history">
-      <h2 class="section-title">Run History ({group.runs.length} {group.runs.length === 1 ? 'run' : 'runs'})</h2>
+    <details class="section run-history">
+      <summary class="section-title">Run History ({group.runs.length} {group.runs.length === 1 ? 'run' : 'runs'})</summary>
       <table>
         <thead>
           <tr>
@@ -120,7 +120,7 @@ const analysis = latest.analysis;
           })}
         </tbody>
       </table>
-    </div>
+    </details>
   </details>
 
   {(latest.study?.hypothesis || latest.study?.questions?.length || latest.study?.focus?.length || hasRichAnalysis || analysis?.summary) && (

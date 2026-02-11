@@ -10,8 +10,8 @@ const { cost } = Astro.props;
 const targets = Object.entries(cost.perTarget ?? {});
 ---
 
-<div class="section">
-  <h2 class="section-title">Cost Estimate</h2>
+<details class="section">
+  <summary class="section-title">Cost Estimate</summary>
   <table>
     <thead>
       <tr>
@@ -33,7 +33,7 @@ const targets = Object.entries(cost.perTarget ?? {});
     </tbody>
   </table>
   <p class="cost-note">{cost.note}</p>
-</div>
+</details>
 
 <style>
   .total-row td {
