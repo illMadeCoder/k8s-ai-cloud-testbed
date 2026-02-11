@@ -1,0 +1,230 @@
+{
+  "name": "logging-comparison-554sl",
+  "namespace": "experiments",
+  "description": "Loki vs Elasticsearch logging comparison - architecture, resource usage, query performance",
+  "createdAt": "2026-02-11T20:21:01Z",
+  "completedAt": "2026-02-11T20:40:39.322387785Z",
+  "durationSeconds": 1178.322387785,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "observability",
+    "logging"
+  ],
+  "study": {
+    "hypothesis": "Loki will use significantly fewer resources than Elasticsearch for equivalent log ingestion volume because it indexes only labels rather than full log content, but Elasticsearch will offer richer full-text query capabilities because its inverted index enables arbitrary field searches that LogQL's label-based filtering cannot match",
+    "questions": [
+      "What is the CPU and memory overhead difference between Loki and Elasticsearch at steady-state log ingestion?",
+      "How do LogQL and Lucene/KQL compare for common operational log queries?",
+      "Which stack is more cost-effective for a small-to-medium Kubernetes cluster?"
+    ],
+    "focus": [
+      "resource efficiency",
+      "query capability",
+      "storage architecture",
+      "operational complexity"
+    ]
+  },
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "logging-comparison-554sl-app",
+      "clusterType": "gke",
+      "machineType": "e2-standard-4",
+      "nodeCount": 1
+    }
+  ],
+  "workflow": {
+    "name": "logging-comparison-554sl-validation",
+    "template": "logging-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-11T20:40:09Z",
+    "finishedAt": "2026-02-11T20:40:24Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-11T20:40:39.415026941Z",
+    "source": "target:cadvisor",
+    "timeRange": {
+      "start": "2026-02-11T20:21:01Z",
+      "end": "2026-02-11T20:40:39.415026941Z",
+      "duration": "19m38.415026941s",
+      "stepSeconds": 0
+    },
+    "queries": {
+      "cpu_by_pod": {
+        "query": "container_cpu_usage_seconds_total by pod (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "CPU usage by pod (cumulative seconds)",
+        "data": [
+          {
+            "labels": {
+              "pod": "alloy-p9nvl"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 0.705362
+          },
+          {
+            "labels": {
+              "pod": "fluent-bit-9qgff"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 0.237181
+          },
+          {
+            "labels": {
+              "pod": "log-generator-7bdc6bdb75-hlwjn"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 0.062961
+          },
+          {
+            "labels": {
+              "pod": "loki-canary-pqnt8"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 0.086594
+          },
+          {
+            "labels": {
+              "pod": "operator-64d66c8747-wwkgb"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 0.692095
+          },
+          {
+            "labels": {
+              "pod": "promtail-9wjlc"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 0.829003
+          },
+          {
+            "labels": {
+              "pod": "ts-vm-hub-dqjkl-0"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 0.398359
+          },
+          {
+            "labels": {
+              "pod": "kube-state-metrics-0"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 0.764371
+          },
+          {
+            "labels": {
+              "pod": "loki-gateway-6b6fb68665-pgglb"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 0.038349
+          }
+        ]
+      },
+      "cpu_total": {
+        "query": "sum(container_cpu_usage_seconds_total) (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "Total CPU usage (cumulative seconds)",
+        "data": [
+          {
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 3.8142750000000007
+          }
+        ]
+      },
+      "memory_by_pod": {
+        "query": "container_memory_working_set_bytes by pod (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Memory working set by pod",
+        "data": [
+          {
+            "labels": {
+              "pod": "log-generator-7bdc6bdb75-hlwjn"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 1998848
+          },
+          {
+            "labels": {
+              "pod": "loki-canary-pqnt8"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 10366976
+          },
+          {
+            "labels": {
+              "pod": "operator-64d66c8747-wwkgb"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 38014976
+          },
+          {
+            "labels": {
+              "pod": "alloy-p9nvl"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 49471488
+          },
+          {
+            "labels": {
+              "pod": "kube-state-metrics-0"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 33042432
+          },
+          {
+            "labels": {
+              "pod": "loki-gateway-6b6fb68665-pgglb"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 12058624
+          },
+          {
+            "labels": {
+              "pod": "promtail-9wjlc"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 30638080
+          },
+          {
+            "labels": {
+              "pod": "ts-vm-hub-dqjkl-0"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 26791936
+          },
+          {
+            "labels": {
+              "pod": "fluent-bit-9qgff"
+            },
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 8486912
+          }
+        ]
+      },
+      "memory_total": {
+        "query": "sum(container_memory_working_set_bytes) (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Total memory working set",
+        "data": [
+          {
+            "timestamp": "2026-02-11T20:40:39.415026941Z",
+            "value": 210870272
+          }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.008771955553510557,
+    "durationHours": 0.3273117743847222,
+    "perTarget": {
+      "app": 0.008771955553510557
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
