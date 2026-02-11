@@ -115,8 +115,8 @@ const { matrix } = Astro.props;
     line-height: 1.5;
   }
 
-  .cap-matrix tbody tr:nth-child(even):not(.cap-matrix-category-row) {
-    background: color-mix(in srgb, var(--bg-surface) 50%, var(--bg-card));
+  .cap-matrix tbody tr:not(.cap-matrix-category-row):nth-of-type(even) {
+    background: var(--bg-surface);
   }
 
   .cap-matrix-summary {

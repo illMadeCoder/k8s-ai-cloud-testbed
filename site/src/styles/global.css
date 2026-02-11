@@ -223,14 +223,37 @@ details.section[open] > summary.section-title {
   border-bottom: 1px solid var(--border);
 }
 
-details.section > :not(summary) {
+details.section > :not(summary):not(details) {
   padding: 1rem;
+}
+
+details.section > details.section {
+  margin: 0;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+}
+
+details.section > details.section:last-of-type {
+  border-bottom: none;
+}
+
+details.section > details.section > summary.section-title {
+  font-size: 0.95rem;
+  padding: 0.5rem 1rem;
+}
+
+details.section > details.section > summary.section-title code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.9em;
 }
 
 .tag {
   display: inline-block;
   padding: 0.15rem 0.55rem;
-  border-radius: 999px;
+  border-radius: 2px;
   font-size: 0.7rem;
   font-weight: 500;
   background: var(--bg-surface);
