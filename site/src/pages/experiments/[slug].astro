@@ -41,11 +41,6 @@ const allMetricEntries = latest.metrics
 const metricEntries = allMetricEntries.filter(([, qr]) => qr.data && qr.data.length > 0);
 const metricsEmpty = metricEntries.length === 0;
 
-// Fall back to an older run's analysis if the latest doesn't have one
-const analysisRun = latest.analysis?.summary
-  ? latest
-  : group.runs.find((r) => r.analysis?.summary);
-const analysisFromOlderRun = analysisRun && analysisRun !== latest;
 ---
 
 <Base title={`${displayName} — K8s AI Lab Benchmarks`} description={latest.description}>
@@ -73,13 +68,10 @@ const analysisFromOlderRun = analysisRun && analysisRun !== latest;
     </div>
   </div>
 
-  {analysisRun?.analysis?.summary && (
+  {latest.analysis?.summary && (
     <div class="analysis-box">
       <h3 class="analysis-title">AI Analysis</h3>
-      {analysisFromOlderRun && (
-        <p class="analysis-note">From earlier run: <a href={`${base}experiments/${group.baseName}/${analysisRun.name}/`}><code>{analysisRun.name}</code></a></p>
-      )}
-      <p>{analysisRun.analysis!.summary}</p>
+      <p>{latest.analysis!.summary}</p>
     </div>
   )}
 
@@ -146,8 +138,8 @@ const analysisFromOlderRun = analysisRun && analysisRun !== latest;
         {metricEntries.map(([name, qr]) => (
           <div class="card">
             <VegaChart spec={buildSpec(name, qr)} />
-            {(latest.analysis?.metricInsights?.[name] || analysisRun?.analysis?.metricInsights?.[name]) && (
-              <p class="metric-insight">{latest.analysis?.metricInsights?.[name] ?? analysisRun?.analysis?.metricInsights?.[name]}</p>
+            {latest.analysis?.metricInsights?.[name] && (
+              <p class="metric-insight">{latest.analysis.metricInsights[name]}</p>
             )}
           </div>
         ))}
@@ -170,11 +162,11 @@ const analysisFromOlderRun = analysisRun && analysisRun !== latest;
     (window as any).vegaEmbed = vegaEmbed;
   </script>
 
-  {analysisRun?.analysis?.recommendations && analysisRun.analysis.recommendations.length > 0 && (
+  {latest.analysis?.recommendations && latest.analysis.recommendations.length > 0 && (
     <div class="section">
       <h2 class="section-title">Recommendations</h2>
       <ul class="recommendations">
-        {analysisRun.analysis.recommendations.map((rec) => <li>{rec}</li>)}
+        {latest.analysis.recommendations.map((rec) => <li>{rec}</li>)}
       </ul>
     </div>
   )}
@@ -222,15 +214,6 @@ const analysisFromOlderRun = analysisRun && analysisRun !== latest;
   }
   .empty-state p {
     margin: 0.5rem 0;
-  }
-  .analysis-note {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 0.5rem;
-    font-style: italic;
-  }
-  .analysis-note code {
-    color: var(--accent);
   }
   .empty-hint {
     font-size: 0.85rem;

@@ -368,17 +368,27 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 			}
 		}
 
-		// Launch AI analysis Job (best-effort, non-fatal).
+		// Launch AI analysis Job — published experiments require successful analysis.
 		if r.AnalyzerImage != "" {
-			if err := r.createAnalysisJob(ctx, exp); err != nil {
-				log.Error(err, "Failed to create analysis Job — non-fatal")
-			} else {
-				jobName := fmt.Sprintf("experiment-analyzer-%s", exp.Name)
-				if len(jobName) > 63 {
-					jobName = jobName[:63]
-				}
-				exp.Status.AnalysisJobName = jobName
+			// Pre-validate Claude credentials before creating analyzer job.
+			secret := &corev1.Secret{}
+			secretKey := types.NamespacedName{Name: "claude-auth", Namespace: "experiment-operator-system"}
+			if err := r.Get(ctx, secretKey, secret); err != nil {
+				return fmt.Errorf("published experiment requires claude-auth secret for analysis: %w", err)
 			}
+			creds, ok := secret.Data["credentials.json"]
+			if !ok || len(creds) == 0 {
+				return fmt.Errorf("claude-auth secret missing or empty credentials.json key — analysis cannot run")
+			}
+
+			if err := r.createAnalysisJob(ctx, exp); err != nil {
+				return fmt.Errorf("failed to create analysis Job: %w", err)
+			}
+			jobName := fmt.Sprintf("experiment-analyzer-%s", exp.Name)
+			if len(jobName) > 63 {
+				jobName = jobName[:63]
+			}
+			exp.Status.AnalysisJobName = jobName
 		}
 	} else if !exp.Spec.Publish {
 		log.Info("Skipping site publish and AI analysis — spec.publish is false", "experiment", exp.Name)
