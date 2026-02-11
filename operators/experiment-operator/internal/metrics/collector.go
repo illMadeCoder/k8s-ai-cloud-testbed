@@ -244,12 +244,10 @@ func CollectMetricsSnapshot(ctx context.Context, metricsURL string, exp *experim
 	}
 
 	start := exp.CreationTimestamp.Time
-	var end time.Time
-	if exp.Status.CompletedAt != nil {
-		end = exp.Status.CompletedAt.Time
-	} else {
-		end = time.Now()
-	}
+	// Always use time.Now() as end time. This function is called while resources
+	// are still alive (cleanup happens after it returns), so Now() captures data
+	// that Alloy wrote after workflow completion but before results collection.
+	end := time.Now()
 
 	duration := end.Sub(start)
 

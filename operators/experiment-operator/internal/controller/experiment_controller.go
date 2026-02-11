@@ -248,6 +248,17 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 		}
 
 		clusterName := exp.Status.Targets[i].ClusterName
+
+		// Skip Phase 1 for targets using hub observability (e.g., Alloy remote-write
+		// via Tailscale). These targets ship metrics to the hub — there's no local
+		// Prometheus/VictoriaMetrics to discover, so Phase 1 retries would all fail.
+		if target.Observability != nil && target.Observability.Enabled &&
+			target.Observability.Transport == "tailscale" {
+			log.Info("Target uses hub observability, skipping target discovery",
+				"cluster", clusterName)
+			continue
+		}
+
 		kubeconfig, err := r.ClusterManager.GetClusterKubeconfig(ctx, clusterName, target.Cluster.Type)
 		if err != nil {
 			log.Error(err, "Failed to get kubeconfig for target metrics", "cluster", clusterName)
@@ -298,13 +309,27 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 	}
 
 	// Phase 2: Fall back to hub VictoriaMetrics if target collection failed or returned empty.
+	// Retry loop allows Alloy time to accumulate enough scrapes for rate() queries.
 	if metricsResult == nil || metrics.AllQueriesEmpty(metricsResult) {
-		hubResult, err := metrics.CollectMetricsSnapshot(ctx, r.MetricsURL, exp)
-		if err != nil {
-			log.Error(err, "Hub metrics snapshot failed — continuing without metrics")
-		} else if hubResult != nil && !metrics.AllQueriesEmpty(hubResult) {
-			metricsResult = hubResult
-			log.Info("Collected metrics from hub VictoriaMetrics")
+		for attempt := 1; attempt <= maxMetricsAttempts; attempt++ {
+			hubResult, err := metrics.CollectMetricsSnapshot(ctx, r.MetricsURL, exp)
+			if err != nil {
+				log.Error(err, "Hub metrics snapshot failed", "attempt", attempt)
+				break
+			}
+			if hubResult != nil && !metrics.AllQueriesEmpty(hubResult) {
+				metricsResult = hubResult
+				metricsResult.Source = "hub"
+				log.Info("Collected metrics from hub VictoriaMetrics", "attempt", attempt)
+				break
+			}
+			if attempt < maxMetricsAttempts {
+				log.Info("Hub metrics returned empty, waiting for Alloy data",
+					"attempt", attempt, "nextRetry", metricsRetryInterval)
+				time.Sleep(metricsRetryInterval)
+			} else {
+				log.Info("Hub metrics still empty after retries")
+			}
 		}
 	}
 
