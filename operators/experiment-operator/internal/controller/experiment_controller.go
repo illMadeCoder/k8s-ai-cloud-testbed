@@ -236,7 +236,7 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 	// Combined discover+collect retry loop: re-discovers endpoints on each attempt so that
 	// newly ready services (e.g., Prometheus pods starting up) are found.
 	var metricsResult *metrics.MetricsResult
-	const maxMetricsAttempts = 16
+	const maxMetricsAttempts = 8
 	const metricsRetryInterval = 30 * time.Second
 
 	for i, target := range exp.Spec.Targets {
@@ -249,13 +249,28 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 
 		clusterName := exp.Status.Targets[i].ClusterName
 
-		// Skip Phase 1 for targets using hub observability (e.g., Alloy remote-write
-		// via Tailscale). These targets ship metrics to the hub — there's no local
-		// Prometheus/VictoriaMetrics to discover, so Phase 1 retries would all fail.
+		// For targets using hub observability (Alloy remote-write via Tailscale),
+		// skip Prometheus/VM discovery and collect directly from kubelet cadvisor.
+		// The Tailscale egress pipeline is too slow on ephemeral clusters for the
+		// remote-write → hub VictoriaMetrics path to work reliably.
 		if target.Observability != nil && target.Observability.Enabled &&
 			target.Observability.Transport == "tailscale" {
-			log.Info("Target uses hub observability, skipping target discovery",
+			log.Info("Target uses hub observability, collecting from cadvisor directly",
 				"cluster", clusterName)
+			kubeconfig, err := r.ClusterManager.GetClusterKubeconfig(ctx, clusterName, target.Cluster.Type)
+			if err != nil {
+				log.Error(err, "Failed to get kubeconfig for cadvisor metrics", "cluster", clusterName)
+				continue
+			}
+			cadvisorResult, err := metrics.CollectCadvisorMetrics(ctx, kubeconfig, exp)
+			if err != nil {
+				log.Error(err, "Cadvisor metrics collection failed", "cluster", clusterName)
+			} else if cadvisorResult != nil && !metrics.AllQueriesEmpty(cadvisorResult) {
+				metricsResult = cadvisorResult
+				log.Info("Collected metrics from target cadvisor", "cluster", clusterName)
+			} else {
+				log.Info("Cadvisor metrics returned empty", "cluster", clusterName)
+			}
 			continue
 		}
 
@@ -308,28 +323,15 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 		}
 	}
 
-	// Phase 2: Fall back to hub VictoriaMetrics if target collection failed or returned empty.
-	// Retry loop allows Alloy time to accumulate enough scrapes for rate() queries.
+	// Phase 2: Fall back to hub VictoriaMetrics if target/cadvisor collection returned empty.
 	if metricsResult == nil || metrics.AllQueriesEmpty(metricsResult) {
-		for attempt := 1; attempt <= maxMetricsAttempts; attempt++ {
-			hubResult, err := metrics.CollectMetricsSnapshot(ctx, r.MetricsURL, exp)
-			if err != nil {
-				log.Error(err, "Hub metrics snapshot failed", "attempt", attempt)
-				break
-			}
-			if hubResult != nil && !metrics.AllQueriesEmpty(hubResult) {
-				metricsResult = hubResult
-				metricsResult.Source = "hub"
-				log.Info("Collected metrics from hub VictoriaMetrics", "attempt", attempt)
-				break
-			}
-			if attempt < maxMetricsAttempts {
-				log.Info("Hub metrics returned empty, waiting for Alloy data",
-					"attempt", attempt, "nextRetry", metricsRetryInterval)
-				time.Sleep(metricsRetryInterval)
-			} else {
-				log.Info("Hub metrics still empty after retries")
-			}
+		hubResult, err := metrics.CollectMetricsSnapshot(ctx, r.MetricsURL, exp)
+		if err != nil {
+			log.Error(err, "Hub metrics snapshot failed — continuing without metrics")
+		} else if hubResult != nil && !metrics.AllQueriesEmpty(hubResult) {
+			metricsResult = hubResult
+			metricsResult.Source = "hub"
+			log.Info("Collected metrics from hub VictoriaMetrics")
 		}
 	}
 
