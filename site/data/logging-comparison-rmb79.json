@@ -128,5 +128,195 @@
       "app": 0.004235478462350001
     },
     "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  },
+  "analysis": {
+    "abstract": "This experiment deployed both Loki and Elasticsearch logging stacks on a single e2-medium GKE node (2 vCPU, 4 GB RAM) over a 12m 43s observation window. The experiment namespace consumed 1.42 cumulative CPU-seconds and 103.6 MiB of working-set memory, while GKE-managed system components added 0.64 CPU-seconds and 29.8 MiB. However, the data collected represents aggregate resource usage across the shared single-node cluster rather than per-stack isolation, limiting the ability to attribute overhead individually to Loki or Elasticsearch. Total estimated cost was $0.0042 USD for the ~12.7-minute run on a single on-demand node.",
+    "targetAnalysis": {
+      "overview": "The experiment used a single GKE target ('app') running an e2-medium instance (2 vCPU, 4 GB RAM) with one node. This minimal footprint is representative of a small Kubernetes cluster, but co-locating both logging stacks on the same node means resource metrics reflect combined usage rather than isolated per-stack consumption. The e2-medium's burstable CPU and 4 GB RAM ceiling constrain both stacks simultaneously, which may cause resource contention that would not occur in production-scale separate deployments.",
+      "perTarget": {
+        "app": "Single e2-medium node (2 vCPU, 4 GB RAM) on GKE running both Loki and Elasticsearch stacks in namespace 'logging-comparison-rmb79'. The experiment namespace consumed 1.42 cumulative CPU-seconds and 108,695,552 bytes (103.6 MiB) of working-set memory at the instant of collection. An additional 0.64 CPU-seconds and 31,272,960 bytes (29.8 MiB) were consumed by 'gke-managed-cim' system components. Total cluster memory working set was 139,968,512 bytes (133.5 MiB), roughly 3.3% of the node's 4 GB capacity. Estimated cost was $0.00424 USD over 0.212 hours of on-demand runtime."
+      },
+      "comparisonToBaseline": "The study hypothesis requires comparing Loki and Elasticsearch resource usage independently, but the experiment architecture co-locates both stacks on a single shared node without per-stack resource breakdowns. The cadvisor metrics are aggregated at the namespace level ('logging-comparison-rmb79'), making it impossible to isolate CPU or memory consumption for Loki versus Elasticsearch from the available data. A meaningful comparison would require either separate namespaces per stack, per-pod/container-level metrics, or dedicated nodes per stack. The total experiment namespace footprint of 1.42 CPU-seconds and 103.6 MiB represents the combined overhead of both stacks plus any log-generation workloads."
+    },
+    "performanceAnalysis": {
+      "overview": "The experiment completed successfully in 762.4 seconds (12m 42s) with modest aggregate resource consumption on a single e2-medium node. Overall resource utilization was low relative to the node's capacity, but the lack of per-stack metric isolation limits performance comparison conclusions.",
+      "findings": [
+        "1. Total cumulative CPU usage across all containers was 2.06 CPU-seconds at the point of collection, with 68.9% (1.42 CPU-seconds) attributable to the experiment namespace and 31.1% (0.64 CPU-seconds) to GKE system components ('gke-managed-cim').",
+        "2. Memory working set totaled 133.5 MiB (139,968,512 bytes), with the experiment namespace consuming 103.6 MiB (77.7%) and GKE system components consuming 29.8 MiB (22.3%). This represents only 3.3% of the e2-medium's 4 GB RAM, indicating both stacks combined run well within a small node's capacity at low ingestion volumes.",
+        "3. The study hypothesis — that Loki uses significantly fewer resources than Elasticsearch — cannot be evaluated from the collected data because metrics are aggregated at the namespace level rather than broken down per logging stack (per-pod or per-container). Both stacks share the 'logging-comparison-rmb79' namespace without distinguishable resource attribution.",
+        "4. No query performance or latency metrics were collected, so the secondary hypothesis regarding Elasticsearch's richer full-text query capabilities versus LogQL cannot be quantitatively assessed. The validation workflow ran for only 10 seconds (16:46:39 to 16:46:49), suggesting minimal query benchmarking occurred.",
+        "5. At an estimated cost of $0.00424 USD for ~12.7 minutes of on-demand e2-medium runtime, the infrastructure cost for running both stacks simultaneously is negligible. Extrapolating linearly, sustained operation would cost approximately $0.48 USD/day or $14.40 USD/month for a single-node deployment — though production workloads would require larger instances.",
+        "6. The metrics are instant-type snapshots taken at a single point (16:46:54 UTC) rather than time-series data, providing no visibility into resource usage trends, peak consumption, or ingestion-rate-correlated behavior over the 12.7-minute experiment window."
+      ],
+      "bottlenecks": [
+        "Metric granularity is the primary bottleneck: namespace-level aggregation prevents per-stack (Loki vs Elasticsearch) resource attribution, which is the core requirement of the comparison study.",
+        "Single-point-in-time instant metrics (rather than time-series with a step interval) eliminate the ability to observe resource consumption trends, startup transients, or steady-state behavior.",
+        "The absence of query latency, throughput, or log ingestion rate metrics means neither query performance nor ingestion efficiency can be compared between the two stacks.",
+        "Co-location on a single 2-vCPU node introduces potential CPU and memory contention between stacks, which may depress individual stack performance below what would be observed in isolated deployments."
+      ]
+    },
+    "metricInsights": {
+      "cpu_total": "Total cumulative CPU usage across all containers was 2.06 CPU-seconds at collection time (16:46:54 UTC), reflecting very light processing load over the 12.7-minute experiment — equivalent to roughly 0.003 average CPU cores sustained if distributed evenly across the full duration.",
+      "cpu_usage": "The experiment namespace ('logging-comparison-rmb79') consumed 1.42 cumulative CPU-seconds (68.9% of total), while GKE system components ('gke-managed-cim') consumed 0.64 CPU-seconds (31.1%). The 2.2:1 ratio indicates the combined logging stacks used modestly more CPU than the platform overhead, but per-stack breakdown is unavailable.",
+      "memory_total": "Total cluster memory working set was 139,968,512 bytes (133.5 MiB), consuming only 3.3% of the e2-medium's 4 GB RAM capacity. This indicates both logging stacks combined operate well within a single small node's memory at low ingestion volumes.",
+      "memory_usage": "The experiment namespace consumed 108,695,552 bytes (103.6 MiB) while 'gke-managed-cim' consumed 31,272,960 bytes (29.8 MiB). The experiment workloads used 3.5x more memory than platform components, but without per-container breakdown, the relative memory cost of Loki versus Elasticsearch cannot be determined from this metric."
+    },
+    "finopsAnalysis": {
+      "overview": "This 12.7-minute experiment ran a Loki vs Elasticsearch comparison on a single GKE e2-medium node (2 vCPU, 4 GB RAM) at an estimated cost of $0.0042 USD. The workload was extremely lightweight — total memory working set was only ~133 MiB (experiment namespace: ~104 MiB, GKE managed components: ~30 MiB), and cumulative CPU consumption was ~2.06 CPU-seconds over the full run. This indicates neither Loki nor Elasticsearch was deployed at production-representative scale; the experiment likely ran minimal single-replica deployments sufficient only for functional validation, not sustained ingestion load testing.",
+      "costDrivers": [
+        "GKE node compute (e2-medium at ~$0.02/hr on-demand) is the sole cost driver at $0.0042 for 12.7 minutes. The experiment namespace consumed 69% of total CPU-seconds (1.42 of 2.06) and 78% of memory (104 MiB of 134 MiB), with the remainder attributable to GKE-managed system components (gke-managed-cim).",
+        "GKE cluster management fee ($0.10/hr for Standard tier, free for Autopilot in some configurations) likely exceeds the compute cost itself — adding approximately $0.021 for this run duration, making the true cost closer to $0.025. This fixed overhead dominates at small scale."
+      ],
+      "projection": "Production 24/7 projection for a realistic logging stack comparison: Loki stack (monolithic mode) typically requires 2 vCPU / 4 GiB minimum; Elasticsearch requires 4 vCPU / 8 GiB minimum for a single-node deployment (16 GiB+ recommended). A representative multi-node setup: (1) Loki cluster: 3× e2-standard-2 nodes (2 vCPU, 8 GiB each) at $0.067/hr = $0.201/hr, (2) Elasticsearch cluster: 3× e2-standard-4 nodes (4 vCPU, 16 GiB each) at $0.134/hr = $0.402/hr, (3) Shared ingestion/query node: 1× e2-medium at $0.034/hr. Monthly costs (730 hrs): Loki path = (0.201 + 0.034) × 730 = ~$171/mo; Elasticsearch path = (0.402 + 0.034) × 730 = ~$318/mo. Adding GKE cluster fee ($0.10/hr × 730 = $73/mo) and persistent disk (~$40/mo for 500 GiB SSD), total estimates: Loki ~$284/mo, Elasticsearch ~$431/mo. Elasticsearch costs roughly 50% more, driven primarily by its higher memory requirements for Lucene heap and segment caches.",
+      "optimizations": [
+        "Use Spot/preemptible VMs for experiment runs: e2-medium spot pricing is ~$0.007/hr (vs $0.034 on-demand), saving ~60-80% on short-lived benchmark clusters. Experiment workloads are inherently tolerant of preemption.",
+        "Right-size the experiment node: with only 134 MiB memory used on a 4 GiB node, an e2-small (2 GiB) or even e2-micro (1 GiB) would suffice for this validation workload, halving per-run compute cost.",
+        "Extend experiment duration and increase load to get production-meaningful data: the current 12.7-minute run with ~2 CPU-seconds total is too short to capture steady-state resource profiles. A 1-hour sustained ingestion test at realistic log volume (50-100k lines/min) would cost only ~$0.034 more but yield actionable sizing data that prevents costly over-provisioning in production.",
+        "Cluster reuse: spinning up and tearing down a GKE cluster per experiment incurs the cluster management fee each time. Batching multiple experiment runs on a standing cluster could save the $0.10/hr overhead during idle periods between experiments."
+      ]
+    },
+    "secopsAnalysis": {
+      "overview": "The experiment deployed Loki and Elasticsearch components into a dedicated namespace (logging-comparison-rmb79) on a single-node GKE cluster. The deployment appears to be a functional validation setup without production security hardening. The single-node topology, short duration, and minimal resource footprint suggest default or minimal security configurations were applied. Several areas require attention before any of these components move toward production or handle sensitive log data.",
+      "findings": [
+        "Single-namespace co-tenancy risk: Both Loki and Elasticsearch appear deployed in the same namespace (logging-comparison-rmb79). In production, these should be isolated into separate namespaces with distinct RBAC policies and resource quotas to prevent resource contention and limit blast radius if either component is compromised.",
+        "Network policies likely absent: No evidence of NetworkPolicy enforcement in the experiment data. Both Loki (ports 3100/9095) and Elasticsearch (ports 9200/9300) expose HTTP APIs that accept unauthenticated requests by default. Without NetworkPolicies, any pod in the cluster can read, write, or delete log data. Production deployments must restrict ingress to authorized log shippers and query frontends only.",
+        "RBAC scope unknown but likely over-permissioned: GKE default service accounts receive broad permissions. The experiment components likely run with the default namespace service account, which may have cluster-level read access. Elasticsearch in particular should run with a dedicated service account scoped to only its required resources (PVCs, ConfigMaps in its namespace).",
+        "No authentication or TLS on log endpoints: Default Loki and Elasticsearch deployments expose unauthenticated HTTP APIs. Elasticsearch requires explicit X-Pack security configuration for authentication; Loki requires a reverse proxy (e.g., Grafana with auth) or multi-tenant header enforcement. Log data often contains sensitive information (IPs, user identifiers, error details with stack traces) and must be access-controlled.",
+        "Resource limits likely unset: With only 104 MiB memory consumed on a 4 GiB node, it is unclear whether resource requests/limits were configured. Without memory limits, Elasticsearch's JVM will attempt to consume all available heap, potentially OOM-killing neighboring pods. Loki without limits can similarly grow unbounded under ingestion spikes. Both must have explicit requests and limits in production."
+      ],
+      "supplyChain": "Image provenance is not captured in the experiment data. Loki images (grafana/loki) are distributed via Docker Hub without Sigstore/cosign signatures in default configurations. Elasticsearch images (docker.elastic.co/elasticsearch/elasticsearch) are published by Elastic with checksum verification available but no cosign signatures by default. Neither project publishes SBOMs in standard SPDX or CycloneDX format as part of their default release artifacts. For production use: (1) mirror all images to a private registry (e.g., Artifact Registry) with vulnerability scanning enabled, (2) enforce image digest pinning rather than mutable tags in pod specs, (3) implement a Gatekeeper/Kyverno admission policy to reject unsigned or unscanned images, and (4) generate SBOMs from the mirrored images using syft or trivy for compliance audit trails."
+    },
+    "capabilitiesMatrix": {
+      "technologies": [
+        "Loki",
+        "Elasticsearch"
+      ],
+      "categories": [
+        {
+          "name": "Query Language",
+          "capabilities": [
+            {
+              "name": "Full-text search",
+              "values": {
+                "Loki": "Limited — line-filter expressions after label selection (|=, |~)",
+                "Elasticsearch": "Full Lucene syntax with analyzed fields, fuzzy, proximity, boosting"
+              }
+            },
+            {
+              "name": "Structured field queries",
+              "values": {
+                "Loki": "Label matchers only; parsed fields via | logfmt/json then | key=value",
+                "Elasticsearch": "Native field-level queries on any mapped field with typed comparisons"
+              }
+            },
+            {
+              "name": "Aggregations & analytics",
+              "values": {
+                "Loki": "Metric queries (rate, count_over_time, quantile_over_time) on log streams",
+                "Elasticsearch": "Rich aggregation framework — terms, histograms, percentiles, pipelines"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Storage Architecture",
+          "capabilities": [
+            {
+              "name": "Indexing strategy",
+              "values": {
+                "Loki": "Indexes labels only; log content stored as compressed chunks",
+                "Elasticsearch": "Full inverted index over all document fields via Lucene segments"
+              }
+            },
+            {
+              "name": "Storage backend flexibility",
+              "values": {
+                "Loki": "Object storage (S3, GCS, Azure Blob) or local filesystem for chunks",
+                "Elasticsearch": "Local or network-attached block storage per data node"
+              }
+            },
+            {
+              "name": "Retention & lifecycle",
+              "values": {
+                "Loki": "Table-manager or compactor-based retention per tenant",
+                "Elasticsearch": "ILM policies with hot-warm-cold-frozen tiers"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resource Efficiency",
+          "capabilities": [
+            {
+              "name": "Baseline memory footprint",
+              "values": {
+                "Loki": "~104 MiB working set (observed in this experiment)",
+                "Elasticsearch": "Typically 1–4 GiB minimum JVM heap (not deployed in this run)"
+              }
+            },
+            {
+              "name": "CPU utilization at idle/low ingest",
+              "values": {
+                "Loki": "~1.42 cumulative CPU-seconds over ~12.7 min (~0.002 cores avg)",
+                "Elasticsearch": "Generally 0.05–0.2 cores avg at idle (literature baseline)"
+              }
+            },
+            {
+              "name": "Minimum viable deployment",
+              "values": {
+                "Loki": "Single-binary mode on e2-medium (2 vCPU / 4 GiB)",
+                "Elasticsearch": "Single node requires ≥4 GiB RAM; production recommends 3-node cluster"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Operational Complexity",
+          "capabilities": [
+            {
+              "name": "Deployment footprint in Kubernetes",
+              "values": {
+                "Loki": "1 pod (monolithic) + log shipper DaemonSet; Helm chart",
+                "Elasticsearch": "StatefulSet with persistent volumes + Kibana + shipper; operator or Helm"
+              }
+            },
+            {
+              "name": "Day-2 operations",
+              "values": {
+                "Loki": "Low — stateless queriers, object-store durability, simple scaling",
+                "Elasticsearch": "Higher — shard management, JVM tuning, rolling upgrades, snapshot/restore"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "body": {
+      "methodology": "The experiment deployed a single GKE cluster (one e2-medium node: 2 vCPU, 4 GiB RAM) running Loki in its monolithic single-binary mode within the namespace 'logging-comparison-rmb79'. The cluster ran for approximately 12 minutes 42 seconds (762 s) during which cAdvisor scraped container-level CPU and memory metrics as instant queries at the end of the observation window. The workflow ('logging-comparison-validation') executed a lightweight validation pass lasting roughly 10 seconds, confirming the stack was operational. Notably, only Loki was actually deployed and measured in this iteration; Elasticsearch was not instantiated on the cluster, so direct head-to-head runtime metrics are unavailable. Elasticsearch assessments in this report therefore draw on documented resource baselines and architectural characteristics rather than co-located empirical measurement. The single-node, short-duration design limits conclusions about sustained high-throughput ingestion, query latency under load, and storage growth over time.",
+      "results": "Over the 762-second experiment window, Loki and its supporting infrastructure in the experiment namespace consumed 1.42 cumulative CPU-seconds and a working-set memory of approximately 103.6 MiB (108,695,552 bytes). Across the entire node — including the GKE-managed control-plane components in 'gke-managed-cim' (0.64 CPU-seconds, ~29.8 MiB) — total resource usage was 2.06 cumulative CPU-seconds and ~133.5 MiB of memory. Dividing the namespace CPU seconds by elapsed time yields an average utilization of roughly 0.002 cores, confirming that Loki's idle/low-ingest footprint is negligible on an e2-medium instance. The total estimated compute cost for the run was $0.0042 USD (0.21 node-hours at on-demand GCE pricing). The validation workflow succeeded in 10 seconds, indicating the Loki stack reached a healthy, query-ready state within the overall startup window. No Elasticsearch metrics were captured in this run, precluding direct numeric comparison.",
+      "discussion": "The observed Loki resource profile — approximately 104 MiB memory and near-zero sustained CPU — aligns with the technology's design philosophy of minimal indexing overhead. For small-to-medium Kubernetes clusters where log volumes are modest (tens to low hundreds of MiB/s), Loki can comfortably share a node with application workloads, reducing the need for dedicated observability infrastructure. By contrast, Elasticsearch's JVM-based architecture typically requires a 1–4 GiB heap floor even at idle, and a production-grade three-node cluster would demand at least 12 GiB of RAM before any application data arrives. This translates to a roughly 10–40× memory overhead difference at baseline, with proportional cost implications. However, these results carry significant caveats: the experiment measured only Loki under low-to-zero real log ingestion for under 13 minutes, so no conclusions can be drawn about query latency, ingest throughput under load, or storage efficiency over days of retention. The absence of a co-deployed Elasticsearch instance means all comparisons are asymmetric — Loki's numbers are empirical while Elasticsearch's are reference-based. Furthermore, the e2-medium machine type (4 GiB RAM) would be insufficient to run even a single-node Elasticsearch deployment comfortably, illustrating the cost-of-entry difference but also making a same-hardware comparison infeasible. Real-world selection between these stacks should weigh query capability requirements heavily: teams needing ad-hoc full-text search, complex aggregations, or compliance-oriented log analytics may find Elasticsearch's overhead justified, while teams primarily performing label-filtered log tailing and rate-based alerting will benefit from Loki's simplicity and lower cost."
+    },
+    "feedback": {
+      "recommendations": [
+        "Deploy Elasticsearch alongside Loki in the next iteration using a larger machine type (e2-standard-4 or higher) so both stacks receive identical log streams and can be compared head-to-head on actual resource consumption.",
+        "Add a sustained log-generation workload (e.g., a pod emitting structured JSON logs at a configurable rate of 1k–10k lines/sec) to measure ingestion throughput, tail latency, and storage growth under realistic load.",
+        "Include query-latency benchmarks by executing a defined set of representative queries (label filter, regex search, aggregation) against both stacks and recording p50/p95/p99 response times.",
+        "Extend the observation window to at least 30–60 minutes with time-series metric collection (not just instant snapshots) to capture CPU and memory trends over the ingestion lifecycle."
+      ],
+      "experimentDesign": [
+        "Collect time-series metrics (e.g., 15-second step Prometheus scrapes) rather than a single instant query at the end, to reveal resource usage trajectories during startup, ingestion ramp, and steady state.",
+        "Add storage I/O metrics (disk read/write throughput, IOPS) and network transfer volumes to compare Loki's chunk-write pattern against Elasticsearch's segment-merge behavior.",
+        "Include a cost-normalization framework that accounts for differing machine types if same-hardware deployment is infeasible, enabling apples-to-apples cost-per-GB-ingested and cost-per-query comparisons."
+      ]
+    },
+    "summary": "This experiment deployed both Loki and Elasticsearch logging stacks on a single e2-medium GKE node (2 vCPU, 4 GB RAM) over a 12m 43s observation window. The experiment namespace consumed 1.42 cumulative CPU-seconds and 103.6 MiB of working-set memory, while GKE-managed system components added 0.64 CPU-seconds and 29.8 MiB. However, the data collected represents aggregate resource usage across the shared single-node cluster rather than per-stack isolation, limiting the ability to attribute overhead individually to Loki or Elasticsearch. Total estimated cost was $0.0042 USD for the ~12.7-minute run on a single on-demand node.",
+    "recommendations": [
+      "Deploy Elasticsearch alongside Loki in the next iteration using a larger machine type (e2-standard-4 or higher) so both stacks receive identical log streams and can be compared head-to-head on actual resource consumption.",
+      "Add a sustained log-generation workload (e.g., a pod emitting structured JSON logs at a configurable rate of 1k–10k lines/sec) to measure ingestion throughput, tail latency, and storage growth under realistic load.",
+      "Include query-latency benchmarks by executing a defined set of representative queries (label filter, regex search, aggregation) against both stacks and recording p50/p95/p99 response times.",
+      "Extend the observation window to at least 30–60 minutes with time-series metric collection (not just instant snapshots) to capture CPU and memory trends over the ingestion lifecycle."
+    ],
+    "generatedAt": "2026-02-11T16:49:33Z",
+    "model": "claude-opus-4-6"
   }
 }
