@@ -187,7 +187,7 @@ const analysis = latest.analysis;
       {latest.metrics?.source && (
         <p class="metrics-source">Source: <code>{latest.metrics.source}</code></p>
       )}
-      <div class="grid grid-2">
+      <div class="grid">
         {metricEntries.map(([name, qr]) => (
           <div class="card">
             <VegaChart spec={buildSpec(name, qr)} />
