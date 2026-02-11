@@ -186,6 +186,47 @@ code {
   border-bottom: 1px solid var(--border);
 }
 
+details.section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+}
+
+details.section > summary.section-title {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0;
+  border-bottom: none;
+  user-select: none;
+}
+
+details.section > summary.section-title::-webkit-details-marker {
+  display: none;
+}
+
+details.section > summary.section-title::before {
+  content: '\25B6 ';
+  font-size: 0.65em;
+  color: var(--text-muted);
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+
+details.section[open] > summary.section-title::before {
+  content: '\25BC ';
+}
+
+details.section[open] > summary.section-title {
+  margin-bottom: 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+details.section > :not(summary) {
+  padding: 1rem;
+}
+
 .tag {
   display: inline-block;
   padding: 0.15rem 0.55rem;

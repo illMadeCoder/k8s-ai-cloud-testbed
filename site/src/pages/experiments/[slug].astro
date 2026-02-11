@@ -69,48 +69,20 @@ const analysis = latest.analysis;
     </div>
   </div>
 
-  {latest.study && (latest.study.hypothesis || latest.study.questions?.length || latest.study.focus?.length) && (
-    <div class="study-context">
-      {latest.study.hypothesis && (
-        <div class="study-hypothesis">
-          <span class="study-label">Hypothesis</span>
-          <p>{latest.study.hypothesis}</p>
-        </div>
-      )}
-      {latest.study.questions && latest.study.questions.length > 0 && (
-        <div class="study-questions">
-          <span class="study-label">Questions</span>
-          <ol>
-            {latest.study.questions.map((q) => <li>{q}</li>)}
-          </ol>
-        </div>
-      )}
-      {latest.study.focus && latest.study.focus.length > 0 && (
-        <div class="study-focus">
-          <span class="study-label">Focus Areas</span>
-          <div class="focus-tags">
-            {latest.study.focus.map((f) => <span class="focus-tag">{f}</span>)}
-          </div>
-        </div>
-      )}
-    </div>
-  )}
+  <div class="stats-row">
+    <MetricCard label="Created" value={formatDate(latest.createdAt)} />
+    <MetricCard label="Duration" value={formatDuration(latest.durationSeconds)} />
+    <MetricCard label="Targets" value={String(latest.targets.length)} />
+    {latest.costEstimate && (
+      <MetricCard label="Est. Cost" value={formatCost(latest.costEstimate.totalUSD)} />
+    )}
+    <MetricCard label="Workflow" value={latest.workflow.phase} />
+  </div>
 
-  {/* Rich analysis: abstract replaces old analysis-box */}
-  {hasRichAnalysis && analysis && (
-    <AnalysisAbstract
-      abstract={analysis.abstract!}
-      model={analysis.model}
-      generatedAt={analysis.generatedAt}
-    />
-  )}
+  <TargetTable targets={latest.targets} />
 
-  {/* Legacy analysis: old-style summary box */}
-  {!hasRichAnalysis && analysis?.summary && (
-    <div class="analysis-box">
-      <h3 class="analysis-title">AI Analysis</h3>
-      <p>{analysis.summary}</p>
-    </div>
+  {latest.costEstimate && (
+    <CostBreakdown cost={latest.costEstimate} />
   )}
 
   <details class="section run-history">
@@ -150,17 +122,57 @@ const analysis = latest.analysis;
     </table>
   </details>
 
-  <div class="stats-row">
-    <MetricCard label="Created" value={formatDate(latest.createdAt)} />
-    <MetricCard label="Duration" value={formatDuration(latest.durationSeconds)} />
-    <MetricCard label="Targets" value={String(latest.targets.length)} />
-    {latest.costEstimate && (
-      <MetricCard label="Est. Cost" value={formatCost(latest.costEstimate.totalUSD)} />
-    )}
-    <MetricCard label="Workflow" value={latest.workflow.phase} />
-  </div>
+  {latest.study && (latest.study.hypothesis || latest.study.questions?.length || latest.study.focus?.length) && (
+    <details class="section study-context">
+      <summary class="section-title">Study Context</summary>
+      <div class="study-context-inner">
+        {latest.study.hypothesis && (
+          <div class="study-hypothesis">
+            <span class="study-label">Hypothesis</span>
+            <p>{latest.study.hypothesis}</p>
+          </div>
+        )}
+        {latest.study.questions && latest.study.questions.length > 0 && (
+          <div class="study-questions">
+            <span class="study-label">Questions</span>
+            <ol>
+              {latest.study.questions.map((q) => <li>{q}</li>)}
+            </ol>
+          </div>
+        )}
+        {latest.study.focus && latest.study.focus.length > 0 && (
+          <div class="study-focus">
+            <span class="study-label">Focus Areas</span>
+            <div class="focus-tags">
+              {latest.study.focus.map((f) => <span class="focus-tag">{f}</span>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
+  )}
 
-  <TargetTable targets={latest.targets} />
+  {/* Rich analysis: abstract replaces old analysis-box */}
+  {hasRichAnalysis && analysis && (
+    <details class="section">
+      <summary class="section-title">AI Analysis</summary>
+      <AnalysisAbstract
+        abstract={analysis.abstract!}
+        model={analysis.model}
+        generatedAt={analysis.generatedAt}
+      />
+    </details>
+  )}
+
+  {/* Legacy analysis: old-style summary box */}
+  {!hasRichAnalysis && analysis?.summary && (
+    <details class="section">
+      <summary class="section-title">AI Analysis</summary>
+      <div class="analysis-box">
+        <p>{analysis.summary}</p>
+      </div>
+    </details>
+  )}
 
   {/* Rich analysis: Target Analysis section */}
   {hasRichAnalysis && analysis?.targetAnalysis && (
@@ -182,8 +194,8 @@ const analysis = latest.analysis;
   )}
 
   {metricEntries.length > 0 && (
-    <div class="section">
-      <h2 class="section-title">Metrics</h2>
+    <details class="section">
+      <summary class="section-title">Metrics</summary>
       {latest.metrics?.source && (
         <p class="metrics-source">Source: <code>{latest.metrics.source}</code></p>
       )}
@@ -197,17 +209,17 @@ const analysis = latest.analysis;
           </div>
         ))}
       </div>
-    </div>
+    </details>
   )}
 
   {metricsEmpty && (
-    <div class="section">
-      <h2 class="section-title">Metrics</h2>
+    <details class="section">
+      <summary class="section-title">Metrics</summary>
       <div class="empty-state">
         <p>No metrics data collected for this experiment run.</p>
         <p class="empty-hint">The target cluster may not have had a monitoring stack deployed, or the queries returned no results. Re-running the experiment with the latest operator will attempt to collect metrics directly from the target cluster's Prometheus.</p>
       </div>
-    </div>
+    </details>
   )}
 
   <script>
@@ -241,14 +253,10 @@ const analysis = latest.analysis;
 
   {/* Rich analysis: FinOps projection inline */}
   {hasRichAnalysis && analysis?.finopsAnalysis?.projection && (
-    <div class="section finops-projection">
-      <h4 class="projection-title">Production Cost Projection</h4>
+    <details class="section finops-projection">
+      <summary class="section-title projection-title">Production Cost Projection</summary>
       <p class="projection-text">{analysis.finopsAnalysis.projection}</p>
-    </div>
-  )}
-
-  {latest.costEstimate && (
-    <CostBreakdown cost={latest.costEstimate} />
+    </details>
   )}
 
   {/* Rich analysis: SecOps Analysis */}
@@ -275,12 +283,12 @@ const analysis = latest.analysis;
 
   {/* Legacy analysis: old-style recommendations */}
   {!hasRichAnalysis && analysis?.recommendations && analysis.recommendations.length > 0 && (
-    <div class="section">
-      <h2 class="section-title">Recommendations</h2>
+    <details class="section">
+      <summary class="section-title">Recommendations</summary>
       <ul class="recommendations">
         {analysis.recommendations.map((rec) => <li>{rec}</li>)}
       </ul>
-    </div>
+    </details>
   )}
 </Base>
 
@@ -303,21 +311,6 @@ const analysis = latest.analysis;
     display: flex;
     flex-wrap: wrap;
     gap: 0.375rem;
-  }
-  .run-history summary {
-    cursor: pointer;
-    list-style: none;
-  }
-  .run-history summary::before {
-    content: '\25B6 ';
-    font-size: 0.75em;
-    color: var(--text-muted);
-  }
-  .run-history[open] summary::before {
-    content: '\25BC ';
-  }
-  .run-history summary::-webkit-details-marker {
-    display: none;
   }
   .metrics-source {
     font-size: 0.8rem;
@@ -343,31 +336,17 @@ const analysis = latest.analysis;
     margin: 0.5rem auto 0;
   }
   .finops-projection {
-    background: color-mix(in srgb, var(--success) 6%, var(--bg-card));
-    border: 1px solid color-mix(in srgb, var(--success) 20%, var(--border));
-    border-radius: var(--radius);
-    padding: 1rem 1.5rem;
+    border-color: color-mix(in srgb, var(--success) 20%, var(--border));
   }
   .projection-title {
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
     color: var(--success);
-    margin-bottom: 0.5rem;
   }
   .projection-text {
     color: var(--text);
     line-height: 1.65;
     font-size: 0.9rem;
   }
-  .study-context {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--accent);
-    border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1.5rem;
+  .study-context-inner {
     display: flex;
     flex-direction: column;
     gap: 1rem;

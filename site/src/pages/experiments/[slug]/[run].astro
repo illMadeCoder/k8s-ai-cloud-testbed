@@ -67,50 +67,6 @@ const analysis = experiment.analysis;
     </div>
   </div>
 
-  {experiment.study && (experiment.study.hypothesis || experiment.study.questions?.length || experiment.study.focus?.length) && (
-    <div class="study-context">
-      {experiment.study.hypothesis && (
-        <div class="study-hypothesis">
-          <span class="study-label">Hypothesis</span>
-          <p>{experiment.study.hypothesis}</p>
-        </div>
-      )}
-      {experiment.study.questions && experiment.study.questions.length > 0 && (
-        <div class="study-questions">
-          <span class="study-label">Questions</span>
-          <ol>
-            {experiment.study.questions.map((q) => <li>{q}</li>)}
-          </ol>
-        </div>
-      )}
-      {experiment.study.focus && experiment.study.focus.length > 0 && (
-        <div class="study-focus">
-          <span class="study-label">Focus Areas</span>
-          <div class="focus-tags">
-            {experiment.study.focus.map((f) => <span class="focus-tag">{f}</span>)}
-          </div>
-        </div>
-      )}
-    </div>
-  )}
-
-  {/* Rich analysis: abstract replaces old analysis-box */}
-  {hasRichAnalysis && analysis && (
-    <AnalysisAbstract
-      abstract={analysis.abstract!}
-      model={analysis.model}
-      generatedAt={analysis.generatedAt}
-    />
-  )}
-
-  {/* Legacy analysis: old-style summary box */}
-  {!hasRichAnalysis && analysis?.summary && (
-    <div class="analysis-box">
-      <h3 class="analysis-title">AI Analysis</h3>
-      <p>{analysis.summary}</p>
-    </div>
-  )}
-
   <div class="stats-row">
     <MetricCard label="Created" value={formatDate(experiment.createdAt)} />
     <MetricCard label="Duration" value={formatDuration(experiment.durationSeconds)} />
@@ -122,6 +78,62 @@ const analysis = experiment.analysis;
   </div>
 
   <TargetTable targets={experiment.targets} />
+
+  {experiment.costEstimate && (
+    <CostBreakdown cost={experiment.costEstimate} />
+  )}
+
+  {experiment.study && (experiment.study.hypothesis || experiment.study.questions?.length || experiment.study.focus?.length) && (
+    <details class="section study-context">
+      <summary class="section-title">Study Context</summary>
+      <div class="study-context-inner">
+        {experiment.study.hypothesis && (
+          <div class="study-hypothesis">
+            <span class="study-label">Hypothesis</span>
+            <p>{experiment.study.hypothesis}</p>
+          </div>
+        )}
+        {experiment.study.questions && experiment.study.questions.length > 0 && (
+          <div class="study-questions">
+            <span class="study-label">Questions</span>
+            <ol>
+              {experiment.study.questions.map((q) => <li>{q}</li>)}
+            </ol>
+          </div>
+        )}
+        {experiment.study.focus && experiment.study.focus.length > 0 && (
+          <div class="study-focus">
+            <span class="study-label">Focus Areas</span>
+            <div class="focus-tags">
+              {experiment.study.focus.map((f) => <span class="focus-tag">{f}</span>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
+  )}
+
+  {/* Rich analysis: abstract replaces old analysis-box */}
+  {hasRichAnalysis && analysis && (
+    <details class="section">
+      <summary class="section-title">AI Analysis</summary>
+      <AnalysisAbstract
+        abstract={analysis.abstract!}
+        model={analysis.model}
+        generatedAt={analysis.generatedAt}
+      />
+    </details>
+  )}
+
+  {/* Legacy analysis: old-style summary box */}
+  {!hasRichAnalysis && analysis?.summary && (
+    <details class="section">
+      <summary class="section-title">AI Analysis</summary>
+      <div class="analysis-box">
+        <p>{analysis.summary}</p>
+      </div>
+    </details>
+  )}
 
   {/* Rich analysis: Target Analysis section */}
   {hasRichAnalysis && analysis?.targetAnalysis && (
@@ -143,8 +155,8 @@ const analysis = experiment.analysis;
   )}
 
   {metricEntries.length > 0 && (
-    <div class="section">
-      <h2 class="section-title">Metrics</h2>
+    <details class="section">
+      <summary class="section-title">Metrics</summary>
       {experiment.metrics?.source && (
         <p class="metrics-source">Source: <code>{experiment.metrics.source}</code></p>
       )}
@@ -158,17 +170,17 @@ const analysis = experiment.analysis;
           </div>
         ))}
       </div>
-    </div>
+    </details>
   )}
 
   {metricsEmpty && (
-    <div class="section">
-      <h2 class="section-title">Metrics</h2>
+    <details class="section">
+      <summary class="section-title">Metrics</summary>
       <div class="empty-state">
         <p>No metrics data collected for this experiment run.</p>
         <p class="empty-hint">The target cluster may not have had a monitoring stack deployed, or the queries returned no results.</p>
       </div>
-    </div>
+    </details>
   )}
 
   <script>
@@ -202,14 +214,10 @@ const analysis = experiment.analysis;
 
   {/* Rich analysis: FinOps projection inline */}
   {hasRichAnalysis && analysis?.finopsAnalysis?.projection && (
-    <div class="section finops-projection">
-      <h4 class="projection-title">Production Cost Projection</h4>
+    <details class="section finops-projection">
+      <summary class="section-title projection-title">Production Cost Projection</summary>
       <p class="projection-text">{analysis.finopsAnalysis.projection}</p>
-    </div>
-  )}
-
-  {experiment.costEstimate && (
-    <CostBreakdown cost={experiment.costEstimate} />
+    </details>
   )}
 
   {/* Rich analysis: SecOps Analysis */}
@@ -236,12 +244,12 @@ const analysis = experiment.analysis;
 
   {/* Legacy analysis: old-style recommendations */}
   {!hasRichAnalysis && analysis?.recommendations && analysis.recommendations.length > 0 && (
-    <div class="section">
-      <h2 class="section-title">Recommendations</h2>
+    <details class="section">
+      <summary class="section-title">Recommendations</summary>
       <ul class="recommendations">
         {analysis.recommendations.map((rec) => <li>{rec}</li>)}
       </ul>
-    </div>
+    </details>
   )}
 </Base>
 
@@ -289,31 +297,17 @@ const analysis = experiment.analysis;
     margin: 0.5rem auto 0;
   }
   .finops-projection {
-    background: color-mix(in srgb, var(--success) 6%, var(--bg-card));
-    border: 1px solid color-mix(in srgb, var(--success) 20%, var(--border));
-    border-radius: var(--radius);
-    padding: 1rem 1.5rem;
+    border-color: color-mix(in srgb, var(--success) 20%, var(--border));
   }
   .projection-title {
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
     color: var(--success);
-    margin-bottom: 0.5rem;
   }
   .projection-text {
     color: var(--text);
     line-height: 1.65;
     font-size: 0.9rem;
   }
-  .study-context {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--accent);
-    border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1.5rem;
+  .study-context-inner {
     display: flex;
     flex-direction: column;
     gap: 1rem;

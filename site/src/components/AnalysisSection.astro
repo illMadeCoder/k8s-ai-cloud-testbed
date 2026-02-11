@@ -19,8 +19,8 @@ const accentColors: Record<string, string> = {
 const color = accentColors[accent];
 ---
 
-<div class="section analysis-section" style={`--section-accent: ${color}`}>
-  <h2 class="section-title analysis-section-title">{title}</h2>
+<details class="section analysis-section" style={`--section-accent: ${color}`}>
+  <summary class="section-title analysis-section-title">{title}</summary>
   <p class="analysis-section-overview">{overview}</p>
 
   {findings && findings.length > 0 && (
@@ -41,7 +41,7 @@ const color = accentColors[accent];
       </ul>
     </div>
   )}
-</div>
+</details>
 
 <style>
   .analysis-section {
