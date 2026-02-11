@@ -150,6 +150,24 @@ spec:
                   benchmark site and whether AI analysis is generated. When false
                   (default), results are only stored in S3.
                 type: boolean
+              study:
+                description: Study provides context about what the experiment is
+                  trying to learn. Passed to the AI analyzer for goal-aware analysis.
+                properties:
+                  focus:
+                    description: Key areas for deep analysis.
+                    items:
+                      type: string
+                    type: array
+                  hypothesis:
+                    description: Expected outcome or claim being tested.
+                    type: string
+                  questions:
+                    description: Specific things the experiment should answer.
+                    items:
+                      type: string
+                    type: array
+                type: object
               tags:
                 description: Tags for categorization on the benchmark site.
                 items:
