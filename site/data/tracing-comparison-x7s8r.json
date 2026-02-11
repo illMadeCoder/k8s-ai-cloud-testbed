@@ -128,5 +128,221 @@
       "app": 0.004269093369677779
     },
     "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  },
+  "analysis": {
+    "abstract": "Insufficient data to evaluate the hypothesis that Tempo uses fewer resources than Jaeger. The experiment deployed both tracing backends on a single shared cluster (e2-medium, 2 vCPU / 4 GB RAM) but collected only aggregate cadvisor metrics at the namespace level, making it impossible to isolate CPU and memory consumption of Tempo versus Jaeger individually. The combined experiment namespace consumed 7.60 cumulative CPU-seconds and 2.29 GB memory working set over the 12m49s run, but without per-container or per-deployment breakdowns, no resource-efficiency comparison can be drawn. To properly evaluate the hypothesis, metrics must be collected at container or pod granularity (e.g., container_cpu_usage_seconds_total broken down by container_name) so that the tracing backend, its storage layer, and any sidecar or collector processes can be attributed separately. The query-capability and storage-architecture dimensions of the hypothesis cannot be assessed from resource metrics alone and would require functional test results or feature-matrix scoring.",
+    "targetAnalysis": {
+      "overview": "The experiment used a single GKE cluster with one e2-medium node (2 vCPU, 4 GB RAM), which is a highly constrained environment. Both Tempo and Jaeger were co-located on this node, meaning they competed for the same 2 vCPU and 4 GB RAM. This co-location makes relative resource comparison dependent on per-container metric granularity, which was not captured. The 12m49s experiment duration is marginal for observing steady-state behavior—Elasticsearch index merges and Tempo block flushes may not have completed a full cycle.",
+      "perTarget": {
+        "app": "The 'app' target ran on a single e2-medium node (2 vCPU, 4 GB RAM) in GKE. The experiment namespace consumed 7.60 cumulative CPU-seconds and 2.29 GB (2,457,743,360 bytes) memory working set, representing 93.7% of total CPU and 98.7% of total memory observed across all namespaces. The remaining resources were consumed by the gke-managed-cim namespace (0.51 CPU-seconds, 30.3 MB memory), which is GKE's internal infrastructure monitoring. At 2.29 GB working set on a 4 GB node, memory utilization was approximately 57%, leaving limited headroom for both backends plus Kubernetes system components. The workflow validation phase completed successfully in 10 seconds (19:04:59–19:05:09), suggesting both backends reached a functional state. Total estimated cost was $0.0043 USD."
+      },
+      "comparisonToBaseline": "This is a comparison experiment (Tempo vs. Jaeger), but the metric collection architecture does not support the comparison. Both backends share the namespace 'tracing-comparison-x7s8r', and cadvisor metrics were aggregated at the namespace level rather than per-container. Without labels like container_name, pod_name, or app distinguishing Tempo components (distributor, ingester, compactor, querier) from Jaeger components (collector, query, Elasticsearch/storage), the 7.60 CPU-seconds and 2.29 GB memory cannot be attributed to either backend. A valid comparison would require either (a) deploying each backend in its own namespace, or (b) collecting container-level metrics with container_name labels preserved."
+    },
+    "performanceAnalysis": {
+      "overview": "The experiment completed successfully with both backends reaching operational status within 12m49s on a severely constrained node. However, the collected metrics provide only a system-level resource snapshot, not a per-backend performance comparison. The data answers 'how much did the whole experiment cost?' but not 'which backend is more efficient?'",
+      "findings": [
+        "1. Total experiment namespace CPU consumption was 7.60 cumulative CPU-seconds over 768s, yielding an average CPU utilization of ~0.0099 cores (0.5% of the 2 vCPU available). This extremely low average suggests either minimal trace load was generated, or the cumulative counter was read at a point before significant ingestion activity occurred.",
+        "2. Memory working set in the experiment namespace was 2,457,743,360 bytes (2.29 GB), consuming 57.2% of the node's 4 GB RAM. This is substantial and indicates that running both tracing backends plus their storage dependencies on a single e2-medium node is near the practical memory ceiling, leaving only ~1.71 GB for kubelet, kube-proxy, and other system components.",
+        "3. The GKE-managed infrastructure namespace (gke-managed-cim) consumed 0.51 CPU-seconds and 30.3 MB memory, representing negligible overhead (6.3% of CPU, 1.3% of memory) relative to the experiment workloads.",
+        "4. The validation workflow executed in 10 seconds and succeeded, confirming both Tempo and Jaeger reached a queryable state and could ingest/retrieve traces. However, no trace volume, latency, or throughput metrics were captured to quantify ingestion performance.",
+        "5. The experiment ran for 12m49s at an estimated cost of $0.0043 USD. This duration may be too short for Tempo's block compaction cycle (default flush interval is 5–10 minutes for WAL to block) or Elasticsearch's segment merge behavior to manifest in resource metrics, meaning peak resource consumption may not have been captured.",
+        "6. No per-container CPU or memory breakdown is available, so the resource overhead question ('What is the resource overhead of each tracing backend?') cannot be answered from this data. The 2.29 GB aggregate could be dominated by Elasticsearch's JVM heap (commonly configured at 1 GB+) or by Tempo's ingester WAL, but this is speculative without container-level attribution."
+      ],
+      "bottlenecks": [
+        "Metric granularity is the primary bottleneck for analysis: namespace-level aggregation prevents per-backend resource attribution, which is the core comparison this experiment was designed to make.",
+        "The single e2-medium node (4 GB RAM) constrains both backends to share limited memory, potentially causing one or both to operate under memory pressure or with reduced cache/buffer sizes, which would not reflect production behavior.",
+        "The 12m49s experiment duration may be insufficient to observe steady-state resource patterns—Elasticsearch index lifecycle and Tempo compaction both operate on multi-minute cycles that may not complete within this window.",
+        "No trace throughput or ingestion rate metrics were collected, making it impossible to confirm that both backends received equivalent trace volume—a prerequisite for fair resource comparison."
+      ]
+    },
+    "metricInsights": {
+      "cpu_total": "Total cumulative CPU usage across all containers was 8.11 CPU-seconds over the 768-second experiment, indicating an average utilization of ~0.011 cores—well below the 2 vCPU capacity of the e2-medium node. This suggests either very light trace ingestion load or that the snapshot was taken before sustained processing began.",
+      "cpu_usage": "The experiment namespace (tracing-comparison-x7s8r) consumed 7.60 cumulative CPU-seconds (93.7% of total), while gke-managed-cim accounted for 0.51 CPU-seconds (6.3%). Without per-container breakdown within the experiment namespace, CPU cannot be attributed to Tempo versus Jaeger individually.",
+      "memory_total": "Total memory working set across all containers was 2,489,495,552 bytes (2.32 GB), representing 58% of the node's 4 GB RAM. This leaves approximately 1.68 GB for Kubernetes system components, which is tight but viable for a short experiment.",
+      "memory_usage": "The experiment namespace consumed 2,457,743,360 bytes (2.29 GB), dominating the node's memory footprint at 98.7% of observed usage. The gke-managed-cim namespace used 31,752,192 bytes (30.3 MB). The 2.29 GB aggregate likely includes Elasticsearch JVM heap, Tempo ingester buffers, collector memory, and any MinIO or storage emulator—container-level labels would be needed to disaggregate."
+    },
+    "finopsAnalysis": {
+      "overview": "This experiment ran a single e2-medium GKE node for ~12.8 minutes comparing Tempo and Jaeger tracing backends, costing an estimated $0.0043 USD. The cost is negligible for a short-lived benchmark, but the resource consumption patterns — particularly memory — reveal important scaling considerations for production deployment of either backend.",
+      "costDrivers": [
+        "Memory pressure is the dominant cost driver: the experiment namespace consumed ~2.46 GB of the 4 GB available on the e2-medium node (61.4% of total node RAM). Running both Tempo and Jaeger simultaneously on a single 4 GB node leaves almost no headroom, meaning production deployments will require substantially larger instances or dedicated nodes per backend.",
+        "Compute usage was modest at 7.6 cumulative CPU-seconds over ~768 seconds in the experiment namespace (average ~0.01 cores), indicating that at this trace volume neither backend is CPU-bound. The cost driver at scale will shift to storage I/O and indexing CPU for Jaeger's Elasticsearch, while Tempo's cost will shift to object storage API calls and compaction cycles."
+      ],
+      "projection": "Production projection for running each backend 24/7 on GKE: A realistic Tempo deployment (3 × e2-standard-4 nodes for distributor/ingester/compactor separation) plus object storage costs approximately (3 × $97.09/mo on-demand) + ~$20/mo GCS = ~$311/mo. A realistic Jaeger deployment (2 × e2-standard-4 for collector/query + 3 × e2-standard-8 for Elasticsearch at 16 GB heap minimum) costs approximately (2 × $97.09) + (3 × $194.18) + ~$50/mo persistent disk = ~$827/mo. Math basis: e2-standard-4 (4 vCPU, 16 GB) ≈ $0.134/hr × 730 hrs = $97.09/mo; e2-standard-8 (8 vCPU, 32 GB) ≈ $0.268/hr × 730 hrs = $194.18/mo. Tempo's infrastructure cost advantage is roughly 2.5–3× at equivalent trace volume, directly attributable to eliminating the Elasticsearch indexing tier.",
+      "optimizations": [
+        "Use preemptible/spot e2 instances for non-critical tracing workloads to reduce compute cost by ~60–70% ($311/mo Tempo → ~$100/mo; $827/mo Jaeger → ~$280/mo). Trace data is reconstructible from source services, making spot interruptions tolerable with proper queue buffering.",
+        "For Jaeger deployments, evaluate Jaeger with the OpenSearch backend or the newer Jaeger V2 architecture (built on OTEL Collector) which supports object storage via Tempo or ClickHouse, potentially eliminating the Elasticsearch cost entirely.",
+        "Right-size resource requests based on actual utilization: this experiment showed <1% average CPU utilization, suggesting that initial deployments can start with smaller instances and scale via HPA rather than over-provisioning from day one.",
+        "For Tempo, enable S3/GCS lifecycle policies to move trace blocks older than 7–14 days to Nearline/Coldline storage, reducing object storage costs by 40–60% on retained data."
+      ]
+    },
+    "secopsAnalysis": {
+      "overview": "The experiment deployed both tracing backends into a single shared namespace on a single-node GKE cluster with no evidence of network segmentation, RBAC scoping, or workload isolation. While acceptable for a short-lived benchmark, this configuration has several security gaps that must not carry forward to production.",
+      "findings": [
+        "No network policies are evident: both Tempo and Jaeger components share the 'tracing-comparison-x7s8r' namespace with no NetworkPolicy restricting inter-pod or egress traffic. In production, tracing backends should have ingress limited to OTLP collector ports (4317/4318) and query APIs restricted to authorized consumers only.",
+        "RBAC scoping is not visible in the experiment data. Both backends require Kubernetes API access for service discovery and configuration; production deployments should use dedicated ServiceAccounts with least-privilege ClusterRoles — particularly for Jaeger's collector which may need access to namespace metadata for service-to-service dependency mapping.",
+        "Resource limits and requests are not reported in the metrics data. Without enforced resource limits, either backend could consume the full 4 GB node memory and OOMKill neighboring workloads. The 2.46 GB working set observed already represents a risk on a 4 GB node. Production deployments must set explicit memory limits with appropriate OOM scoring.",
+        "The single-node cluster provides no workload isolation between the tracing infrastructure and the GKE managed components (gke-managed-cim namespace). Tracing backends that process high-volume telemetry data should run on dedicated node pools with taints to prevent co-scheduling with business-critical workloads.",
+        "No TLS/mTLS configuration is evident for OTLP ingestion endpoints. Both Tempo's distributor and Jaeger's collector accept traces over gRPC (port 4317); without mTLS, trace data — which may contain sensitive span attributes such as user IDs, query parameters, or error details — transits in cleartext within the cluster network."
+      ],
+      "supplyChain": "No image signing, SBOM, or provenance verification is evident in the experiment configuration. Tempo images are published by Grafana Labs to Docker Hub (grafana/tempo) and Jaeger images by the CNCF Jaeger project (jaegertracing/*); neither set of images is verified via cosign/Sigstore signatures or accompanied by attested SBOMs in this deployment. Production deployments should pin images by digest (not tag), enforce admission policies via Kyverno or Gatekeeper requiring signature verification, and maintain an internal registry mirror with vulnerability scanning. Jaeger's CNCF-graduated status provides some supply chain assurance through its security audit history, but Tempo as a Grafana Labs project has a different governance model and should be independently assessed."
+    },
+    "capabilitiesMatrix": {
+      "technologies": [
+        "Tempo",
+        "Jaeger"
+      ],
+      "categories": [
+        {
+          "name": "Query Language",
+          "capabilities": [
+            {
+              "name": "Trace retrieval by ID",
+              "values": {
+                "Tempo": "Native support",
+                "Jaeger": "Native support"
+              }
+            },
+            {
+              "name": "Tag/attribute search",
+              "values": {
+                "Tempo": "TraceQL with optional search (Parquet columnar blocks required)",
+                "Jaeger": "Built-in tag search via Elasticsearch/Cassandra index"
+              }
+            },
+            {
+              "name": "Structural span queries",
+              "values": {
+                "Tempo": "TraceQL span-set selectors (e.g. ancestor/child relationships)",
+                "Jaeger": "Not supported; flat tag filtering only"
+              }
+            },
+            {
+              "name": "Full-text search",
+              "values": {
+                "Tempo": "Not supported natively",
+                "Jaeger": "Full Lucene syntax via Elasticsearch backend"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Storage Architecture",
+          "capabilities": [
+            {
+              "name": "Backend requirement",
+              "values": {
+                "Tempo": "Object storage only (S3, GCS, Azure Blob)",
+                "Jaeger": "Elasticsearch or Cassandra (stateful, indexed)"
+              }
+            },
+            {
+              "name": "Indexing overhead",
+              "values": {
+                "Tempo": "None (index-free design)",
+                "Jaeger": "Significant (Lucene segment merges, Cassandra compaction)"
+              }
+            },
+            {
+              "name": "Operational complexity",
+              "values": {
+                "Tempo": "Low; no index cluster to manage",
+                "Jaeger": "Higher; requires tuning and operating ES/Cassandra"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resource Efficiency",
+          "capabilities": [
+            {
+              "name": "CPU profile",
+              "values": {
+                "Tempo": "Lower expected baseline (no indexing)",
+                "Jaeger": "Higher baseline due to indexing layer"
+              }
+            },
+            {
+              "name": "Memory profile",
+              "values": {
+                "Tempo": "Bounded by WAL and block compaction",
+                "Jaeger": "Driven by ES JVM heap or Cassandra memtables"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ingestion & Integration",
+          "capabilities": [
+            {
+              "name": "OTLP ingestion",
+              "values": {
+                "Tempo": "Native via distributor component",
+                "Jaeger": "Supported via OTLP receiver (v1.35+)"
+              }
+            },
+            {
+              "name": "OpenTelemetry Collector compatibility",
+              "values": {
+                "Tempo": "First-class OTLP/gRPC and OTLP/HTTP exporters",
+                "Jaeger": "First-class OTLP/gRPC and OTLP/HTTP exporters"
+              }
+            }
+          ]
+        },
+        {
+          "name": "UI & Debugging Workflow",
+          "capabilities": [
+            {
+              "name": "Trace visualization",
+              "values": {
+                "Tempo": "Via Grafana Explore (external dependency)",
+                "Jaeger": "Built-in Jaeger UI with timeline and flamegraph"
+              }
+            },
+            {
+              "name": "Dependency graph",
+              "values": {
+                "Tempo": "Via metrics-generator (optional, requires enabling)",
+                "Jaeger": "Built-in service dependency DAG"
+              }
+            },
+            {
+              "name": "Trace comparison",
+              "values": {
+                "Tempo": "Not natively supported",
+                "Jaeger": "Built-in side-by-side trace comparison"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "body": {
+      "methodology": "The experiment deployed Grafana Tempo and Jaeger as tracing backends within a single GKE cluster running on an e2-medium node (2 vCPU, 4 GB RAM) under the namespace 'tracing-comparison-x7s8r'. The total experiment duration was approximately 768 seconds (~12 min 49 sec), from cluster provisioning at 18:52:26 UTC to final metric collection at 19:05:14 UTC. A validation workflow ('tracing-comparison-validation') executed successfully in the final 10 seconds of the experiment window (19:04:59 to 19:05:09 UTC), confirming both backends were operational. Resource consumption was captured via cadvisor instant queries at the end of the experiment window, reporting cumulative CPU usage (container_cpu_usage_seconds_total) and point-in-time memory working set (container_memory_working_set_bytes), broken down by namespace. A key limitation is that the cadvisor metrics are aggregated at the namespace level rather than per-container, so it is not possible to isolate CPU and memory consumption of Tempo vs. Jaeger individually; both backends, along with any collectors or sidecars, are co-located in the same experiment namespace. Additionally, the metrics represent a single instant snapshot rather than a time series, which prevents analysis of resource trends during ingestion. The constrained single-node environment provides a fair relative comparison but does not reflect production-scale behavior.",
+      "results": "The experiment namespace 'tracing-comparison-x7s8r' consumed 7.595 cumulative CPU-seconds over the ~768-second run, yielding an average CPU utilization of approximately 0.0099 cores (~0.5% of the 2 vCPU node). The memory working set for the experiment namespace was 2,457,743,360 bytes (~2.29 GB), representing 57.2% of the node's 4 GB total RAM. By comparison, the GKE-managed infrastructure namespace ('gke-managed-cim') consumed only 0.512 cumulative CPU-seconds and 31,752,192 bytes (~30.3 MB) of memory, confirming that the vast majority of resource consumption was attributable to the experiment workloads. Total cluster-wide CPU usage was 8.107 cumulative CPU-seconds, and total memory working set was 2,489,495,552 bytes (~2.31 GB). The validation workflow completed successfully in 10 seconds with a 'Succeeded' phase, indicating both tracing backends were functional and accepting traces. The total experiment cost was estimated at $0.0043 USD for 0.21 hours of e2-medium on-demand compute. However, because cadvisor metrics were not broken down per container, no differential resource comparison between Tempo and Jaeger could be extracted from this data.",
+      "discussion": "The central hypothesis—that Tempo would consume fewer resources than Jaeger due to its index-free architecture—could not be directly validated because the collected metrics are aggregated at the namespace level, with both backends sharing the 'tracing-comparison-x7s8r' namespace. The combined ~2.29 GB memory footprint is notable on a 4 GB node, suggesting that running both backends simultaneously on an e2-medium instance is near the practical ceiling; in a production setting, each backend would typically have a dedicated allocation. The low average CPU utilization (~0.01 cores) indicates that the validation workload was lightweight and did not stress either backend's ingestion pipeline—this means the experiment measured idle/near-idle resource profiles rather than behavior under sustained trace load. The architectural trade-offs remain theoretically well-established: Tempo's object-storage-only design eliminates the operational burden and resource cost of an Elasticsearch or Cassandra cluster, while Jaeger's indexing layer enables richer ad-hoc search and full-text queries at the expense of that infrastructure. For real-world adoption decisions, teams prioritizing operational simplicity and cost efficiency on large trace volumes would lean toward Tempo, while teams requiring built-in UI features (dependency graphs, trace comparison, flexible tag search without additional configuration) would benefit from Jaeger's more complete out-of-the-box experience. The single-snapshot metric collection, co-located namespace, and minimal trace volume represent significant limitations that prevent drawing quantitative resource-efficiency conclusions from this iteration."
+    },
+    "feedback": {
+      "recommendations": [
+        "Deploy Tempo and Jaeger in separate namespaces so that cadvisor metrics can be disaggregated per-backend, enabling a direct CPU and memory comparison",
+        "Introduce a sustained trace-generation workload (e.g., a load generator emitting a fixed rate of OTLP spans for at least 10 minutes) to measure resource consumption under realistic ingestion pressure rather than near-idle conditions",
+        "Collect per-container metrics (labeling by container name) rather than per-namespace aggregates to isolate backend processes from collectors, init containers, and sidecars",
+        "Add a query-performance benchmark by issuing identical lookups (trace-by-ID, tag search) against both backends and recording response latency"
+      ],
+      "experimentDesign": [
+        "Switch from instant metric snapshots to range queries (e.g., rate(container_cpu_usage_seconds_total[1m])) sampled at 15-second intervals across the full experiment window to capture resource consumption trends over time",
+        "Use a larger node (e.g., e2-standard-4 with 4 vCPU / 16 GB RAM) or separate node pools to avoid memory pressure artifacts and ensure neither backend is OOM-throttled during the test",
+        "Include storage-layer metrics (disk I/O, object storage PUT/GET counts for Tempo, Elasticsearch indexing rate for Jaeger) to quantify the storage architecture trade-offs that are central to the hypothesis"
+      ]
+    },
+    "summary": "Insufficient data to evaluate the hypothesis that Tempo uses fewer resources than Jaeger. The experiment deployed both tracing backends on a single shared cluster (e2-medium, 2 vCPU / 4 GB RAM) but collected only aggregate cadvisor metrics at the namespace level, making it impossible to isolate CPU and memory consumption of Tempo versus Jaeger individually. The combined experiment namespace consumed 7.60 cumulative CPU-seconds and 2.29 GB memory working set over the 12m49s run, but without per-container or per-deployment breakdowns, no resource-efficiency comparison can be drawn. To properly evaluate the hypothesis, metrics must be collected at container or pod granularity (e.g., container_cpu_usage_seconds_total broken down by container_name) so that the tracing backend, its storage layer, and any sidecar or collector processes can be attributed separately. The query-capability and storage-architecture dimensions of the hypothesis cannot be assessed from resource metrics alone and would require functional test results or feature-matrix scoring.",
+    "recommendations": [
+      "Deploy Tempo and Jaeger in separate namespaces so that cadvisor metrics can be disaggregated per-backend, enabling a direct CPU and memory comparison",
+      "Introduce a sustained trace-generation workload (e.g., a load generator emitting a fixed rate of OTLP spans for at least 10 minutes) to measure resource consumption under realistic ingestion pressure rather than near-idle conditions",
+      "Collect per-container metrics (labeling by container name) rather than per-namespace aggregates to isolate backend processes from collectors, init containers, and sidecars",
+      "Add a query-performance benchmark by issuing identical lookups (trace-by-ID, tag search) against both backends and recording response latency"
+    ],
+    "generatedAt": "2026-02-11T19:08:04Z",
+    "model": "claude-opus-4-6"
   }
 }
