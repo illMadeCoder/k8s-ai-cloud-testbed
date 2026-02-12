@@ -57,16 +57,16 @@ const { matrix } = Astro.props;
   }
 
   .cap-category-label {
-    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-muted);
-    padding: 0.5rem 0 0;
+    padding: 0.75rem 0 0;
   }
 
   .cap-panel {
-    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
@@ -76,6 +76,7 @@ const { matrix } = Astro.props;
     display: flex;
     align-items: center;
     padding: 0.75rem 1rem;
+    background: var(--bg-card);
     border-bottom: 1px solid var(--border);
   }
 
@@ -90,6 +91,7 @@ const { matrix } = Astro.props;
   .cap-panel-body {
     display: flex;
     flex-direction: column;
+    background: transparent;
   }
 
   .cap-tech-card {
