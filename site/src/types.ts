@@ -85,6 +85,9 @@ export interface AnalysisResult {
   generatedAt: string;
   model: string;
 
+  // Hypothesis verdict for at-a-glance display
+  hypothesisVerdict?: 'supported' | 'partially supported' | 'not supported' | 'insufficient data';
+
   // Structured analysis sections
   abstract?: string;
   targetAnalysis?: TargetAnalysis;

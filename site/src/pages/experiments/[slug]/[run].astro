@@ -41,6 +41,10 @@ const metricsEmpty = metricEntries.length === 0;
 
 const hasRichAnalysis = !!experiment.analysis?.abstract;
 const analysis = experiment.analysis;
+const verdict = analysis?.hypothesisVerdict;
+const verdictLabel = verdict
+  ? verdict.charAt(0).toUpperCase() + verdict.slice(1)
+  : null;
 ---
 
 <Base title={`${experiment.name} — K8s AI Lab Benchmarks`} description={experiment.description}>
@@ -69,6 +73,12 @@ const analysis = experiment.analysis;
   </div>
 
   <div class="stats-row">
+    {verdictLabel && (
+      <div class={`metric-card verdict-card verdict-${verdict!.replace(/\s+/g, '-')}`}>
+        <span class="metric-label">Hypothesis</span>
+        <span class="metric-value verdict-value">{verdictLabel}</span>
+      </div>
+    )}
     <MetricCard label="Created" value={formatDate(experiment.createdAt)} />
     <MetricCard label="Duration" value={formatDuration(experiment.durationSeconds)} />
     <MetricCard label="Targets" value={String(experiment.targets.length)} />
@@ -297,6 +307,41 @@ const analysis = experiment.analysis;
     display: flex;
     flex-wrap: wrap;
     gap: 0.125rem;
+  }
+  .verdict-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius);
+    min-width: 140px;
+  }
+  .verdict-value {
+    font-size: 1.05rem;
+  }
+  .verdict-supported {
+    background: color-mix(in srgb, #22c55e 15%, var(--bg-surface));
+  }
+  .verdict-supported .verdict-value {
+    color: #22c55e;
+  }
+  .verdict-partially-supported {
+    background: color-mix(in srgb, #eab308 15%, var(--bg-surface));
+  }
+  .verdict-partially-supported .verdict-value {
+    color: #eab308;
+  }
+  .verdict-not-supported {
+    background: color-mix(in srgb, #ef4444 15%, var(--bg-surface));
+  }
+  .verdict-not-supported .verdict-value {
+    color: #ef4444;
+  }
+  .verdict-insufficient-data {
+    background: var(--bg-surface);
+  }
+  .verdict-insufficient-data .verdict-value {
+    color: var(--text-muted);
   }
   .empty-state {
     padding: 2rem;

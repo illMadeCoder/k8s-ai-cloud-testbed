@@ -135,6 +135,10 @@ type AnalysisResult struct {
 	GeneratedAt     time.Time         `json:"generatedAt"`
 	Model           string            `json:"model"`
 
+	// Hypothesis verdict — structured enum for at-a-glance display in stats row.
+	// Values: "supported", "partially supported", "not supported", "insufficient data"
+	HypothesisVerdict string `json:"hypothesisVerdict,omitempty"`
+
 	// Structured analysis sections
 	Abstract            string               `json:"abstract,omitempty"`
 	TargetAnalysis      *TargetAnalysis      `json:"targetAnalysis,omitempty"`
