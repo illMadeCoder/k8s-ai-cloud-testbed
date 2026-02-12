@@ -1,0 +1,58 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Experiment
+metadata:
+  generateName: my-experiment-
+  namespace: experiments
+spec:
+  description: "Brief description of what this experiment tests"
+  tags: ["comparison", "observability"]  # Used for site categorization
+  publish: true   # Set to true to publish results to benchmark site
+  ttlDays: 7
+
+  # AI analysis configuration — controls which sections the analyzer generates.
+  # Omit this block entirely to skip AI analysis (saves API spend).
+  # Each section maps to an analyzer pass; unused passes are skipped automatically.
+  analysis:
+    sections:
+      # Pass 2 — Core analysis (always useful):
+      - abstract              # Executive summary with hypothesis verdict
+      - targetAnalysis        # Per-target infrastructure analysis
+      - performanceAnalysis   # Key performance findings with data
+      - metricInsights        # Per-metric chart annotations
+
+      # Pass 3 — FinOps + SecOps (include if relevant):
+      - finopsAnalysis        # Cost analysis and production projections
+      # - secopsAnalysis      # Security posture — omit for non-security experiments
+
+      # Pass 4 — Deep dive:
+      - body                  # Research-paper methodology/results/discussion
+      - capabilitiesMatrix    # Feature comparison table — only for comparisons!
+      - feedback              # Recommendations and experiment design improvements
+
+      # Pass 5 — Diagram:
+      - architectureDiagram   # ASCII architecture topology diagram
+
+  # Study context — guides the AI analyzer toward your specific goals.
+  study:
+    hypothesis: "State the expected outcome or claim being tested"
+    questions:
+      - "What specific question should the experiment answer?"
+    focus:
+      - "area of deep analysis"
+
+  targets:
+    - name: app
+      cluster:
+        type: gke
+        machineType: e2-standard-4
+        preemptible: true
+      observability:
+        enabled: true
+        transport: tailscale
+      components:
+        - app: my-component
+
+  workflow:
+    template: my-workflow-template
+    completion:
+      mode: workflow

@@ -55,6 +55,33 @@ fi
 
 echo "==> Summary fetched ($(wc -c < "${SUMMARY_FILE}") bytes)"
 
+# --- Extract requested analysis sections from summary.json ---
+REQUESTED_SECTIONS=""
+if jq -e '.analysisConfig.sections' "${SUMMARY_FILE}" > /dev/null 2>&1; then
+  REQUESTED_SECTIONS=$(jq -r '.analysisConfig.sections | join(",")' "${SUMMARY_FILE}")
+  echo "==> Requested analysis sections: ${REQUESTED_SECTIONS}"
+else
+  echo "==> No analysisConfig.sections in summary.json — skipping analysis"
+  echo "==> To enable analysis, add spec.analysis.sections to the Experiment CR"
+  exit 0
+fi
+
+# --- Helper: check if a section is requested ---
+section_requested() {
+  local section="$1"
+  echo ",${REQUESTED_SECTIONS}," | grep -q ",${section},"
+}
+
+# --- Helper: check if ANY of the given sections are requested ---
+any_section_requested() {
+  for section in "$@"; do
+    if section_requested "${section}"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # --- Helper: extract JSON from claude --output-format json (JSONL) response ---
 extract_json() {
   local raw_file="$1"
@@ -190,6 +217,9 @@ echo "==> Analysis plan: $(jq -c '{technologies, isComparison, focusAreas}' "${P
 # ============================================================================
 # Pass 2: Core Analysis (abstract, targetAnalysis, performanceAnalysis, metricInsights)
 # ============================================================================
+PASS2_FILE="${WORK_DIR}/pass_2.json"
+if any_section_requested "abstract" "targetAnalysis" "performanceAnalysis" "metricInsights"; then
+
 PASS2_PROMPT=$(cat <<'EOF'
 You are writing research-paper quality analysis of Kubernetes experiment benchmark results.
 You have an analysis plan and the full experiment data. Generate the core analysis sections.
@@ -242,16 +272,23 @@ ANALYSIS PLAN:
 EOF
 )
 
-PASS2_FILE="${WORK_DIR}/pass_2.json"
 run_pass "pass_2_core" "${PASS2_PROMPT}
 ${PLAN_DATA}
 ${STUDY_CONTEXT}
 EXPERIMENT DATA:
 ${SUMMARY_DATA}" "${PASS2_FILE}" || true
 
+else
+  echo "==> Skipping pass 2 (core) — no relevant sections requested"
+  echo '{}' > "${PASS2_FILE}"
+fi
+
 # ============================================================================
 # Pass 3: FinOps + SecOps Analysis
 # ============================================================================
+PASS3_FILE="${WORK_DIR}/pass_3.json"
+if any_section_requested "finopsAnalysis" "secopsAnalysis"; then
+
 PASS3_PROMPT=$(cat <<'EOF'
 You are writing financial and security analysis of Kubernetes experiment benchmark results.
 You have an analysis plan and the full experiment data.
@@ -294,16 +331,23 @@ ANALYSIS PLAN:
 EOF
 )
 
-PASS3_FILE="${WORK_DIR}/pass_3.json"
 run_pass "pass_3_finops_secops" "${PASS3_PROMPT}
 ${PLAN_DATA}
 
 EXPERIMENT DATA:
 ${SUMMARY_DATA}" "${PASS3_FILE}" || true
 
+else
+  echo "==> Skipping pass 3 (finops/secops) — no relevant sections requested"
+  echo '{}' > "${PASS3_FILE}"
+fi
+
 # ============================================================================
 # Pass 4: Deep Dive + Capabilities Matrix + Feedback
 # ============================================================================
+PASS4_FILE="${WORK_DIR}/pass_4.json"
+if any_section_requested "body" "capabilitiesMatrix" "feedback"; then
+
 IS_COMPARISON=$(jq -r '.isComparison // false' "${PASS1_FILE}" 2>/dev/null || echo "false")
 
 if [ "${IS_COMPARISON}" = "true" ]; then
@@ -369,16 +413,23 @@ ANALYSIS PLAN:
 EOF
 )
 
-PASS4_FILE="${WORK_DIR}/pass_4.json"
 run_pass "pass_4_deep_dive" "${PASS4_PROMPT}
 ${PLAN_DATA}
 
 EXPERIMENT DATA:
 ${SUMMARY_DATA}" "${PASS4_FILE}" || true
 
+else
+  echo "==> Skipping pass 4 (deep dive) — no relevant sections requested"
+  echo '{}' > "${PASS4_FILE}"
+fi
+
 # ============================================================================
 # Pass 5: ASCII Architecture Diagram
 # ============================================================================
+PASS5_FILE="${WORK_DIR}/pass_5.json"
+if section_requested "architectureDiagram"; then
+
 PASS5_PROMPT=$(cat <<'EOF'
 You are creating an ASCII architecture diagram for a Kubernetes experiment benchmark page.
 The page uses monospace font (JetBrains Mono). Generate a clear topology diagram showing
@@ -432,12 +483,16 @@ ANALYSIS PLAN:
 EOF
 )
 
-PASS5_FILE="${WORK_DIR}/pass_5.json"
 run_pass "pass_5_diagram" "${PASS5_PROMPT}
 ${PLAN_DATA}
 
 EXPERIMENT DATA:
 ${SUMMARY_DATA}" "${PASS5_FILE}" || true
+
+else
+  echo "==> Skipping pass 5 (diagram) — architectureDiagram not requested"
+  echo '{}' > "${PASS5_FILE}"
+fi
 
 # ============================================================================
 # Assembly: Merge all passes into final AnalysisResult
@@ -472,6 +527,14 @@ jq 'del(.technologies, .isComparison, .focusAreas, .domainContext, .domain)' \
 # Remove null capabilitiesMatrix for non-comparison experiments
 jq 'if .capabilitiesMatrix == null then del(.capabilitiesMatrix) else . end' \
   "${FINAL_FILE}" > "${FINAL_FILE}.tmp" && mv "${FINAL_FILE}.tmp" "${FINAL_FILE}"
+
+# Strip any sections that weren't explicitly requested
+ALL_SECTIONS="abstract targetAnalysis performanceAnalysis metricInsights finopsAnalysis secopsAnalysis body capabilitiesMatrix feedback architectureDiagram"
+for section in ${ALL_SECTIONS}; do
+  if ! section_requested "${section}"; then
+    jq "del(.${section})" "${FINAL_FILE}" > "${FINAL_FILE}.tmp" && mv "${FINAL_FILE}.tmp" "${FINAL_FILE}"
+  fi
+done
 
 echo "==> Final analysis assembled ($(wc -c < "${FINAL_FILE}") bytes)"
 echo "==> Sections present: $(jq -r 'keys | join(", ")' "${FINAL_FILE}")"

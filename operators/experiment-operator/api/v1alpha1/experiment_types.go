@@ -68,7 +68,67 @@ type ExperimentSpec struct {
 	// This is passed to the AI analyzer to produce focused, goal-aware analysis.
 	// +optional
 	Study *StudySpec `json:"study,omitempty"`
+
+	// Analysis configures which AI analysis sections to generate on experiment
+	// completion. Each section maps to one or more analyzer passes. If omitted,
+	// no AI analysis is performed (even with publish: true). Only experiments
+	// with publish: true AND analysis.sections will trigger the analyzer Job.
+	//
+	// Available sections (grouped by analyzer pass):
+	//
+	//   Pass 2 — Core analysis:
+	//     abstract            Executive summary with hypothesis verdict
+	//     targetAnalysis      Per-target infrastructure analysis
+	//     performanceAnalysis Key performance findings with data
+	//     metricInsights      Per-metric chart annotations
+	//
+	//   Pass 3 — FinOps + SecOps:
+	//     finopsAnalysis      Cost analysis and production projections
+	//     secopsAnalysis      Security posture and supply chain assessment
+	//
+	//   Pass 4 — Deep dive:
+	//     body                Research-paper methodology/results/discussion
+	//     capabilitiesMatrix  Feature comparison table (comparisons only)
+	//     feedback            Recommendations and experiment design improvements
+	//
+	//   Pass 5 — Diagram:
+	//     architectureDiagram ASCII architecture topology diagram
+	//
+	// +optional
+	Analysis *AnalysisSpec `json:"analysis,omitempty"`
 }
+
+// AnalysisSpec configures AI analysis generation for the experiment.
+type AnalysisSpec struct {
+	// Sections is the list of analysis sections to generate. Each value
+	// must be one of the recognized section names. The analyzer will only
+	// run passes that contain at least one requested section.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:items:Enum=abstract;targetAnalysis;performanceAnalysis;metricInsights;finopsAnalysis;secopsAnalysis;body;capabilitiesMatrix;feedback;architectureDiagram
+	Sections []string `json:"sections"`
+}
+
+// Analysis section constants. Grouped by analyzer pass for documentation.
+const (
+	// Pass 2: Core analysis
+	AnalysisSectionAbstract            = "abstract"
+	AnalysisSectionTargetAnalysis      = "targetAnalysis"
+	AnalysisSectionPerformanceAnalysis = "performanceAnalysis"
+	AnalysisSectionMetricInsights      = "metricInsights"
+
+	// Pass 3: FinOps + SecOps
+	AnalysisSectionFinopsAnalysis = "finopsAnalysis"
+	AnalysisSectionSecopsAnalysis = "secopsAnalysis"
+
+	// Pass 4: Deep dive
+	AnalysisSectionBody               = "body"
+	AnalysisSectionCapabilitiesMatrix = "capabilitiesMatrix"
+	AnalysisSectionFeedback           = "feedback"
+
+	// Pass 5: Diagram
+	AnalysisSectionArchitectureDiagram = "architectureDiagram"
+)
 
 // StudySpec describes the goals and hypotheses of an experiment so the AI
 // analyzer can produce focused analysis aligned with the experimenter's intent.

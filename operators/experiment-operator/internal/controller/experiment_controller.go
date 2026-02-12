@@ -368,8 +368,8 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 			}
 		}
 
-		// Launch AI analysis Job — published experiments require successful analysis.
-		if r.AnalyzerImage != "" {
+		// Launch AI analysis Job — only if analysis sections are configured.
+		if r.AnalyzerImage != "" && exp.Spec.Analysis != nil && len(exp.Spec.Analysis.Sections) > 0 {
 			// Pre-validate Claude credentials before creating analyzer job.
 			secret := &corev1.Secret{}
 			secretKey := types.NamespacedName{Name: "claude-auth", Namespace: "experiment-operator-system"}
@@ -389,6 +389,8 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 				jobName = jobName[:63]
 			}
 			exp.Status.AnalysisJobName = jobName
+		} else if r.AnalyzerImage != "" && (exp.Spec.Analysis == nil || len(exp.Spec.Analysis.Sections) == 0) {
+			log.Info("Skipping AI analysis — spec.analysis.sections not configured", "experiment", exp.Name)
 		}
 	} else if !exp.Spec.Publish {
 		log.Info("Skipping site publish and AI analysis — spec.publish is false", "experiment", exp.Name)

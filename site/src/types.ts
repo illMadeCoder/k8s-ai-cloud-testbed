@@ -10,6 +10,7 @@ export interface ExperimentSummary {
   phase: string;
   tags?: string[];
   study?: StudyContext;
+  analysisConfig?: { sections: string[] };
   targets: TargetSummary[];
   workflow: WorkflowSummary;
   metrics?: MetricsResult;

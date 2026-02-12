@@ -67,22 +67,29 @@ type promResult struct {
 	Values [][2]json.RawMessage `json:"values,omitempty"`
 }
 
+// AnalysisConfig captures the requested analysis sections from the experiment spec.
+// The analyzer reads this to decide which passes to run and which sections to keep.
+type AnalysisConfig struct {
+	Sections []string `json:"sections"`
+}
+
 // ExperimentSummary is the top-level results object stored in S3.
 type ExperimentSummary struct {
-	Name         string          `json:"name"`
-	Namespace    string          `json:"namespace"`
-	Description  string          `json:"description"`
-	CreatedAt    time.Time       `json:"createdAt"`
-	CompletedAt  time.Time       `json:"completedAt"`
-	DurationSec  float64         `json:"durationSeconds"`
-	Phase        string          `json:"phase"`
-	Tags         []string        `json:"tags,omitempty"`
-	Study        *StudyContext   `json:"study,omitempty"`
-	Targets      []TargetSummary `json:"targets"`
-	Workflow     WorkflowSummary `json:"workflow"`
-	Metrics      *MetricsResult  `json:"metrics,omitempty"`
-	CostEstimate *CostEstimate   `json:"costEstimate,omitempty"`
-	Analysis     *AnalysisResult `json:"analysis,omitempty"`
+	Name           string          `json:"name"`
+	Namespace      string          `json:"namespace"`
+	Description    string          `json:"description"`
+	CreatedAt      time.Time       `json:"createdAt"`
+	CompletedAt    time.Time       `json:"completedAt"`
+	DurationSec    float64         `json:"durationSeconds"`
+	Phase          string          `json:"phase"`
+	Tags           []string        `json:"tags,omitempty"`
+	Study          *StudyContext   `json:"study,omitempty"`
+	AnalysisConfig *AnalysisConfig `json:"analysisConfig,omitempty"`
+	Targets        []TargetSummary `json:"targets"`
+	Workflow       WorkflowSummary `json:"workflow"`
+	Metrics        *MetricsResult  `json:"metrics,omitempty"`
+	CostEstimate   *CostEstimate   `json:"costEstimate,omitempty"`
+	Analysis       *AnalysisResult `json:"analysis,omitempty"`
 }
 
 // StudyContext captures the experiment's goals for AI analysis.
@@ -235,6 +242,13 @@ func CollectSummary(exp *experimentsv1alpha1.Experiment) *ExperimentSummary {
 			Hypothesis: exp.Spec.Study.Hypothesis,
 			Questions:  exp.Spec.Study.Questions,
 			Focus:      exp.Spec.Study.Focus,
+		}
+	}
+
+	// Analysis config — pass requested sections through to summary for analyzer
+	if exp.Spec.Analysis != nil && len(exp.Spec.Analysis.Sections) > 0 {
+		s.AnalysisConfig = &AnalysisConfig{
+			Sections: exp.Spec.Analysis.Sections,
 		}
 	}
 

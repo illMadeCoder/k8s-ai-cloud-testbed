@@ -62,6 +62,31 @@ spec:
           spec:
             description: spec defines the desired state of Experiment
             properties:
+              analysis:
+                description: Configures which AI analysis sections to generate.
+                  If omitted, no AI analysis is performed.
+                properties:
+                  sections:
+                    description: Analysis sections to generate. The analyzer only
+                      runs passes containing requested sections.
+                    items:
+                      enum:
+                      - abstract
+                      - targetAnalysis
+                      - performanceAnalysis
+                      - metricInsights
+                      - finopsAnalysis
+                      - secopsAnalysis
+                      - body
+                      - capabilitiesMatrix
+                      - feedback
+                      - architectureDiagram
+                      type: string
+                    minItems: 1
+                    type: array
+                required:
+                - sections
+                type: object
               description:
                 description: Description of the experiment
                 type: string
