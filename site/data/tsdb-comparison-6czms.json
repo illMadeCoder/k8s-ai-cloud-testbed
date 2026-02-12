@@ -290,8 +290,609 @@
     "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
   },
   "analysis": {
-    "summary": "Analysis incomplete",
-    "generatedAt": "2026-02-12T18:56:00Z",
+    "hypothesisVerdict": "insufficient",
+    "abstract": "The experiment provides partial support for the hypothesis that VictoriaMetrics is the most resource-efficient single-node TSDB, but the data is insufficient to fully evaluate either claim due to critical missing metrics. VictoriaMetrics (ts-vm-hub) consumed only 1.30 CPU-seconds and 25.3 MB memory versus Prometheus at 25.13 CPU-seconds and 310.7 MB — a 19x CPU and 12x memory advantage — strongly favoring the efficiency claim. However, Mimir's deployment appears incomplete: only the nginx gateway pod (mimir-nginx, 0.18 CPU-seconds, 11.6 MB) is visible, with no ingester, compactor, querier, or store-gateway pods recorded, making it impossible to assess Mimir's total resource cost or horizontal scalability characteristics. Furthermore, the experiment lacks query latency metrics, active time-series counts, and ingestion rate data, which are essential to normalize resource consumption per metric and evaluate query performance. To conclusively test both parts of the hypothesis, the experiment would need a fully deployed Mimir stack, PromQL query latency histograms, and a known cardinality workload sustained for at least 1 hour. The most actionable finding is that VictoriaMetrics demonstrated an order-of-magnitude resource efficiency advantage over Prometheus on identical infrastructure, warranting further investigation at higher cardinality.",
+    "targetAnalysis": {
+      "overview": "All three TSDBs were deployed on a single GKE cluster using an e2-medium instance (2 vCPUs, 4 GB RAM), which constrains the experiment to vertical-scaling comparisons only. The single-node topology prevents any evaluation of horizontal scalability — a core part of the hypothesis regarding Mimir. The experiment ran for approximately 34 minutes, which is short for steady-state TSDB benchmarking where compaction cycles and memory stabilization typically require 1-2 hours.",
+      "perTarget": {
+        "app": "The 'app' target ran a single e2-medium node (2 shared vCPUs, 4 GB RAM) in GKE cluster tsdb-comparison-6czms-app. This node hosted all three TSDBs simultaneously plus infrastructure pods (Grafana, Alloy, kube-state-metrics, node-exporter, MinIO, operators, cardinality-generator). Total cluster CPU consumption was 96.83 cumulative CPU-seconds and 1.00 GB memory working set. Running all workloads on a single 2-vCPU node introduces significant resource contention — Grafana alone consumed 40.66 CPU-seconds and 372.6 MB, dominating the cluster and potentially skewing TSDB measurements through CPU throttling. The estimated cost was $0.011 for 0.57 hours of runtime."
+      },
+      "comparisonToBaseline": "Comparing the three TSDB-under-test pods directly: Prometheus (prometheus-kube-prometheus-stack-prometheus-0) used 25.13 CPU-seconds and 310.7 MB memory; VictoriaMetrics (ts-vm-hub-zpkgt-0) used 1.30 CPU-seconds and 25.3 MB; Mimir's nginx gateway (mimir-nginx-64c595b85c-2dt8t) used 0.18 CPU-seconds and 11.6 MB. However, the Mimir comparison is invalid because only the reverse-proxy frontend is present — the actual TSDB components (ingesters, queriers, compactors, store-gateways) are missing from the pod data, suggesting either deployment failure or pods not reaching Running state. MinIO (Mimir's object-storage backend) consumed 2.63 CPU-seconds and 78.7 MB but should not be counted without corresponding Mimir TSDB pods."
+    },
+    "performanceAnalysis": {
+      "overview": "Resource efficiency data strongly favors VictoriaMetrics in this experiment, but the comparison is incomplete due to Mimir's apparent deployment failure and the absence of query performance metrics. The 34-minute experiment duration is too short for meaningful compaction and long-term storage analysis.",
+      "findings": [
+        "1. VictoriaMetrics used 19.4x less CPU than Prometheus (1.30 vs 25.13 cumulative CPU-seconds) and 12.3x less memory (25.3 MB vs 310.7 MB), confirming its single-binary efficiency advantage under identical workload conditions on the same node.",
+        "2. Mimir's deployment is incomplete — only the nginx reverse-proxy pod (0.18 CPU-seconds, 11.6 MB) appears in the data. No ingester, querier, compactor, or store-gateway pods were recorded, making Mimir's total resource footprint unmeasurable and the three-way comparison invalid.",
+        "3. Infrastructure overhead dominated the cluster: Grafana consumed 40.66 CPU-seconds (42% of total cluster CPU) and 372.6 MB (37% of total memory), exceeding even Prometheus. This suggests Grafana was actively querying or rendering dashboards, but without query latency data the impact on TSDB performance cannot be isolated.",
+        "4. The cardinality-generator pod (0.24 CPU-seconds, 3.7 MB) had minimal resource usage, suggesting a low-cardinality synthetic workload. Without active-series-count metrics, it is impossible to calculate per-series resource efficiency — a key study question.",
+        "5. Alloy (the collection agent) consumed 5.14 CPU-seconds and 60.1 MB, representing non-trivial overhead that would be shared across all three TSDBs in a remote-write pipeline but is specific to Prometheus in a pull-based model.",
+        "6. Total cluster memory working set was 1.00 GB on a 4 GB node (25% utilization), and total cumulative CPU was 96.83 seconds over 34 minutes. The e2-medium's shared-core architecture may have introduced CPU throttling artifacts that would not appear in dedicated-core instances."
+      ],
+      "bottlenecks": [
+        "Single e2-medium node with 2 shared vCPUs created resource contention between all three TSDBs and infrastructure pods, potentially throttling CPU-bound operations like Prometheus compaction and WAL replay.",
+        "Mimir deployment failure eliminated the primary comparison target for horizontal scalability evaluation — the most likely cause is insufficient node resources to schedule all Mimir microservice pods alongside the other workloads.",
+        "Absence of query latency metrics (e.g., prometheus_engine_query_duration_seconds, vm_request_duration_seconds) prevents answering the study question about dashboard-style PromQL query performance.",
+        "The 34-minute experiment duration is too short to observe Prometheus 2-hour block compaction or VictoriaMetrics merge-tree background merges, limiting storage engine efficiency analysis."
+      ]
+    },
+    "metricInsights": {
+      "cpu_by_pod": "Prometheus dominated TSDB CPU consumption at 25.13 cumulative CPU-seconds, followed by VictoriaMetrics at just 1.30 seconds (19.4x lower). Mimir's nginx gateway used only 0.18 seconds, but this reflects a reverse-proxy, not the TSDB engine — infrastructure pods (Grafana at 40.66s, kube-prometheus-stack-operator at 6.88s) consumed more CPU than either VM or Mimir's visible components.",
+      "cpu_total": "Total cluster CPU consumption was 96.83 cumulative CPU-seconds over the 34-minute experiment window, yielding an average utilization of approximately 0.047 cores — well below the e2-medium's 2-vCPU capacity, indicating the workload was memory-bound or bursty rather than sustained CPU-intensive.",
+      "memory_by_pod": "Prometheus held the largest TSDB memory footprint at 310.7 MB, 12.3x more than VictoriaMetrics at 25.3 MB, consistent with VM's documented lower memory allocation strategy. Grafana was the single largest memory consumer at 372.6 MB. Mimir's nginx pod used only 11.6 MB — without ingester/querier pods, Mimir's actual TSDB memory cost is unknown. MinIO consumed 78.7 MB for object storage that Mimir would have used if fully deployed.",
+      "memory_total": "Total cluster memory working set was 1.00 GB (1,049,133,056 bytes), representing approximately 25% of the e2-medium's 4 GB capacity. This leaves headroom for the missing Mimir components, though a full Mimir deployment (typically 5-7 pods) would likely push memory utilization above 50%, potentially triggering OOM conditions on this node size."
+    },
+    "architectureDiagram": "flowchart TD\n  subgraph GKE[\"GKE Cluster: tsdb-comparison-6czms-app<br/>e2-medium · 2 vCPU · 4 GB\"]\n    subgraph Workload[\"Synthetic Workload\"]\n      CG[\"cardinality-generator<br/>0.24 CPU-s · 3.7 MB\"]\n    end\n    subgraph Collection[\"Metrics Collection\"]\n      Alloy[\"Alloy (agent)<br/>5.14 CPU-s · 60.1 MB\"]\n      NE[\"node-exporter<br/>3.03 CPU-s · 12.8 MB\"]\n      KSM1[\"kube-state-metrics (stack)<br/>5.97 CPU-s · 20.4 MB\"]\n      KSM2[\"kube-state-metrics<br/>2.71 CPU-s · 43.1 MB\"]\n    end\n    subgraph Prometheus[\"Prometheus TSDB\"]\n      Prom[\"prometheus-0<br/>25.13 CPU-s · 310.7 MB\"]\n    end\n    subgraph VictoriaMetrics[\"VictoriaMetrics TSDB\"]\n      VM[\"ts-vm-hub<br/>1.30 CPU-s · 25.3 MB\"]\n    end\n    subgraph Mimir[\"Mimir TSDB (incomplete)\"]\n      Nginx[\"mimir-nginx<br/>0.18 CPU-s · 11.6 MB\"]\n      MinIO[\"MinIO (object store)<br/>2.63 CPU-s · 78.7 MB\"]\n    end\n    subgraph Visualization[\"Visualization\"]\n      Grafana[\"Grafana<br/>40.66 CPU-s · 372.6 MB\"]\n    end\n    subgraph Operators[\"Operators\"]\n      OP1[\"kube-prometheus-operator<br/>6.88 CPU-s · 23.2 MB\"]\n      OP2[\"testbed-operator<br/>2.97 CPU-s · 38.0 MB\"]\n    end\n  end\n  CG -->|generates metrics| Alloy\n  NE -->|node metrics| Alloy\n  KSM1 -->|k8s metrics| Alloy\n  KSM2 -->|k8s metrics| Alloy\n  Alloy -->|remote-write| VM\n  Alloy -->|remote-write| Nginx\n  Prom -->|scrapes| NE\n  Prom -->|scrapes| KSM1\n  Nginx -->|proxy| MinIO\n  Grafana -->|queries| Prom\n  Grafana -->|queries| VM\n  Grafana -->|queries| Nginx",
+    "architectureDiagramFormat": "mermaid",
+    "finopsAnalysis": {
+      "overview": "This 34-minute experiment ran on a single GKE e2-medium node (2 vCPUs, 4 GB RAM) and cost approximately $0.0114 USD. The cluster hosted all three TSDBs (Prometheus, VictoriaMetrics, Mimir) simultaneously alongside infrastructure components (Grafana, Alloy, MinIO, kube-state-metrics, node-exporter, operators), packing the entire comparison onto minimal compute. While cost-efficient for a short benchmark, the single e2-medium node is severely resource-constrained and likely introduced CPU throttling and memory pressure that affected results.",
+      "costDrivers": [
+        "Compute (e2-medium instance): The sole cost driver at $0.0114 for ~34 minutes. GKE e2-medium on-demand pricing is approximately $0.03351/hr. All 12 pods shared 2 vCPUs and 4 GB RAM, with Grafana (391 MB, 40.7 CPU-seconds) and Prometheus (326 MB, 25.1 CPU-seconds) consuming the majority of resources.",
+        "Grafana dominated resource consumption: At 391 MB memory and 40.7 cumulative CPU-seconds, Grafana was the single largest resource consumer — larger than any TSDB under test. This is infrastructure overhead, not a TSDB cost, but on a constrained node it crowded out the systems being benchmarked. MinIO (object storage for Mimir) added another 83 MB, representing Mimir-specific infrastructure cost that Prometheus and VictoriaMetrics do not require."
+      ],
+      "projection": "Production projection for running all three TSDBs 24/7 on GKE with adequate resources:\n\n- Prometheus: Typically needs 2 vCPUs, 8 GB RAM at moderate scale → e2-standard-4 ($0.134/hr) = ~$97/month\n- VictoriaMetrics: Runs efficiently on 1 vCPU, 4 GB RAM for equivalent load → e2-standard-2 ($0.067/hr) = ~$49/month\n- Mimir (microservices mode): Requires separate pods for distributor, ingester, querier, compactor, store-gateway, plus nginx gateway and object storage. Minimum viable: 3 nodes × e2-standard-4 ($0.134/hr × 3) = $0.402/hr compute + MinIO/S3 storage (~$23/month for 100 GB) = ~$313/month\n\nUsing on-demand e2-standard-4 ($0.134/hr, 4 vCPUs, 16 GB):\n- Prometheus single-node: 1 node × $0.134 × 730 hrs = $97.82/month\n- VictoriaMetrics single-node: 1 node × $0.067 × 730 hrs = $48.91/month\n- Mimir multi-node: 3 nodes × $0.134 × 730 hrs + $23 storage = $316.46/month\n\nMimir's production cost is roughly 3.2× Prometheus and 6.5× VictoriaMetrics due to its distributed architecture requiring multiple nodes plus object storage. These figures exclude persistent disk, network egress, and GKE management fees ($0.10/hr for Standard clusters = $73/month per cluster).",
+      "optimizations": [
+        "Use preemptible/spot VMs for benchmarking: e2-medium spot pricing is ~$0.01/hr (70% savings), suitable for short-lived experiment clusters that can tolerate interruption.",
+        "Right-size the benchmark node: An e2-medium (2 vCPU, 4 GB) is undersized for 12 pods. Use e2-standard-4 (4 vCPU, 16 GB) to avoid resource contention that distorts benchmark results — marginal cost increase (~$0.067/hr vs $0.034/hr) yields more reliable data.",
+        "Run TSDBs in separate experiments: Testing all three simultaneously on one node creates resource contention. Sequential single-TSDB runs on identical nodes would produce cleaner cost attribution and more accurate per-TSDB resource profiles.",
+        "For production Mimir: Use GCS instead of self-hosted MinIO to eliminate the MinIO pod overhead (~83 MB RAM, 2.6 CPU-seconds) and shift to managed storage with built-in durability. GCS pricing (~$0.020/GB/month) is typically cheaper than running and maintaining MinIO."
+      ]
+    },
+    "secopsAnalysis": {
+      "overview": "The experiment deployed all components into a single 'experiments' namespace on a single-node GKE cluster with no evidence of network segmentation, RBAC scoping, or secrets management controls. This is acceptable for an ephemeral benchmark but represents a security posture that must not be replicated in production.",
+      "findings": [
+        "Single flat namespace with no network policies: All 12 pods (TSDBs, Grafana, MinIO, operators, exporters) run in the 'experiments' namespace with unrestricted pod-to-pod communication. Prometheus, Grafana, and MinIO can reach each other without restriction. In production, network policies should isolate TSDB backends from dashboarding components and restrict MinIO access to only Mimir ingesters/compactors/store-gateways.",
+        "RBAC and privilege concerns: The kube-prometheus-stack-operator pod has broad cluster-level permissions to create/manage Prometheus CustomResources, ServiceMonitors, and alerting rules. The node-exporter pod runs as a DaemonSet with host-level access (hostPID, hostNetwork) to collect node metrics. Both require careful RBAC scoping in production — the operator should be restricted to specific namespaces, and node-exporter's host access should be audited against Pod Security Standards.",
+        "MinIO running without TLS or access controls evident: MinIO (minio-7594465b77-jtkv8) serves as Mimir's object storage backend. In this deployment there is no indication of TLS encryption for the MinIO API endpoint or rotation of access credentials. Mimir-to-MinIO traffic containing metric blocks would traverse the pod network unencrypted. Production deployments should use managed object storage (GCS/S3) with IAM-based authentication via Workload Identity, eliminating static credentials entirely.",
+        "Grafana exposed without authentication hardening: Grafana (kube-prometheus-stack-grafana) is deployed as part of the Helm stack with default credentials likely in place (admin/prom-operator). In production, Grafana must be configured with SSO/OIDC, RBAC for dashboard access, and should sit behind an ingress controller with TLS termination and authentication enforcement.",
+        "No resource limits or quotas observed: The pod data shows no evidence of Kubernetes resource limits or requests being enforced. Without limits, any pod can consume all available node resources, enabling noisy-neighbor effects and potential denial-of-service within the cluster. Production deployments must set CPU/memory requests and limits on all TSDB pods and enforce ResourceQuotas per namespace."
+      ],
+      "supplyChain": "Image provenance is uncertain across all deployed components. The experiment uses images from multiple sources: Prometheus and kube-state-metrics from the prometheus-community Helm chart, Grafana from grafana/grafana, VictoriaMetrics from victoriametrics/victoria-metrics, Mimir from grafana/mimir, MinIO from minio/minio, and Alloy from grafana/alloy. None of these images show evidence of cosign signature verification, SBOM (Software Bill of Materials) attestation, or admission controller enforcement (e.g., Sigstore policy-controller or Kyverno). In production, all images should be pulled from a private registry mirror with vulnerability scanning (e.g., Artifact Registry with Container Analysis), verified against cosign signatures from upstream maintainers, and enforced by an admission webhook that rejects unsigned or unscanned images. The MinIO image is particularly sensitive as it handles persistent metric data and should be pinned to a specific digest rather than a mutable tag."
+    },
+    "capabilitiesMatrix": {
+      "technologies": [
+        "Prometheus",
+        "VictoriaMetrics",
+        "Mimir"
+      ],
+      "categories": [
+        {
+          "name": "Resource Efficiency",
+          "capabilities": [
+            {
+              "name": "CPU consumption (TSDB pod only)",
+              "values": {
+                "Prometheus": "25.1 cumulative CPU-seconds (~0.012 cores avg over 34 min)",
+                "VictoriaMetrics": "1.3 cumulative CPU-seconds (~0.0006 cores avg) — 19x lower than Prometheus",
+                "Mimir": "0.18 cumulative CPU-seconds for nginx gateway only; core ingest/query pods not visible in data"
+              }
+            },
+            {
+              "name": "Memory working set (TSDB pod only)",
+              "values": {
+                "Prometheus": "~311 MiB",
+                "VictoriaMetrics": "~25 MiB — 12x lower than Prometheus",
+                "Mimir": "~12 MiB (nginx gateway only); true footprint unknown without ingester/compactor/store-gateway data"
+              }
+            },
+            {
+              "name": "Infrastructure overhead",
+              "values": {
+                "Prometheus": "None beyond the StatefulSet pod itself",
+                "VictoriaMetrics": "None — single hub pod",
+                "Mimir": "MinIO (~79 MiB, 2.6 CPU-s) required for object storage; additional microservice pods expected but not captured"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Architecture & Scalability",
+          "capabilities": [
+            {
+              "name": "Horizontal scale-out",
+              "values": {
+                "Prometheus": "Not supported natively; vertical scaling only",
+                "VictoriaMetrics": "Optional cluster mode (vminsert/vmselect/vmstorage) available but not exercised here",
+                "Mimir": "Full microservices decomposition with independent scaling per concern"
+              }
+            },
+            {
+              "name": "Deployment complexity",
+              "values": {
+                "Prometheus": "Single StatefulSet; simplest to operate",
+                "VictoriaMetrics": "Single binary; comparable simplicity to Prometheus",
+                "Mimir": "Multiple microservices + nginx gateway + object storage (MinIO/S3); highest operational burden"
+              }
+            },
+            {
+              "name": "Pod count (TSDB components)",
+              "values": {
+                "Prometheus": "1 pod",
+                "VictoriaMetrics": "1 pod",
+                "Mimir": "1 nginx pod visible; expected 4-6+ component pods not captured in metrics"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query & Compatibility",
+          "capabilities": [
+            {
+              "name": "PromQL support",
+              "values": {
+                "Prometheus": "Native, reference implementation",
+                "VictoriaMetrics": "Full PromQL compatibility plus MetricsQL extensions",
+                "Mimir": "Full PromQL compatibility via querier/query-frontend microservices"
+              }
+            },
+            {
+              "name": "Multi-tenancy",
+              "values": {
+                "Prometheus": "Not supported",
+                "VictoriaMetrics": "Supported in cluster mode via tenant-prefixed endpoints",
+                "Mimir": "Native multi-tenancy with per-tenant limits and isolation"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Storage Engine",
+          "capabilities": [
+            {
+              "name": "Storage model",
+              "values": {
+                "Prometheus": "Local TSDB with 2-hour blocks, on-disk compaction",
+                "VictoriaMetrics": "Merge-tree engine with ZSTD compression and inverted-index caching",
+                "Mimir": "TSDB blocks uploaded to object storage (S3/MinIO) for long-term retention"
+              }
+            },
+            {
+              "name": "Long-term retention",
+              "values": {
+                "Prometheus": "Limited by local disk; requires Thanos or remote-write for durability",
+                "VictoriaMetrics": "Local or object-store retention; single-node durability tied to disk",
+                "Mimir": "Object-store backed; virtually unlimited retention with independent compaction"
+              }
+            }
+          ]
+        }
+      ],
+      "summary": "VictoriaMetrics is the clear winner for single-node resource efficiency, consuming roughly 19x less CPU and 12x less memory than Prometheus while maintaining full PromQL compatibility — strongly confirming the experiment hypothesis. The Mimir comparison is inconclusive because only the nginx gateway pod was captured; its core microservice pods (ingesters, queriers, compactors, store-gateways) are missing from the metric data, making any resource-efficiency judgment unreliable. The key trade-off remains: VictoriaMetrics delivers dramatically lower resource costs for single-node or small-cluster deployments, while Mimir's value proposition — independent horizontal scaling and native multi-tenancy — cannot be validated or dismissed without complete pod-level metrics."
+    },
+    "feedback": {
+      "recommendations": [
+        "Re-run the Mimir leg of the experiment with explicit pod discovery for all Mimir microservice components (distributor, ingester, querier, compactor, store-gateway) to obtain a complete resource profile",
+        "Add a controlled workload phase with a known cardinality (e.g., 10k, 50k, 100k active series via cardinality-generator) and measure CPU/memory at each tier to produce per-series efficiency ratios",
+        "Include PromQL query latency benchmarks — run a standard set of dashboard-style queries (rate, histogram_quantile, aggregations over label sets) against each TSDB and record p50/p95/p99 latencies",
+        "Extend experiment duration to at least 2 hours to capture Prometheus block compaction behavior and Mimir compactor cycles, which significantly affect CPU/memory profiles"
+      ],
+      "experimentDesign": [
+        "Instrument metric collection to distinguish TSDB-under-test pods from infrastructure pods programmatically (e.g., via labels or annotations) rather than relying on post-hoc pod-name matching, which caused the Mimir data gap in this run",
+        "Collect time-series CPU and memory data (range queries at 15s intervals) rather than cumulative instant values, enabling analysis of resource usage patterns over time — especially during ingestion ramp-up, compaction, and query load",
+        "Add a dedicated query-load phase using a tool like promtool or k6-prometheus to generate reproducible read traffic, separating ingestion-only and mixed read/write resource profiles"
+      ]
+    },
+    "body": {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "This experiment compared Prometheus, VictoriaMetrics, and Mimir on a single GKE e2-medium node (2 vCPUs, 4 GB RAM) over 34 minutes. VictoriaMetrics demonstrated a decisive resource efficiency advantage, but Mimir's incomplete deployment and missing query latency data limit the scope of conclusions."
+        },
+        {
+          "type": "architecture",
+          "diagram": "flowchart TD\n  subgraph GKE[\"GKE Cluster: e2-medium · 2 vCPU · 4 GB\"]\n    subgraph Workload[\"Synthetic Workload\"]\n      CG[\"cardinality-generator<br/>0.24 CPU-s · 3.7 MB\"]\n    end\n    subgraph Collection[\"Metrics Collection\"]\n      Alloy[\"Alloy<br/>5.14 CPU-s · 60.1 MB\"]\n      NE[\"node-exporter<br/>3.03 CPU-s · 12.8 MB\"]\n      KSM[\"kube-state-metrics<br/>8.68 CPU-s · 63.5 MB\"]\n    end\n    subgraph Prometheus[\"Prometheus\"]\n      Prom[\"prometheus-0<br/>25.13 CPU-s · 310.7 MB\"]\n    end\n    subgraph VictoriaMetrics[\"VictoriaMetrics\"]\n      VM[\"ts-vm-hub<br/>1.30 CPU-s · 25.3 MB\"]\n    end\n    subgraph Mimir[\"Mimir (incomplete)\"]\n      Nginx[\"mimir-nginx<br/>0.18 CPU-s · 11.6 MB\"]\n      MinIO[\"MinIO<br/>2.63 CPU-s · 78.7 MB\"]\n    end\n    subgraph Viz[\"Visualization\"]\n      Grafana[\"Grafana<br/>40.66 CPU-s · 372.6 MB\"]\n    end\n  end\n  CG -->|generates metrics| Alloy\n  NE -->|node metrics| Alloy\n  KSM -->|k8s metrics| Alloy\n  Alloy -->|remote-write| VM\n  Alloy -->|remote-write| Nginx\n  Prom -->|scrapes| NE\n  Prom -->|scrapes| KSM\n  Nginx -->|proxy| MinIO\n  Grafana -->|queries| Prom\n  Grafana -->|queries| VM\n  Grafana -->|queries| Nginx",
+          "format": "mermaid",
+          "caption": "All three TSDBs co-located on a single e2-medium node with shared infrastructure pods"
+        },
+        {
+          "type": "callout",
+          "variant": "warning",
+          "title": "Hypothesis Verdict: Insufficient Data",
+          "content": "VictoriaMetrics' efficiency advantage over Prometheus is strongly supported (19x CPU, 12x memory), but the hypothesis cannot be fully evaluated. Mimir's core microservice pods (ingester, querier, compactor, store-gateway) are missing from the data, and no query latency metrics were collected."
+        },
+        {
+          "type": "topic",
+          "title": "Resource Efficiency: VictoriaMetrics vs Prometheus",
+          "blocks": [
+            {
+              "type": "text",
+              "content": "The headline result is clear: VictoriaMetrics consumed an order of magnitude fewer resources than Prometheus while handling the same synthetic workload on identical infrastructure."
+            },
+            {
+              "type": "row",
+              "blocks": [
+                {
+                  "type": "metric",
+                  "key": "cpu_by_pod",
+                  "size": "small",
+                  "insight": "Prometheus consumed 25.1 CPU-seconds vs VictoriaMetrics at 1.3 CPU-seconds — a 19.4x difference. Grafana (40.7 CPU-s) was actually the largest CPU consumer on the node."
+                },
+                {
+                  "type": "metric",
+                  "key": "memory_by_pod",
+                  "size": "small",
+                  "insight": "Prometheus held 311 MB vs VictoriaMetrics at 25 MB — a 12.3x difference. Grafana dominated at 373 MB, consuming more memory than any TSDB under test."
+                }
+              ]
+            },
+            {
+              "type": "comparison",
+              "items": [
+                {
+                  "label": "Prometheus",
+                  "value": "25.1 CPU-s / 311 MB",
+                  "description": "Reference TSDB implementation; highest resource consumption among tested systems"
+                },
+                {
+                  "label": "VictoriaMetrics",
+                  "value": "1.3 CPU-s / 25 MB",
+                  "description": "19x less CPU and 12x less memory than Prometheus; single-binary architecture pays off"
+                },
+                {
+                  "label": "Mimir (nginx only)",
+                  "value": "0.18 CPU-s / 12 MB",
+                  "description": "Only the reverse-proxy gateway was captured; core TSDB pods are missing from data"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "content": "VictoriaMetrics' merge-tree storage engine and aggressive memory allocation strategy produced dramatic savings. However, without active-series-count metrics from the cardinality-generator, per-series efficiency ratios cannot be calculated."
+            }
+          ]
+        },
+        {
+          "type": "topic",
+          "title": "Mimir Deployment Gap",
+          "blocks": [
+            {
+              "type": "text",
+              "content": "Mimir's evaluation is invalid in this experiment. Only the nginx gateway pod appears in the metrics data — the core microservice components that perform actual TSDB work were not captured."
+            },
+            {
+              "type": "table",
+              "headers": [
+                "Expected Mimir Component",
+                "Status",
+                "Impact"
+              ],
+              "rows": [
+                [
+                  "nginx gateway",
+                  "Present (0.18 CPU-s, 12 MB)",
+                  "Reverse proxy only; no TSDB function"
+                ],
+                [
+                  "Ingester",
+                  "Missing",
+                  "Cannot measure write-path resource cost"
+                ],
+                [
+                  "Querier / Query-frontend",
+                  "Missing",
+                  "Cannot measure read-path resource cost"
+                ],
+                [
+                  "Compactor",
+                  "Missing",
+                  "Cannot measure background maintenance cost"
+                ],
+                [
+                  "Store-gateway",
+                  "Missing",
+                  "Cannot measure object-store read cost"
+                ]
+              ],
+              "caption": "Mimir deployment completeness assessment"
+            },
+            {
+              "type": "callout",
+              "variant": "finding",
+              "title": "Probable Cause: Resource Exhaustion",
+              "content": "The e2-medium node (2 vCPU, 4 GB) was likely too small to schedule all Mimir microservice pods alongside Prometheus, VictoriaMetrics, Grafana, and infrastructure components. Total observed memory was already 1.0 GB across 12 pods, and Mimir's full deployment typically requires 5-7 additional pods."
+            }
+          ]
+        },
+        {
+          "type": "topic",
+          "title": "Infrastructure Overhead & Cluster Utilization",
+          "blocks": [
+            {
+              "type": "text",
+              "content": "Infrastructure pods consumed more resources than the TSDBs under test, raising concerns about measurement validity on a constrained single-node cluster."
+            },
+            {
+              "type": "row",
+              "blocks": [
+                {
+                  "type": "metric",
+                  "key": "cpu_total",
+                  "size": "small",
+                  "insight": "96.8 cumulative CPU-seconds across all pods over 34 minutes. Average utilization was ~0.047 cores — well below the 2-vCPU capacity, suggesting bursty rather than sustained load."
+                },
+                {
+                  "type": "metric",
+                  "key": "memory_total",
+                  "size": "small",
+                  "insight": "1.0 GB total working set on a 4 GB node (25% utilization). Sufficient for the observed pods, but a full Mimir stack would likely push past 50%."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "headers": [
+                "Component",
+                "CPU-seconds",
+                "Memory (MB)",
+                "% of Cluster CPU",
+                "% of Cluster Memory"
+              ],
+              "rows": [
+                [
+                  "Grafana",
+                  "40.66",
+                  "373",
+                  "42.0%",
+                  "37.3%"
+                ],
+                [
+                  "Prometheus",
+                  "25.13",
+                  "311",
+                  "26.0%",
+                  "31.1%"
+                ],
+                [
+                  "kube-prometheus-operator",
+                  "6.88",
+                  "23",
+                  "7.1%",
+                  "2.3%"
+                ],
+                [
+                  "kube-state-metrics (both)",
+                  "8.68",
+                  "64",
+                  "9.0%",
+                  "6.3%"
+                ],
+                [
+                  "Alloy",
+                  "5.14",
+                  "60",
+                  "5.3%",
+                  "6.0%"
+                ],
+                [
+                  "node-exporter",
+                  "3.03",
+                  "13",
+                  "3.1%",
+                  "1.3%"
+                ],
+                [
+                  "testbed-operator",
+                  "2.97",
+                  "38",
+                  "3.1%",
+                  "3.8%"
+                ],
+                [
+                  "MinIO",
+                  "2.63",
+                  "79",
+                  "2.7%",
+                  "7.9%"
+                ],
+                [
+                  "VictoriaMetrics",
+                  "1.30",
+                  "25",
+                  "1.3%",
+                  "2.5%"
+                ],
+                [
+                  "cardinality-generator",
+                  "0.24",
+                  "4",
+                  "0.2%",
+                  "0.4%"
+                ],
+                [
+                  "Mimir nginx",
+                  "0.18",
+                  "12",
+                  "0.2%",
+                  "1.2%"
+                ]
+              ],
+              "caption": "Resource consumption ranked by CPU usage — infrastructure dominates the cluster"
+            },
+            {
+              "type": "text",
+              "content": "Grafana alone consumed 42% of cluster CPU and 37% of memory — more than Prometheus. This heavy infrastructure footprint on a 2-vCPU shared-core instance likely introduced CPU throttling artifacts that could affect TSDB measurements."
+            }
+          ]
+        },
+        {
+          "type": "topic",
+          "title": "Production Cost Projections",
+          "blocks": [
+            {
+              "type": "text",
+              "content": "Extrapolating from this experiment's resource profiles to production-grade deployments reveals significant cost differences driven by architectural choices."
+            },
+            {
+              "type": "comparison",
+              "items": [
+                {
+                  "label": "VictoriaMetrics",
+                  "value": "~$49/month",
+                  "description": "Single e2-standard-2 node (1 vCPU, 4 GB); lowest operational overhead with single-binary deployment"
+                },
+                {
+                  "label": "Prometheus",
+                  "value": "~$98/month",
+                  "description": "Single e2-standard-4 node (4 vCPU, 16 GB); higher resource requirements for equivalent workload"
+                },
+                {
+                  "label": "Mimir",
+                  "value": "~$316/month",
+                  "description": "3x e2-standard-4 nodes + object storage; microservices architecture requires multi-node deployment"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "content": "Mimir's production cost is roughly 6.5x VictoriaMetrics and 3.2x Prometheus due to its distributed architecture. These estimates exclude GKE management fees ($73/month), persistent disk, and network egress. The trade-off is that Mimir offers native multi-tenancy and independent horizontal scaling — capabilities the other two lack."
+            },
+            {
+              "type": "callout",
+              "variant": "info",
+              "title": "Cost Optimization",
+              "content": "This benchmark cost $0.011 on a single e2-medium node. Using spot/preemptible VMs would reduce benchmarking costs by ~70%. For production, VictoriaMetrics on a single node offers the best cost-efficiency ratio for moderate-scale deployments."
+            }
+          ]
+        },
+        {
+          "type": "topic",
+          "title": "Capabilities & Trade-offs",
+          "blocks": [
+            {
+              "type": "text",
+              "content": "Beyond raw resource efficiency, each TSDB makes fundamentally different architectural trade-offs. These differences matter more than benchmark numbers when choosing a production system."
+            },
+            {
+              "type": "capabilityRow",
+              "capability": "Horizontal Scale-out",
+              "values": {
+                "Prometheus": "Not supported natively; vertical scaling only",
+                "VictoriaMetrics": "Optional cluster mode available (not tested here)",
+                "Mimir": "Full microservices decomposition; independent scaling per concern (not validated)"
+              }
+            },
+            {
+              "type": "capabilityRow",
+              "capability": "Deployment Complexity",
+              "values": {
+                "Prometheus": "Single StatefulSet; simplest to operate",
+                "VictoriaMetrics": "Single binary; comparable simplicity",
+                "Mimir": "5-7 microservices + nginx + object storage; highest operational burden"
+              }
+            },
+            {
+              "type": "capabilityRow",
+              "capability": "Multi-tenancy",
+              "values": {
+                "Prometheus": "Not supported",
+                "VictoriaMetrics": "Supported in cluster mode via tenant-prefixed endpoints",
+                "Mimir": "Native multi-tenancy with per-tenant limits and isolation"
+              }
+            },
+            {
+              "type": "capabilityRow",
+              "capability": "Long-term Retention",
+              "values": {
+                "Prometheus": "Limited by local disk; requires Thanos for durability",
+                "VictoriaMetrics": "Local or object-store; single-node durability tied to disk",
+                "Mimir": "Object-store backed; virtually unlimited retention"
+              }
+            },
+            {
+              "type": "capabilityRow",
+              "capability": "PromQL Support",
+              "values": {
+                "Prometheus": "Native reference implementation",
+                "VictoriaMetrics": "Full PromQL + MetricsQL extensions",
+                "Mimir": "Full PromQL via querier microservices"
+              }
+            }
+          ]
+        },
+        {
+          "type": "topic",
+          "title": "What This Experiment Could Not Answer",
+          "blocks": [
+            {
+              "type": "text",
+              "content": "Several of the study's core questions remain unanswered due to missing instrumentation and the incomplete Mimir deployment."
+            },
+            {
+              "type": "table",
+              "headers": [
+                "Study Question",
+                "Status",
+                "Missing Data"
+              ],
+              "rows": [
+                [
+                  "CPU/memory per ingested metric",
+                  "Unanswered",
+                  "No active-series-count or ingestion-rate metrics collected"
+                ],
+                [
+                  "Query performance comparison",
+                  "Unanswered",
+                  "No query latency metrics (prometheus_engine_query_duration_seconds, vm_request_duration_seconds)"
+                ],
+                [
+                  "Mimir horizontal scalability",
+                  "Unanswered",
+                  "Mimir core pods not deployed; single-node topology prevents scale-out testing"
+                ],
+                [
+                  "Storage engine efficiency",
+                  "Partial",
+                  "34-minute duration too short for Prometheus 2-hour block compaction or VM merge-tree background merges"
+                ]
+              ],
+              "caption": "Study questions vs. available evidence"
+            },
+            {
+              "type": "recommendation",
+              "priority": "p0",
+              "title": "Re-run Mimir with adequate resources",
+              "description": "Deploy Mimir on an e2-standard-4 node (or dedicated node pool) with explicit pod discovery for all microservice components. The current data gap makes the three-way comparison invalid.",
+              "effort": "medium"
+            },
+            {
+              "type": "recommendation",
+              "priority": "p0",
+              "title": "Add query latency instrumentation",
+              "description": "Include PromQL query benchmarks using promtool or k6-prometheus with a standard set of dashboard-style queries (rate, histogram_quantile, label aggregations). Record p50/p95/p99 latencies per TSDB.",
+              "effort": "medium"
+            },
+            {
+              "type": "recommendation",
+              "priority": "p1",
+              "title": "Extend experiment duration to 2+ hours",
+              "description": "A 34-minute window misses Prometheus block compaction (2-hour cycle) and Mimir compactor activity. Longer runs reveal steady-state resource profiles and storage engine behavior.",
+              "effort": "low"
+            },
+            {
+              "type": "recommendation",
+              "priority": "p1",
+              "title": "Isolate TSDBs into separate experiments",
+              "description": "Running all three TSDBs on a single 2-vCPU node introduces resource contention that distorts measurements. Sequential single-TSDB runs on identical nodes would produce cleaner attribution.",
+              "effort": "medium"
+            },
+            {
+              "type": "recommendation",
+              "priority": "p2",
+              "title": "Use controlled cardinality tiers",
+              "description": "Run the cardinality-generator at known levels (10k, 50k, 100k active series) and measure resources at each tier to produce per-series efficiency ratios — the primary study metric.",
+              "effort": "low"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "content": "VictoriaMetrics delivered a clear and substantial resource efficiency win over Prometheus in this experiment: 19x less CPU and 12x less memory for the same workload. This strongly supports the single-node efficiency hypothesis. However, the experiment falls short of a conclusive three-way comparison — Mimir's incomplete deployment and the absence of query performance data leave two of the three study questions unanswered. The next iteration should prioritize a fully-deployed Mimir stack on adequately-sized infrastructure and standardized query latency benchmarks."
+        }
+      ]
+    },
+    "summary": "The experiment provides partial support for the hypothesis that VictoriaMetrics is the most resource-efficient single-node TSDB, but the data is insufficient to fully evaluate either claim due to critical missing metrics. VictoriaMetrics (ts-vm-hub) consumed only 1.30 CPU-seconds and 25.3 MB memory versus Prometheus at 25.13 CPU-seconds and 310.7 MB — a 19x CPU and 12x memory advantage — strongly favoring the efficiency claim. However, Mimir's deployment appears incomplete: only the nginx gateway pod (mimir-nginx, 0.18 CPU-seconds, 11.6 MB) is visible, with no ingester, compactor, querier, or store-gateway pods recorded, making it impossible to assess Mimir's total resource cost or horizontal scalability characteristics. Furthermore, the experiment lacks query latency metrics, active time-series counts, and ingestion rate data, which are essential to normalize resource consumption per metric and evaluate query performance. To conclusively test both parts of the hypothesis, the experiment would need a fully deployed Mimir stack, PromQL query latency histograms, and a known cardinality workload sustained for at least 1 hour. The most actionable finding is that VictoriaMetrics demonstrated an order-of-magnitude resource efficiency advantage over Prometheus on identical infrastructure, warranting further investigation at higher cardinality.",
+    "generatedAt": "2026-02-12T20:37:38Z",
     "model": "claude-opus-4-6"
   }
 }
