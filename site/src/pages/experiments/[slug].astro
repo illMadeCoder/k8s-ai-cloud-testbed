@@ -91,7 +91,7 @@ const analysis = latest.analysis;
         <thead>
           <tr>
             <th>Run</th>
-            <th>Phase</th>
+            <th>Hypothesis</th>
             <th>Date</th>
             <th>Duration</th>
             <th>Cost</th>
@@ -99,11 +99,7 @@ const analysis = latest.analysis;
         </thead>
         <tbody>
           {group.runs.map((run) => {
-            const runBadge = run.phase === 'Complete'
-              ? 'badge-complete'
-              : run.phase === 'Failed'
-                ? 'badge-failed'
-                : 'badge-running';
+            const runVerdict = run.analysis?.hypothesisVerdict;
             return (
               <tr>
                 <td>
@@ -111,7 +107,9 @@ const analysis = latest.analysis;
                     <code>{run.name}</code>
                   </a>
                 </td>
-                <td><span class={`badge ${runBadge}`}>{run.phase}</span></td>
+                <td>{runVerdict ? (
+                  <span class={`badge verdict-badge verdict-badge-${runVerdict.replace(/\s+/g, '-')}`}>{runVerdict}</span>
+                ) : '—'}</td>
                 <td>{formatDate(run.createdAt)}</td>
                 <td>{formatDuration(run.durationSeconds)}</td>
                 <td>{run.costEstimate ? formatCost(run.costEstimate.totalUSD) : '—'}</td>

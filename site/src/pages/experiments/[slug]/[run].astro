@@ -104,7 +104,6 @@ const verdictLabel = verdict
           <thead>
             <tr>
               <th>Run</th>
-              <th>Phase</th>
               <th>Hypothesis</th>
               <th>Date</th>
               <th>Duration</th>
@@ -113,11 +112,6 @@ const verdictLabel = verdict
           </thead>
           <tbody>
             {siblingRuns.map((run) => {
-              const runBadge = run.phase === 'Complete'
-                ? 'badge-complete'
-                : run.phase === 'Failed'
-                  ? 'badge-failed'
-                  : 'badge-running';
               const isCurrent = run.name === experiment.name;
               const runVerdict = run.analysis?.hypothesisVerdict;
               return (
@@ -131,7 +125,6 @@ const verdictLabel = verdict
                       </a>
                     )}
                   </td>
-                  <td><span class={`badge ${runBadge}`}>{run.phase}</span></td>
                   <td>{runVerdict ? (
                     <span class={`badge verdict-badge verdict-badge-${runVerdict.replace(/\s+/g, '-')}`}>{runVerdict}</span>
                   ) : '—'}</td>
