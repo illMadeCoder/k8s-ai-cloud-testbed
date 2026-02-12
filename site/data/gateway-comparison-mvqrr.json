@@ -220,30 +220,64 @@
     "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
   },
   "analysis": {
-    "finopsAnalysis": {
-      "overview": "This 37-minute gateway comparison experiment ran on a single e2-standard-4 GKE node and cost approximately $0.0165 USD. The cost is minimal because it was a short-duration benchmark, but the single-node topology and use of e2-standard-4 (4 vCPU, 16 GB RAM) means most of the node's capacity was idle — total memory working set across all pods was only ~218 MiB out of 16 GB available, and cumulative CPU usage of ~23.3 core-seconds over 37 minutes translates to roughly 0.010 cores average utilization on a 4-core node (0.26% utilization).",
-      "costDrivers": [
-        "GKE node compute is the sole cost driver at $0.0165 for 0.617 hours of an e2-standard-4 instance ($0.134/hr on-demand). All three gateway controllers plus observability stack (Alloy, kube-state-metrics, operator, Tailscale hub) fit on a single node, meaning the minimum billable unit is one full VM regardless of actual utilization.",
-        "Observability and platform overhead pods (Alloy at 7.6 core-seconds CPU and 42.8 MiB memory, kube-state-metrics at 2.6 core-seconds and 36.9 MiB, operator at 3.3 core-seconds and 25.6 MiB) collectively consumed more resources than any individual gateway controller, accounting for ~58% of total CPU and ~47% of total memory."
+    "hypothesisVerdict": "supported",
+    "abstract": "The hypothesis is largely supported: Envoy Gateway demonstrates the richest Gateway API feature set as the reference implementation with the broadest Core, Extended, and Experimental conformance coverage, and its control-plane pod alone consumed 56% more CPU (3.74 core-seconds vs. 2.40 for NGINX, 2.07 for Traefik) and 23% more memory (34.0 MiB vs. 29.0 MiB for NGINX, 27.6 MiB for Traefik) than either competitor over the 37-minute experiment — with its separate data-plane proxy pods (envoy-default-*) not even captured in metrics, meaning true overhead is materially higher. However, the hypothesis that NGINX Ingress would be the most resource-efficient is only partially confirmed: Traefik narrowly beat NGINX on both CPU (0.93 vs. 1.08 millicores average) and memory (27.6 vs. 29.0 MiB), indicating that a single Go binary architecture can match or exceed NGINX's single-process efficiency. The experiment is limited to idle resource footprints with no traffic load applied and incomplete Envoy Gateway metrics, so performance under load and true two-process overhead remain unquantified. The most actionable finding is that Envoy Gateway's data-plane pods must be included in metrics collection before any resource comparison can be considered complete.",
+    "targetAnalysis": {
+      "overview": "The experiment ran all three gateway controllers co-located on a single e2-standard-4 GKE node (4 vCPU, 16 GB RAM) for 37 minutes. This single-node topology means all gateways competed for the same CPU and memory resources, though at <1.5% total utilization there was no resource contention. The e2-standard-4 machine type is significantly over-provisioned for this idle benchmark — total memory working set was 218 MiB out of 16 GB available (1.3%), and average CPU utilization was 0.010 cores on a 4-core node (0.26%). The single-target design prevents isolating per-gateway scheduling overhead and means Envoy Gateway's data-plane pods may not have been scheduled or captured.",
+      "perTarget": {
+        "app": "Single GKE cluster on e2-standard-4 (4 vCPU, 16 GB RAM) with 1 node, hosting all three gateways plus observability stack (Alloy, kube-state-metrics, operator) and a Tailscale VPN hub. Total experiment cost was $0.0165 USD for 0.617 hours. The node was massively under-utilized: 23.3 cumulative core-seconds of CPU over 2,221 seconds (0.010 avg cores, 0.26% of capacity) and 218 MiB memory working set (1.3% of 16 GB). The co-located topology is suitable for idle comparison but would introduce interference under load. Notably, only 7 pods were captured in metrics — the absence of envoy-default-* pods suggests Envoy Gateway's data-plane proxies either were not deployed with active GatewayClass/Gateway resources or were excluded from collection."
+      },
+      "comparisonToBaseline": "Comparing the three gateways at idle: Traefik was the lightest at 2.07 core-seconds CPU and 27.6 MiB memory, followed by NGINX Ingress at 2.40 core-seconds and 29.0 MiB, and Envoy Gateway's control plane at 3.74 core-seconds and 34.0 MiB. Envoy Gateway consumed 80% more CPU and 23% more memory than Traefik — and this only reflects its control-plane pod. The observability stack (Alloy at 7.64 core-seconds / 40.8 MiB, kube-state-metrics at 2.62 / 36.9 MiB, operator at 3.29 / 25.6 MiB) collectively exceeded any individual gateway's footprint, consuming 58% of total CPU and 47% of total memory. This means infrastructure overhead dominates gateway overhead in idle scenarios."
+    },
+    "performanceAnalysis": {
+      "overview": "All three gateways demonstrated minimal idle resource consumption, collectively using less than 0.004 average cores and under 92 MiB of memory. The differences between them are small in absolute terms (sub-millicore CPU, single-digit MiB memory) but directionally consistent with architectural expectations. No load was applied, so proxy throughput, latency, and connection-handling performance remain unmeasured.",
+      "findings": [
+        "1. Traefik was the most resource-efficient gateway, consuming 2.07 core-seconds of CPU (0.93 millicores avg) and 27.6 MiB memory — 14% less CPU and 5% less memory than NGINX Ingress. This contradicts the hypothesis that NGINX's single-process model would be most efficient, suggesting Traefik's single Go binary architecture is at least equally lean.",
+        "2. Envoy Gateway's control-plane pod consumed 3.74 core-seconds (1.68 millicores avg) and 34.0 MiB memory — 80% more CPU and 23% more memory than Traefik. Critically, the envoy-default-* data-plane proxy pods were not captured in metrics, meaning Envoy Gateway's true total footprint is materially undercounted. In production, the data-plane pods typically consume more resources than the control plane.",
+        "3. NGINX Ingress consumed 2.40 core-seconds (1.08 millicores avg) and 29.0 MiB memory, placing it between Traefik and Envoy Gateway on both dimensions. Its single-process NGINX + Lua architecture is efficient but did not achieve the lowest footprint as hypothesized.",
+        "4. The observability and platform stack consumed more resources than the gateways: Alloy alone used 7.64 core-seconds (3.44 millicores avg) and 40.8 MiB — more than any individual gateway by 2x on CPU. Combined with kube-state-metrics (2.62 core-sec, 36.9 MiB) and the operator (3.29 core-sec, 25.6 MiB), platform pods accounted for 58% of total CPU and 47% of total memory.",
+        "5. Total cluster utilization was negligible: 23.3 cumulative core-seconds over 2,221 seconds translates to 0.010 average cores on a 4-core node (0.26% CPU utilization) and 218 MiB out of 16 GB RAM (1.3% memory utilization). The e2-standard-4 node is at least 4x over-provisioned for this workload.",
+        "6. No load-generation phase was executed, so the experiment cannot differentiate proxy performance characteristics (throughput, latency percentiles, connection handling, TLS termination overhead) between the three gateways. Idle footprint alone is insufficient for production gateway selection."
       ],
-      "projection": "For production 24/7 operation, each gateway would run on its own cluster or node pool with redundancy. A realistic multi-node production setup per gateway: 3-node cluster with e2-standard-4 nodes (for HA across zones) at $0.134/hr per node. Monthly cost per gateway cluster: 3 nodes × $0.134/hr × 730 hrs/month = $293.46/month. Running all three gateways in separate production clusters: $293.46 × 3 = $880.38/month. However, Envoy Gateway requires additional data-plane proxy pods (envoy-default-* pods not captured in this experiment) which would increase its node resource consumption — realistically requiring e2-standard-8 nodes or an additional node, pushing its cluster to ~$390-$587/month. Using committed-use discounts (1-year CUD: 37% discount) reduces total to ~$554-$620/month for all three. If consolidating to a single production cluster with 3× e2-standard-8 nodes: 3 × $0.268/hr × 730 = $586.92/month. Note: actual production costs will also include load balancer IPs ($18.26/month each in GCP), persistent disks, and egress — likely adding $50-100/month per cluster.",
+      "bottlenecks": [
+        "Envoy Gateway data-plane pods (envoy-default-*) were not captured in metrics, making it impossible to assess the true resource cost of Envoy Gateway's two-process architecture. This is the most significant gap in the experiment data.",
+        "No traffic load was applied, so proxy-layer performance (throughput, p99 latency, connection scale) could not be measured. Idle CPU and memory reveal control-plane overhead but not data-path efficiency.",
+        "Single-point-in-time cumulative CPU counters prevent distinguishing startup burst from steady-state consumption. Time-series collection with per-second rates would enable phase-specific analysis.",
+        "Co-location of all gateways and observability on a single node means any load test would introduce cross-gateway interference, requiring dedicated node pools for isolated benchmarking."
+      ]
+    },
+    "metricInsights": {
+      "cpu_by_pod": "Envoy Gateway's control-plane pod led CPU consumption at 3.74 core-seconds (1.68 millicores avg), followed by the operator at 3.29 and kube-state-metrics at 2.62. Among gateways, NGINX Ingress used 2.40 core-seconds (1.08 millicores avg) and Traefik was lightest at 2.07 (0.93 millicores avg) — but Alloy dominated at 7.64 core-seconds (3.44 millicores avg), consuming more than any two gateway pods combined.",
+      "cpu_total": "Total cumulative CPU across all 7 pods was 23.27 core-seconds over 2,221 seconds, yielding an average cluster utilization of 0.010 cores — just 0.26% of the e2-standard-4 node's 4-core capacity. The three gateway pods collectively accounted for only 8.21 core-seconds (35% of total), with observability and platform pods consuming the remaining 65%.",
+      "memory_by_pod": "Memory working set ranged from 25.8 MiB (Tailscale hub) to 42.8 MiB (Alloy). Among gateways: Traefik at 27.6 MiB, NGINX Ingress at 29.0 MiB, and Envoy Gateway control plane at 34.0 MiB. Envoy Gateway's data-plane proxy pods are absent from this snapshot, so its true memory footprint is higher than the 34.0 MiB shown.",
+      "memory_total": "Total memory working set across all pods was 218.5 MiB — just 1.3% of the node's 16 GB capacity. Gateway pods accounted for 90.6 MiB (41% of the total), while observability and platform pods consumed 127.9 MiB (59%). An e2-medium (4 GB) would comfortably host this workload at one-quarter the cost."
+    },
+    "architectureDiagram": "flowchart TD\n  subgraph hub[\"Hub Cluster\"]\n    operator[\"Operator Pod<br/>3.29 core-sec / 25.6 MiB\"]\n    tsHub[\"Tailscale Hub<br/>ts-vm-hub / 25.8 MiB\"]\n  end\n  subgraph app[\"App Cluster — e2-standard-4 (1 node)\"]\n    subgraph gateways[\"Gateway Controllers\"]\n      nginx[\"NGINX Ingress<br/>2.40 core-sec / 29.0 MiB\"]\n      traefik[\"Traefik<br/>2.07 core-sec / 27.6 MiB\"]\n      envoyCtrl[\"Envoy Gateway Controller<br/>3.74 core-sec / 34.0 MiB\"]\n      envoyDP[\"Envoy Data Plane<br/>(envoy-default-* not captured)\"]\n    end\n    subgraph observability[\"Observability Stack\"]\n      alloy[\"Alloy Agent<br/>7.64 core-sec / 40.8 MiB\"]\n      ksm[\"kube-state-metrics<br/>2.62 core-sec / 36.9 MiB\"]\n    end\n  end\n  operator -->|manages| app\n  tsHub -->|VPN tunnel| app\n  envoyCtrl -->|programs| envoyDP\n  alloy -->|scrapes cadvisor| nginx\n  alloy -->|scrapes cadvisor| traefik\n  alloy -->|scrapes cadvisor| envoyCtrl\n  ksm -->|watches| gateways",
+    "architectureDiagramFormat": "mermaid",
+    "finopsAnalysis": {
+      "overview": "This 37-minute gateway comparison experiment ran on a single e2-standard-4 GKE node (4 vCPU, 16 GB RAM) and cost $0.0165 USD. The node was massively underutilized: total CPU averaged 0.010 cores (0.26% of 4 cores) and total memory working set was 218 MiB (1.3% of 16 GB). All three gateway controllers plus the observability stack fit comfortably on a single VM, meaning the minimum billable unit — one full e2-standard-4 instance — dominated cost regardless of workload.",
+      "costDrivers": [
+        "GKE node compute is the sole cost driver at $0.0165 for 0.617 hours of e2-standard-4 ($0.134/hr on-demand). The three gateway pods collectively used only 8.2 core-seconds of CPU and 91.0 MiB of memory — a fraction of the node's capacity. The cost floor is set by the VM, not the workload.",
+        "Observability and platform pods (Alloy: 7.6 core-sec CPU / 42.8 MiB, kube-state-metrics: 2.6 core-sec / 36.9 MiB, operator: 3.3 core-sec / 25.6 MiB, Tailscale hub: 1.5 core-sec / 24.6 MiB) consumed 58% of total CPU and 47% of total memory — more than all three gateways combined. The monitoring tax exceeds the workload being monitored."
+      ],
+      "projection": "Production 24/7 operation requires HA (3 nodes across zones) and dedicated infrastructure per gateway. Math for a single gateway cluster: 3 × e2-standard-4 nodes × $0.134/hr × 730 hrs/month = $293.46/month. Running all three gateways in separate HA clusters: $293.46 × 3 = $880.38/month. Envoy Gateway's two-process architecture (controller + separate envoy-default-* data-plane pods, which were not captured in this experiment) requires larger nodes — e2-standard-8 at $0.268/hr — pushing its cluster to 3 × $0.268 × 730 = $586.92/month alone, bringing the three-gateway total to $880.38 + $293.46 (Envoy upgrade delta) = ~$1,174/month. With 1-year committed-use discounts (37% off): $554–$740/month. Additional production costs: 3 GCP load balancer forwarding rules at $18.26/month each ($54.78), persistent disks (~$20–40/month), and egress charges — adding $75–150/month per cluster. Realistic all-in monthly estimate for three production gateway clusters: $700–$1,100/month on-demand, $475–$750/month with CUDs. Consolidating all three onto a single 3-node e2-standard-8 cluster: 3 × $0.268 × 730 = $586.92/month + LB/disk/egress ≈ $650–$750/month.",
       "optimizations": [
-        "Right-size the experiment node: an e2-medium (2 vCPU, 4 GB) at $0.034/hr would suffice for this idle/light-load benchmark, reducing experiment cost by ~75% to ~$0.004 per run.",
-        "Use preemptible/spot VMs for benchmarking: e2-standard-4 spot pricing is ~$0.040/hr (70% savings), reducing this experiment to ~$0.005.",
-        "Consolidate observability: Alloy alone consumed 33% of total CPU — consider sampling or reducing collection frequency during short benchmarks. Alternatively, use a shared external observability stack rather than deploying per-experiment.",
-        "For production, Envoy Gateway's two-process architecture (control plane + data plane) means its total resource envelope is larger than measured here. Size node pools based on the combined footprint, not just the control-plane pod metrics captured in this experiment."
+        "Right-size the experiment node to e2-medium (2 vCPU, 4 GB) at $0.034/hr — sufficient for idle benchmarking and reduces per-run cost by 75% from $0.017 to ~$0.004. At scale (e.g., 100 experiment runs/month), this saves ~$1.30/month.",
+        "Use spot/preemptible VMs for benchmarking at ~$0.040/hr for e2-standard-4 (70% discount), reducing this experiment to ~$0.005. Acceptable for non-production benchmarks where interruption is tolerable.",
+        "Reduce observability overhead during short benchmarks: Alloy consumed 33% of total CPU. Lower collection frequency or scrape interval for sub-hour experiments, or use a shared external monitoring stack to eliminate per-experiment observability pods entirely.",
+        "For production gateway selection, consolidate to a single gateway rather than running three. A single-gateway 3-node HA cluster costs $293–$587/month vs. $880–$1,174/month for three separate clusters — a 67% reduction by making a selection decision."
       ]
     },
     "secopsAnalysis": {
-      "overview": "The experiment deploys three ingress/gateway controllers alongside observability and connectivity components on a single GKE node. The single-node, short-lived nature limits blast radius, but several security considerations apply to any production adoption of these components. No network policies, RBAC restrictions, or pod security standards are evident in the experiment data — all pods appear to run in default configurations.",
+      "overview": "Three gateway controllers (NGINX Ingress, Traefik, Envoy Gateway) plus observability agents (Alloy, kube-state-metrics), a cluster operator, and a Tailscale VPN hub run on a single GKE node with no observable network segmentation, resource constraints, or hardened pod security posture. While the short-lived, single-node experiment topology limits blast radius, the deployed configuration reflects several security gaps that would be critical in production.",
       "findings": [
-        "RBAC over-provisioning risk: NGINX Ingress Controller, Traefik, and Envoy Gateway all require cluster-wide RBAC permissions to watch Ingress/Gateway API resources across namespaces. In production, each controller's ClusterRole should be audited and scoped to the minimum required API groups and verbs. Running all three simultaneously means three separate service accounts with broad read access to cluster routing configuration, increasing the credential attack surface.",
-        "No network policy segmentation observed: All gateway controllers, the operator, Alloy telemetry agent, kube-state-metrics, and the Tailscale VPN hub (ts-vm-hub) run on the same node with no apparent NetworkPolicy enforcement. In production, each gateway's control plane should be isolated via NetworkPolicies restricting ingress/egress to only required endpoints (API server, data-plane pods, webhook endpoints). The Tailscale hub pod is particularly sensitive — it provides network connectivity and should be tightly restricted.",
-        "Tailscale VPN hub (ts-vm-hub) is present in the workload, providing remote access to the cluster. This is a high-privilege connectivity component: if compromised, it could provide network-level access to the cluster. Its credentials and auth keys should be rotated regularly, and its pod should run with a restrictive SecurityContext (read-only root filesystem, non-root UID, dropped capabilities).",
-        "No resource limits or requests are evident in the metrics data. Without resource limits, a compromised or misbehaving gateway pod could consume all node resources, causing denial of service to other pods. All three gateways and the observability stack should have CPU/memory limits set, especially in a shared-node topology.",
-        "The NGINX Ingress Controller runs an embedded Lua interpreter for dynamic configuration, which expands the attack surface compared to static-config proxies. Ensure the controller version is patched against known Lua sandbox escapes and NGINX CVEs. Traefik and Envoy Gateway should similarly be pinned to versions with no known critical CVEs."
+        "RBAC over-provisioning across three concurrent controllers: NGINX Ingress, Traefik, and Envoy Gateway each require ClusterRole bindings to watch Ingress, Gateway, HTTPRoute, and related resources across all namespaces. Running all three simultaneously creates three separate service accounts with broad cluster-wide read access to routing configuration. A compromised controller pod could enumerate all routing rules, backend service addresses, and TLS certificate references cluster-wide. In production, each controller's ClusterRole should be audited to restrict API groups (e.g., Envoy Gateway does not need networking.k8s.io/ingresses) and verbs to the minimum required.",
+        "No NetworkPolicy enforcement observed: All seven pods (three gateways, Alloy, kube-state-metrics, operator, Tailscale hub) share the same network plane with no ingress/egress restrictions. This permits unrestricted lateral movement — a compromised Alloy telemetry pod could reach the Tailscale VPN hub, the Kubernetes API server, or any gateway's admin interface. Production deployments must enforce deny-all default NetworkPolicies per namespace, with explicit allow rules for each pod's required communication paths (e.g., gateway → API server:443, Alloy → kubelet:10250).",
+        "Tailscale VPN hub (ts-vm-hub-xmccv-0) provides network-level remote access to the cluster and represents a high-value target. If its authentication keys are compromised, an attacker gains direct network connectivity to the cluster's pod network. This pod should run with a restrictive SecurityContext (readOnlyRootFilesystem: true, runAsNonRoot: true, drop ALL capabilities, add only NET_ADMIN if required), its auth keys should be short-lived and rotated, and it should be isolated in a dedicated namespace with strict NetworkPolicy.",
+        "No resource limits or requests are evident in the deployment. Without limits, any pod (gateway or otherwise) can consume unbounded CPU and memory, enabling resource exhaustion attacks. A malicious request pattern against an unlimited NGINX Ingress pod could starve Traefik and Envoy Gateway of resources on this shared node. All pods should have CPU/memory requests and limits set, with requests sized to observed usage (e.g., 10m CPU / 64Mi memory for gateway idle) and limits set to prevent runaway consumption (e.g., 500m CPU / 256Mi memory).",
+        "NGINX Ingress runs an embedded Lua interpreter (OpenResty/lua-nginx-module) for dynamic configuration updates, which expands the attack surface beyond static-config proxies. Historical CVEs (e.g., CVE-2023-5044 for annotation injection into Lua context) demonstrate this risk. All three controller images should be pinned to specific digests (not mutable tags), scanned for known CVEs, and verified that no critical or high-severity vulnerabilities are present in the deployed versions."
       ],
-      "supplyChain": "Image provenance is not verifiable from the experiment data alone. NGINX Ingress Controller images are published by the Kubernetes project (registry.k8s.io/ingress-nginx) and have cosign signatures available but SBOM adoption is partial. Traefik publishes official images on Docker Hub (traefik) with no cosign signatures or SBOM attestations in their standard distribution as of early 2025. Envoy Gateway images are published by the Envoy project (docker.io/envoyproxy) and have begun adopting cosign-signed images with SLSA provenance, though completeness varies by release. For production, all three should be verified against cosign signatures where available, images should be pulled from a private registry mirror with admission control (e.g., Kyverno or OPA Gatekeeper policy requiring signature verification), and SBOM attestations should be required to track transitive dependency vulnerabilities — particularly important for NGINX (C/Lua) and Envoy (C++) which have native code dependencies not visible in container layer scanning alone."
+      "supplyChain": "Image provenance varies significantly across the three gateways and cannot be verified from experiment data alone. NGINX Ingress Controller images (registry.k8s.io/ingress-nginx/controller) have cosign signatures available from the Kubernetes project, but SBOM attestations are partial and not consistently published across all releases. Traefik images (docker.io/library/traefik) are published on Docker Hub without cosign signatures or SBOM attestations in their standard distribution channel as of early 2025 — this is the weakest supply chain posture of the three. Envoy Gateway images (docker.io/envoyproxy/gateway and envoyproxy/envoy) have begun adopting cosign-signed images with SLSA provenance attestations, though coverage varies by release. For production adoption: (1) all images should be mirrored to a private registry (e.g., Artifact Registry) with vulnerability scanning enabled; (2) an admission controller (Kyverno or OPA Gatekeeper) should enforce signature verification policies, rejecting unsigned images; (3) SBOM attestations should be required and ingested into a dependency tracking system — this is particularly important for NGINX (C + Lua native dependencies) and Envoy (C++ with BoringSSL) where transitive native-code vulnerabilities are not visible through container layer scanning alone; (4) Traefik's lack of cosign signatures should be flagged as a supply chain risk and raised with the Traefik project or mitigated by building from source with internal signing."
     },
     "capabilitiesMatrix": {
       "technologies": [
@@ -256,19 +290,19 @@
           "name": "Resource Efficiency",
           "capabilities": [
             {
-              "name": "CPU usage (avg cores over 37 min)",
+              "name": "Avg CPU utilization (idle)",
               "values": {
                 "NGINX Ingress": "~0.001 cores (2.4 core-sec / 2221s)",
-                "Traefik": "~0.0009 cores (2.1 core-sec / 2221s)",
-                "Envoy Gateway": "~0.0017 cores (3.7 core-sec / 2221s) — control plane only"
+                "Traefik": "~0.0009 cores (2.1 core-sec / 2221s) — lowest",
+                "Envoy Gateway": "~0.0017 cores (3.7 core-sec / 2221s) — control plane only; data-plane pods not captured"
               }
             },
             {
-              "name": "Memory working set",
+              "name": "Memory working set (idle)",
               "values": {
                 "NGINX Ingress": "~29 MiB",
-                "Traefik": "~27.6 MiB",
-                "Envoy Gateway": "~34 MiB — control plane only, data-plane pods not captured"
+                "Traefik": "~27.6 MiB — lowest",
+                "Envoy Gateway": "~34 MiB — control plane only; true footprint higher with envoy-default-* pods"
               }
             },
             {
@@ -276,28 +310,28 @@
               "values": {
                 "NGINX Ingress": "Single-process (NGINX + Lua controller in one pod)",
                 "Traefik": "Single Go binary (control + data plane combined)",
-                "Envoy Gateway": "Two-process (controller pod + separate Envoy proxy pods); total footprint undercounted here"
+                "Envoy Gateway": "Two-process split (Go controller pod + separate Envoy proxy pods); higher operational surface area"
               }
             }
           ]
         },
         {
-          "name": "Gateway API Support",
+          "name": "Gateway API Conformance",
           "capabilities": [
             {
-              "name": "Native Gateway API implementation",
+              "name": "Native Gateway API support",
               "values": {
-                "NGINX Ingress": "Add-on translation layer; not native",
+                "NGINX Ingress": "Translation layer add-on; not native",
                 "Traefik": "Experimental provider; partial native support",
                 "Envoy Gateway": "Reference implementation; fully native"
               }
             },
             {
-              "name": "Conformance level",
+              "name": "Conformance tier coverage",
               "values": {
-                "NGINX Ingress": "Core (via translation); limited Extended support",
-                "Traefik": "Core + some Extended; Experimental features gated",
-                "Envoy Gateway": "Core + Extended; broadest Experimental coverage"
+                "NGINX Ingress": "Core only (via translation shim); limited Extended",
+                "Traefik": "Core + some Extended; Experimental behind feature gates",
+                "Envoy Gateway": "Core + Extended + broadest Experimental coverage"
               }
             }
           ]
@@ -309,37 +343,37 @@
               "name": "Primary API surface",
               "values": {
                 "NGINX Ingress": "Ingress resources + annotations; Gateway API via separate CRDs",
-                "Traefik": "Ingress, IngressRoute CRDs, and Gateway API (three models)",
+                "Traefik": "Three overlapping models: Ingress, IngressRoute CRDs, Gateway API",
                 "Envoy Gateway": "Gateway API exclusively (HTTPRoute, GRPCRoute, etc.)"
               }
             },
             {
-              "name": "Complexity for simple routing",
+              "name": "Simple routing complexity",
               "values": {
-                "NGINX Ingress": "Low — familiar Ingress annotations",
-                "Traefik": "Low to moderate — multiple overlapping APIs",
-                "Envoy Gateway": "Moderate — Gateway API is more verbose but more expressive"
+                "NGINX Ingress": "Low — familiar annotation model",
+                "Traefik": "Low to moderate — multiple overlapping APIs add cognitive load",
+                "Envoy Gateway": "Moderate — more verbose but more expressive and structured"
               }
             },
             {
               "name": "Advanced configuration ergonomics",
               "values": {
-                "NGINX Ingress": "Annotation sprawl; snippets needed for non-standard features",
-                "Traefik": "Clean via IngressRoute CRDs and middleware chains",
-                "Envoy Gateway": "Structured via BackendTrafficPolicy, SecurityPolicy, and EnvoyPatchPolicy CRDs"
+                "NGINX Ingress": "Annotation sprawl; raw NGINX snippets needed for non-standard features",
+                "Traefik": "Clean middleware chains via IngressRoute CRDs",
+                "Envoy Gateway": "Structured CRDs (BackendTrafficPolicy, SecurityPolicy, EnvoyPatchPolicy)"
               }
             }
           ]
         },
         {
-          "name": "Extensibility and Feature Breadth",
+          "name": "Extensibility & Protocol Support",
           "capabilities": [
             {
               "name": "Filter / middleware architecture",
               "values": {
-                "NGINX Ingress": "Limited — Lua plugins and NGINX snippets; no formal chain",
-                "Traefik": "Built-in middleware chain (rate-limit, circuit-breaker, headers, etc.)",
-                "Envoy Gateway": "Full Envoy filter chain (Wasm, ext_proc, Lua, ext_authz); richest extensibility"
+                "NGINX Ingress": "Limited — Lua plugins and NGINX snippets; no formal filter chain",
+                "Traefik": "Built-in middleware chain (rate-limit, circuit-breaker, headers, auth forwarding)",
+                "Envoy Gateway": "Full Envoy filter chain (Wasm, ext_proc, ext_authz, Lua); richest extensibility"
               }
             },
             {
@@ -353,26 +387,26 @@
           ]
         }
       ],
-      "summary": "Traefik wins on resource efficiency for simple routing, narrowly beating NGINX Ingress on both CPU and memory while offering a cleaner advanced-config model. Envoy Gateway is the clear winner for Gateway API conformance and extensibility, but its two-process architecture imposes measurably higher overhead—and the true cost is undercounted here because the Envoy data-plane proxy pods were not captured in metrics. The key trade-off is operational simplicity and lower resource cost (Traefik or NGINX) versus future-proof Gateway API nativeness and filter-chain extensibility (Envoy Gateway)."
+      "summary": "Traefik wins on resource efficiency and configuration ergonomics for straightforward routing, narrowly beating NGINX Ingress on both idle CPU (~0.0009 vs ~0.001 cores) and memory (~27.6 vs ~29 MiB) while offering a cleaner middleware model. Envoy Gateway is the definitive winner for Gateway API conformance and extensibility via Envoy's filter chain, but its two-process architecture imposes higher overhead — and the true cost is materially undercounted here because data-plane proxy pods were not captured. The key trade-off: operational simplicity and lower resource cost (Traefik/NGINX) versus future-proof Gateway API nativeness and deep extensibility (Envoy Gateway), with the caveat that a load-tested experiment with complete Envoy metrics is required before making a production commitment."
     },
     "feedback": {
       "recommendations": [
-        "Capture Envoy data-plane proxy pods (envoy-default-*) in metrics collection to measure Envoy Gateway's true total resource footprint; the current data only reflects the control plane.",
-        "Add a load-generation phase (e.g., hey or k6) with defined RPS targets to compare latency percentiles and throughput under realistic traffic, since idle-only metrics do not differentiate proxy performance.",
-        "Test Gateway API conformance explicitly by deploying a standard conformance test suite (gateway-api/conformance) against each implementation to quantify Core/Extended/Experimental support gaps with concrete pass/fail data.",
-        "Include Traefik's IngressRoute and NGINX's annotation-based routing alongside Gateway API HTTPRoute to compare equivalent routing configurations across all three native config models."
+        "Capture envoy-default-* data-plane proxy pods in metrics collection to measure Envoy Gateway's true total resource footprint — current data reflects only the control plane, making all resource comparisons structurally incomplete.",
+        "Add a load-generation phase (hey or k6 at defined RPS targets) to compare request latency percentiles (p50/p95/p99), throughput ceiling, and error rates under realistic traffic; idle-only metrics cannot differentiate proxy performance.",
+        "Run the official gateway-api/conformance test suite against all three implementations to produce concrete pass/fail data for Core, Extended, and Experimental features rather than relying on documentation claims.",
+        "Test equivalent routing configurations across each gateway's native config model (NGINX annotations, Traefik IngressRoute, Envoy Gateway HTTPRoute) to compare operational complexity with concrete examples."
       ],
       "experimentDesign": [
-        "Separate the experiment into distinct idle and loaded phases with clear boundaries, collecting time-series data (not just cumulative counters) to enable per-phase CPU rate and memory trend analysis rather than relying on single-point-in-time snapshots.",
-        "Add application-level metrics (request latency p50/p95/p99, error rates, connection setup time) via a sidecar or test client to measure actual proxy performance beyond infrastructure resource consumption.",
-        "Run the experiment for a longer duration (15-30 minutes per phase minimum) and on dedicated node pools per gateway to eliminate scheduling noise and co-tenant interference from system pods like alloy and kube-state-metrics."
+        "Collect time-series data with distinct idle and loaded phases (15-30 minutes each) using rate-based CPU queries rather than cumulative counters from a single point-in-time snapshot, enabling per-phase resource trend analysis.",
+        "Add application-level metrics (request latency p50/p95/p99, error rates, connection setup time, TLS handshake overhead) via a structured test client to measure actual proxy performance beyond infrastructure resource consumption.",
+        "Run each gateway on a dedicated node pool or in separate experiment runs to eliminate co-tenant interference from observability pods (Alloy consumed 33% of total CPU) and system components, and right-size to e2-medium or spot instances to reduce per-run cost by 70-75%."
       ]
     },
     "body": {
       "blocks": [
         {
           "type": "text",
-          "content": "This experiment deployed three Kubernetes gateway controllers — NGINX Ingress, Traefik, and Envoy Gateway — side-by-side on a single e2-standard-4 GKE node for 37 minutes. The goal: compare idle resource footprints, Gateway API maturity, configuration ergonomics, and extensibility to test the hypothesis that Envoy Gateway offers the richest feature set at the cost of higher resource consumption."
+          "content": "This experiment deployed three Kubernetes gateway controllers — NGINX Ingress, Traefik, and Envoy Gateway — side-by-side on a single e2-standard-4 GKE node for 37 minutes. The goal: compare idle resource footprints, Gateway API maturity, configuration ergonomics, and extensibility."
         },
         {
           "type": "callout",
@@ -386,7 +420,7 @@
           "blocks": [
             {
               "type": "text",
-              "content": "All three gateways are remarkably lightweight at idle, collectively consuming less than 1.5% of the node's available resources. The differences between them are small in absolute terms but reveal architectural distinctions worth understanding."
+              "content": "All three gateways are remarkably lightweight at idle, collectively consuming less than 1.5% of the node's available resources. The differences are small in absolute terms but directionally consistent with architectural expectations."
             },
             {
               "type": "row",
@@ -395,13 +429,13 @@
                   "type": "metric",
                   "key": "cpu_by_pod",
                   "size": "small",
-                  "insight": "Envoy Gateway's control plane consumed 56% more CPU than Traefik and 55% more than NGINX — but all three averaged under 0.002 cores."
+                  "insight": "Envoy Gateway's control plane consumed 56% more CPU than Traefik — but all three averaged under 0.002 cores."
                 },
                 {
                   "type": "metric",
                   "key": "memory_by_pod",
                   "size": "small",
-                  "insight": "Memory follows the same pattern: Envoy Gateway at ~34 MiB, NGINX at ~29 MiB, Traefik at ~27.6 MiB. All well within minimal pod allocations."
+                  "insight": "Memory follows the same ranking: Envoy Gateway at ~34 MiB, NGINX at ~29 MiB, Traefik lightest at ~27.6 MiB."
                 }
               ]
             },
@@ -429,17 +463,17 @@
               "type": "callout",
               "variant": "warning",
               "title": "Envoy Gateway footprint is incomplete",
-              "content": "The Envoy Gateway metrics only cover the controller pod. In production, envoy-default-* data-plane pods run separately and would add significant CPU and memory to the total. The true resource envelope for Envoy Gateway is materially larger than shown here."
+              "content": "Only the controller pod was captured. In production, envoy-default-* data-plane pods run separately and typically consume more resources than the control plane. The true resource envelope for Envoy Gateway is materially larger than shown."
             },
             {
               "type": "text",
-              "content": "Notably, the observability stack (Alloy, kube-state-metrics, operator) consumed more resources than any individual gateway — 58% of total CPU and 47% of total memory. In production, right-sizing the monitoring footprint matters as much as gateway selection."
+              "content": "The observability stack (Alloy, kube-state-metrics, operator) consumed 58% of total CPU and 47% of total memory — more than all three gateways combined. In production, right-sizing monitoring overhead matters as much as gateway selection."
             },
             {
               "type": "metric",
               "key": "cpu_total",
               "size": "large",
-              "insight": "Total cluster CPU: 23.3 core-seconds over 37 minutes — just 0.26% utilization of the 4-core node. The experiment node could be downsized to e2-medium for a 75% cost reduction."
+              "insight": "23.3 core-seconds over 37 minutes — just 0.26% utilization of the 4-core node. The experiment node is at least 4x over-provisioned."
             }
           ]
         },
@@ -449,7 +483,7 @@
           "blocks": [
             {
               "type": "text",
-              "content": "Gateway API support is the primary differentiator among these three controllers. Their approaches range from native-first to bolted-on, which impacts configuration ergonomics and future-proofing."
+              "content": "Gateway API support is the primary differentiator among these controllers. Their approaches range from native-first to bolted-on, directly impacting configuration ergonomics and future-proofing."
             },
             {
               "type": "capabilityRow",
@@ -464,16 +498,25 @@
               "type": "capabilityRow",
               "capability": "Conformance level",
               "values": {
-                "NGINX Ingress": "Core (via translation); limited Extended support",
-                "Traefik": "Core + some Extended; Experimental features gated",
-                "Envoy Gateway": "Core + Extended; broadest Experimental coverage"
+                "NGINX Ingress": "Core only (via translation); limited Extended support",
+                "Traefik": "Core + some Extended; Experimental behind feature gates",
+                "Envoy Gateway": "Core + Extended + broadest Experimental coverage"
+              }
+            },
+            {
+              "type": "capabilityRow",
+              "capability": "Protocol support beyond HTTP",
+              "values": {
+                "NGINX Ingress": "TCP/UDP via ConfigMap; gRPC supported",
+                "Traefik": "TCP, UDP, gRPC natively via IngressRoute",
+                "Envoy Gateway": "TCP, UDP, gRPC, HTTP/3 via Gateway API route types"
               }
             },
             {
               "type": "callout",
               "variant": "finding",
               "title": "Hypothesis partially confirmed",
-              "content": "Envoy Gateway is the clear leader in Gateway API conformance as the reference implementation with the broadest Core, Extended, and Experimental coverage. However, NGINX Ingress was not the most resource-efficient — Traefik narrowly beat both NGINX and Envoy Gateway on CPU and memory, contradicting the hypothesis that NGINX's single-process model would be most efficient."
+              "content": "Envoy Gateway is the clear leader in Gateway API conformance as the reference implementation. However, NGINX Ingress was not the most resource-efficient — Traefik narrowly beat it on both CPU (0.93 vs 1.08 millicores) and memory (27.6 vs 29.0 MiB), contradicting the hypothesis that NGINX's single-process model would be most efficient."
             }
           ]
         },
@@ -501,35 +544,29 @@
                   "Gateway API exclusively"
                 ],
                 [
-                  "Simple routing complexity",
+                  "Simple routing",
                   "Low — familiar annotations",
                   "Low to moderate — overlapping APIs",
                   "Moderate — verbose but expressive"
                 ],
                 [
-                  "Advanced config ergonomics",
+                  "Advanced config",
                   "Annotation sprawl; NGINX snippets needed",
                   "Clean middleware chains via IngressRoute",
                   "Structured CRDs (BackendTrafficPolicy, SecurityPolicy)"
                 ],
                 [
-                  "Filter / middleware architecture",
-                  "Lua plugins and NGINX snippets; no formal chain",
-                  "Built-in middleware chain (rate-limit, circuit-breaker, etc.)",
-                  "Full Envoy filter chain (Wasm, ext_proc, Lua, ext_authz)"
-                ],
-                [
-                  "Protocol support",
-                  "TCP/UDP via ConfigMap; gRPC",
-                  "TCP, UDP, gRPC natively",
-                  "TCP, UDP, gRPC, HTTP/3 via Gateway API"
+                  "Filter architecture",
+                  "Lua plugins; no formal chain",
+                  "Built-in middleware chain",
+                  "Full Envoy filter chain (Wasm, ext_proc, ext_authz)"
                 ]
               ],
               "caption": "Configuration and extensibility comparison across all three gateways"
             },
             {
               "type": "text",
-              "content": "Envoy Gateway's exclusive use of Gateway API means a steeper initial learning curve but avoids the configuration fragmentation that affects NGINX (annotation sprawl) and Traefik (three overlapping API surfaces). For teams already committed to Gateway API, Envoy Gateway provides the cleanest path forward."
+              "content": "Envoy Gateway's exclusive use of Gateway API avoids the configuration fragmentation that affects NGINX (annotation sprawl) and Traefik (three overlapping API surfaces). For teams already committed to Gateway API, it provides the cleanest path forward."
             }
           ]
         },
@@ -539,7 +576,7 @@
           "blocks": [
             {
               "type": "text",
-              "content": "This benchmark cost $0.017 USD on a single on-demand node. Extrapolating to production reveals meaningful cost differences driven primarily by architecture rather than idle resource consumption."
+              "content": "This benchmark cost $0.017 USD on a single on-demand node. Extrapolating to production reveals meaningful cost differences driven by architecture rather than idle consumption."
             },
             {
               "type": "row",
@@ -548,7 +585,7 @@
                   "type": "metric",
                   "key": "memory_total",
                   "size": "small",
-                  "insight": "218 MiB total across all pods — just 1.3% of the node's 16 GB. Massive over-provisioning for a benchmark of this scale."
+                  "insight": "218 MiB total across all pods — just 1.3% of the node's 16 GB. An e2-medium would suffice at one-quarter the cost."
                 },
                 {
                   "type": "comparison",
@@ -559,24 +596,18 @@
                       "description": "37 minutes on a single e2-standard-4 node"
                     },
                     {
-                      "label": "Production estimate (all three)",
-                      "value": "$880–$990/mo",
-                      "description": "3-node HA clusters per gateway on e2-standard-4/8; Envoy Gateway requires larger nodes"
+                      "label": "Production (3 gateways)",
+                      "value": "$880–$1,174/mo",
+                      "description": "3-node HA clusters per gateway; Envoy Gateway requires larger nodes for data-plane pods"
                     },
                     {
                       "label": "With 1-year CUD",
-                      "value": "$554–$620/mo",
+                      "value": "$554–$740/mo",
                       "description": "37% committed-use discount applied"
                     }
                   ]
                 }
               ]
-            },
-            {
-              "type": "callout",
-              "variant": "warning",
-              "title": "Security gaps for production",
-              "content": "No NetworkPolicies, resource limits, or pod security standards were observed. All three gateways hold cluster-wide RBAC permissions. The Tailscale VPN hub pod adds a high-privilege attack vector. Before production adoption: enforce NetworkPolicy isolation, set CPU/memory limits, scope RBAC to minimum required permissions, and verify image signatures via admission control."
             },
             {
               "type": "table",
@@ -588,22 +619,22 @@
               "rows": [
                 [
                   "Cluster-wide RBAC for all three gateways",
-                  "Broad read access to routing config increases credential attack surface",
+                  "Broad read access to routing config across namespaces",
                   "Audit and scope ClusterRoles to minimum API groups and verbs"
                 ],
                 [
                   "No NetworkPolicy segmentation",
-                  "Lateral movement risk between gateway, observability, and VPN pods",
-                  "Enforce per-namespace NetworkPolicies restricting ingress/egress"
+                  "Lateral movement between gateway, observability, and VPN pods",
+                  "Enforce per-namespace deny-all defaults with explicit allow rules"
                 ],
                 [
                   "No resource limits set",
                   "Compromised pod can starve node of CPU/memory",
-                  "Set requests and limits on all pods, especially in shared-node topology"
+                  "Set requests and limits on all pods based on observed usage"
                 ],
                 [
                   "Mixed image provenance",
-                  "NGINX (cosign partial), Traefik (no cosign), Envoy (cosign + SLSA emerging)",
+                  "Traefik lacks cosign signatures; NGINX partial; Envoy emerging",
                   "Pull from private registry with admission policy requiring signature verification"
                 ]
               ],
@@ -619,54 +650,54 @@
               "type": "recommendation",
               "priority": "p0",
               "title": "Capture Envoy Gateway data-plane metrics",
-              "description": "Include envoy-default-* proxy pods in metrics collection to measure Envoy Gateway's true total resource footprint. Current data only reflects the control plane, making resource comparisons incomplete.",
+              "description": "Include envoy-default-* proxy pods in metrics collection. Current data only reflects the control plane, making all resource comparisons structurally incomplete.",
               "effort": "low"
             },
             {
               "type": "recommendation",
               "priority": "p0",
               "title": "Add load-generation phase",
-              "description": "Introduce a traffic phase using hey or k6 with defined RPS targets to compare latency percentiles (p50/p95/p99) and throughput under realistic load. Idle-only metrics cannot differentiate proxy performance.",
+              "description": "Introduce traffic using hey or k6 with defined RPS targets to compare latency percentiles (p50/p95/p99) and throughput. Idle-only metrics cannot differentiate proxy performance.",
               "effort": "medium"
             },
             {
               "type": "recommendation",
               "priority": "p1",
               "title": "Run Gateway API conformance test suite",
-              "description": "Deploy the official gateway-api/conformance suite against each implementation to produce concrete pass/fail data for Core, Extended, and Experimental features rather than relying on documentation claims.",
+              "description": "Deploy the official gateway-api/conformance suite against each implementation to produce concrete pass/fail data for Core, Extended, and Experimental features.",
               "effort": "medium"
             },
             {
               "type": "recommendation",
               "priority": "p1",
-              "title": "Right-size the experiment infrastructure",
-              "description": "Use e2-medium (2 vCPU, 4 GB) or spot instances for idle benchmarks — the current node is 99.7% idle on CPU. This reduces per-run cost from $0.017 to ~$0.004.",
+              "title": "Right-size experiment infrastructure",
+              "description": "Use e2-medium or spot instances for idle benchmarks — the current node is 99.7% idle on CPU. Reduces per-run cost from $0.017 to ~$0.004.",
               "effort": "low"
             },
             {
               "type": "recommendation",
               "priority": "p2",
-              "title": "Separate experiment into phased time-series collection",
-              "description": "Collect time-series data with distinct idle and loaded phases rather than cumulative counters from a single point in time. This enables CPU rate analysis and memory trend visualization per phase.",
+              "title": "Isolate gateways on dedicated node pools",
+              "description": "Run each gateway in separate experiment runs or on dedicated nodes to eliminate co-tenant interference from observability pods (Alloy consumed 33% of total CPU).",
               "effort": "medium"
             },
             {
               "type": "recommendation",
               "priority": "p2",
-              "title": "Enforce security baselines before production evaluation",
-              "description": "Add NetworkPolicies, resource limits, pod security standards, and RBAC scoping to the experiment to validate each gateway operates correctly under production-like security constraints.",
+              "title": "Enforce security baselines",
+              "description": "Add NetworkPolicies, resource limits, pod security standards, and scoped RBAC before production evaluation to validate each gateway operates under realistic constraints.",
               "effort": "high"
             }
           ]
         },
         {
           "type": "text",
-          "content": "Traefik emerges as the best balance of resource efficiency and configuration ergonomics for teams with straightforward routing needs — it was the lightest on both CPU and memory while offering cleaner advanced configuration than NGINX's annotation model. Envoy Gateway is the right choice for teams investing in Gateway API as their long-term standard and needing deep extensibility through Envoy's filter chain, but its two-process architecture and incomplete metrics capture mean the true resource cost remains to be quantified. NGINX Ingress occupies a middle ground: familiar and battle-tested, but its annotation-driven model is showing its age against structured CRD-based alternatives. A load-tested follow-up experiment with complete Envoy data-plane metrics is essential before making a production decision."
+          "content": "Traefik emerges as the best balance of resource efficiency and configuration ergonomics for straightforward routing — lightest on both CPU and memory with cleaner advanced configuration than NGINX's annotation model. Envoy Gateway is the right choice for teams investing in Gateway API long-term and needing deep extensibility through Envoy's filter chain, but its true resource cost remains unquantified. A load-tested follow-up with complete Envoy data-plane metrics is essential before making a production commitment."
         }
       ]
     },
-    "summary": "Analysis incomplete",
-    "generatedAt": "2026-02-12T20:13:58Z",
+    "summary": "The hypothesis is largely supported: Envoy Gateway demonstrates the richest Gateway API feature set as the reference implementation with the broadest Core, Extended, and Experimental conformance coverage, and its control-plane pod alone consumed 56% more CPU (3.74 core-seconds vs. 2.40 for NGINX, 2.07 for Traefik) and 23% more memory (34.0 MiB vs. 29.0 MiB for NGINX, 27.6 MiB for Traefik) than either competitor over the 37-minute experiment — with its separate data-plane proxy pods (envoy-default-*) not even captured in metrics, meaning true overhead is materially higher. However, the hypothesis that NGINX Ingress would be the most resource-efficient is only partially confirmed: Traefik narrowly beat NGINX on both CPU (0.93 vs. 1.08 millicores average) and memory (27.6 vs. 29.0 MiB), indicating that a single Go binary architecture can match or exceed NGINX's single-process efficiency. The experiment is limited to idle resource footprints with no traffic load applied and incomplete Envoy Gateway metrics, so performance under load and true two-process overhead remain unquantified. The most actionable finding is that Envoy Gateway's data-plane pods must be included in metrics collection before any resource comparison can be considered complete.",
+    "generatedAt": "2026-02-12T21:05:27Z",
     "model": "claude-opus-4-6"
   }
 }
