@@ -90,6 +90,38 @@ spec:
               description:
                 description: Description of the experiment
                 type: string
+              metrics:
+                description: Custom PromQL queries to execute at experiment completion.
+                  Results are stored in summary.json for the benchmark site.
+                items:
+                  properties:
+                    name:
+                      description: Key for this metric in output JSON.
+                      pattern: ^[a-z][a-z0-9_]*$
+                      type: string
+                    query:
+                      description: PromQL expression. Supports $EXPERIMENT, $NAMESPACE,
+                        $DURATION variable substitution.
+                      type: string
+                    type:
+                      default: instant
+                      description: 'Query type: instant (single value) or range (time-series).'
+                      enum:
+                      - instant
+                      - range
+                      type: string
+                    unit:
+                      description: Display hint for chart axis labels (e.g., bytes,
+                        cores, req/s).
+                      type: string
+                    description:
+                      description: Human-readable chart title.
+                      type: string
+                  required:
+                  - name
+                  - query
+                  type: object
+                type: array
               targets:
                 description: Targets to deploy (app, loadgen, etc.)
                 items:
