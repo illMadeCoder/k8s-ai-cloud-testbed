@@ -364,32 +364,33 @@ func queryInstantViaProxy(ctx context.Context, restClient rest.Interface, ep Mon
 // without requiring an experiment-specific label. They filter out system namespaces
 // to focus on workload metrics.
 func defaultTargetQueries() []experimentsv1alpha1.MetricsQuery {
-	sysNS := `kube-system|gke-managed-system|gmp-system|gmp-public|kube-node-lease|kube-public`
+	sysNS := `kube-system|gke-managed-system|gmp-system|gmp-public|kube-node-lease|kube-public|observability`
+	harnessPods := `alloy-.*|ts-vm-hub-.*`
 	return []experimentsv1alpha1.MetricsQuery{
 		{
 			Name:        "cpu_by_pod",
-			Query:       fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{namespace!~"%s",container!="POD",container!=""}[1m])) by (pod)`, sysNS),
+			Query:       fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{namespace!~"%s",pod!~"%s",container!="POD",container!=""}[1m])) by (pod)`, sysNS, harnessPods),
 			Type:        "range",
 			Unit:        "cores",
 			Description: "CPU usage by pod",
 		},
 		{
 			Name:        "memory_by_pod",
-			Query:       fmt.Sprintf(`sum(container_memory_working_set_bytes{namespace!~"%s",container!="POD",container!=""}) by (pod)`, sysNS),
+			Query:       fmt.Sprintf(`sum(container_memory_working_set_bytes{namespace!~"%s",pod!~"%s",container!="POD",container!=""}) by (pod)`, sysNS, harnessPods),
 			Type:        "range",
 			Unit:        "bytes",
 			Description: "Memory working set by pod",
 		},
 		{
 			Name:        "cpu_total",
-			Query:       fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{namespace!~"%s"}[1m]))`, sysNS),
+			Query:       fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{namespace!~"%s",pod!~"%s"}[1m]))`, sysNS, harnessPods),
 			Type:        "range",
 			Unit:        "cores",
 			Description: "Total CPU usage",
 		},
 		{
 			Name:        "memory_total",
-			Query:       fmt.Sprintf(`sum(container_memory_working_set_bytes{namespace!~"%s"})`, sysNS),
+			Query:       fmt.Sprintf(`sum(container_memory_working_set_bytes{namespace!~"%s",pod!~"%s"})`, sysNS, harnessPods),
 			Type:        "range",
 			Unit:        "bytes",
 			Description: "Total memory working set",
@@ -419,6 +420,19 @@ var systemNamespaces = map[string]bool{
 	"kube-node-lease":    true,
 	"kube-public":        true,
 	"tailscale":          true,
+	"observability":      true,
+}
+
+// isHarnessPod returns true for pods that are part of the experiment harness
+// (observability/infra layers) rather than the experiment workload.
+func isHarnessPod(pod string) bool {
+	harnessPrefixes := []string{"alloy-", "ts-vm-hub-"}
+	for _, p := range harnessPrefixes {
+		if strings.HasPrefix(pod, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // CollectCadvisorMetrics scrapes cadvisor metrics directly from kubelet on target
@@ -578,6 +592,11 @@ func parseCadvisorMetrics(text string, cpuByPod, memByPod map[string]float64) {
 
 		// Skip system namespaces, empty containers (pause), and POD containers
 		if ns == "" || systemNamespaces[ns] || container == "" || container == "POD" || pod == "" {
+			continue
+		}
+
+		// Skip harness pods deployed to experiment namespace
+		if isHarnessPod(pod) {
 			continue
 		}
 

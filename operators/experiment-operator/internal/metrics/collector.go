@@ -129,55 +129,21 @@ type CostEstimate struct {
 // AnalysisResult holds AI-generated analysis of experiment results.
 type AnalysisResult struct {
 	// Backward-compatible fields
-	Summary         string            `json:"summary"`
-	MetricInsights  map[string]string `json:"metricInsights"`
-	Recommendations []string          `json:"recommendations,omitempty"`
-	GeneratedAt     time.Time         `json:"generatedAt"`
-	Model           string            `json:"model"`
+	Summary        string            `json:"summary"`
+	MetricInsights map[string]string `json:"metricInsights"`
+	GeneratedAt    time.Time         `json:"generatedAt"`
+	Model          string            `json:"model"`
 
 	// Hypothesis verdict — structured enum for at-a-glance display in stats row.
 	// Values: "supported", "unsupported", "insufficient"
 	HypothesisVerdict string `json:"hypothesisVerdict,omitempty"`
 
 	// Structured analysis sections
-	Abstract            string               `json:"abstract,omitempty"`
-	TargetAnalysis      *TargetAnalysis      `json:"targetAnalysis,omitempty"`
-	PerformanceAnalysis *PerformanceAnalysis `json:"performanceAnalysis,omitempty"`
-	FinopsAnalysis      *FinopsAnalysis      `json:"finopsAnalysis,omitempty"`
-	SecopsAnalysis      *SecopsAnalysis      `json:"secopsAnalysis,omitempty"`
-	CapabilitiesMatrix  *CapabilitiesMatrix  `json:"capabilitiesMatrix,omitempty"`
-	Body                *AnalysisBody        `json:"body,omitempty"`
-	Feedback            *AnalysisFeedback    `json:"feedback,omitempty"`
-	ArchitectureDiagram string               `json:"architectureDiagram,omitempty"`
-}
-
-// TargetAnalysis describes how infrastructure choices affect metrics.
-type TargetAnalysis struct {
-	Overview             string            `json:"overview"`
-	PerTarget            map[string]string `json:"perTarget,omitempty"`
-	ComparisonToBaseline string            `json:"comparisonToBaseline,omitempty"`
-}
-
-// PerformanceAnalysis presents key performance findings with data.
-type PerformanceAnalysis struct {
-	Overview    string   `json:"overview"`
-	Findings    []string `json:"findings,omitempty"`
-	Bottlenecks []string `json:"bottlenecks,omitempty"`
-}
-
-// FinopsAnalysis covers cost analysis and production projections.
-type FinopsAnalysis struct {
-	Overview      string   `json:"overview"`
-	CostDrivers   []string `json:"costDrivers,omitempty"`
-	Projection    string   `json:"projection,omitempty"`
-	Optimizations []string `json:"optimizations,omitempty"`
-}
-
-// SecopsAnalysis covers security observations and supply chain assessment.
-type SecopsAnalysis struct {
-	Overview    string   `json:"overview"`
-	Findings    []string `json:"findings,omitempty"`
-	SupplyChain string   `json:"supplyChain,omitempty"`
+	Abstract            string              `json:"abstract,omitempty"`
+	CapabilitiesMatrix  *CapabilitiesMatrix `json:"capabilitiesMatrix,omitempty"`
+	Body                *AnalysisBody       `json:"body,omitempty"`
+	Feedback            *AnalysisFeedback   `json:"feedback,omitempty"`
+	ArchitectureDiagram string              `json:"architectureDiagram,omitempty"`
 }
 
 // CapabilitiesMatrix is a feature comparison table for comparison experiments.
@@ -199,12 +165,15 @@ type CapabilityEntry struct {
 	Values map[string]string `json:"values"`
 }
 
-// AnalysisBody contains research-paper style deep-dive sections.
+// AnalysisBody contains the rich narrative body as an ordered array of typed blocks.
+// The analyzer generates blocks; the operator only needs JSON round-tripping.
 type AnalysisBody struct {
-	Methodology string `json:"methodology"`
-	Results     string `json:"results"`
-	Discussion  string `json:"discussion"`
+	Blocks []BodyBlock `json:"blocks,omitempty"`
 }
+
+// BodyBlock is a discriminated union of content blocks. The operator never generates
+// blocks (the analyzer does), so we use a generic map for JSON round-tripping.
+type BodyBlock map[string]interface{}
 
 // AnalysisFeedback provides actionable recommendations and experiment design improvements.
 type AnalysisFeedback struct {
@@ -298,12 +267,13 @@ func CollectSummary(exp *experimentsv1alpha1.Experiment) *ExperimentSummary {
 
 // defaultQueries returns the built-in metrics queries used when spec.metrics is empty.
 func defaultQueries() []experimentsv1alpha1.MetricsQuery {
-	sysNS := `kube-system|gke-managed-system|gmp-system|gmp-public|kube-node-lease|kube-public`
+	sysNS := `kube-system|gke-managed-system|gmp-system|gmp-public|kube-node-lease|kube-public|observability`
+	harnessPods := `alloy-.*|ts-vm-hub-.*`
 	return []experimentsv1alpha1.MetricsQuery{
-		{Name: "cpu_by_pod", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s",container!="POD",container!=""}[1m])) by (pod)`, sysNS), Type: "range", Unit: "cores", Description: "CPU usage by pod"},
-		{Name: "memory_by_pod", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s",container!="POD",container!=""}) by (pod)`, sysNS), Type: "range", Unit: "bytes", Description: "Memory working set by pod"},
-		{Name: "cpu_total", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s"}[1m]))`, sysNS), Type: "range", Unit: "cores", Description: "Total CPU usage"},
-		{Name: "memory_total", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s"})`, sysNS), Type: "range", Unit: "bytes", Description: "Total memory working set"},
+		{Name: "cpu_by_pod", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s",container!="POD",container!=""}[1m])) by (pod)`, sysNS, harnessPods), Type: "range", Unit: "cores", Description: "CPU usage by pod"},
+		{Name: "memory_by_pod", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s",container!="POD",container!=""}) by (pod)`, sysNS, harnessPods), Type: "range", Unit: "bytes", Description: "Memory working set by pod"},
+		{Name: "cpu_total", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s"}[1m]))`, sysNS, harnessPods), Type: "range", Unit: "cores", Description: "Total CPU usage"},
+		{Name: "memory_total", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s"})`, sysNS, harnessPods), Type: "range", Unit: "bytes", Description: "Total memory working set"},
 	}
 }
 

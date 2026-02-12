@@ -16,6 +16,12 @@ interface VegaDataPoint {
   value: number;
 }
 
+const HARNESS_POD_PREFIXES = ['alloy-', 'ts-vm-hub-', 'ts-vm-'];
+
+function isHarnessPod(label: string): boolean {
+  return HARNESS_POD_PREFIXES.some((p) => label.startsWith(p));
+}
+
 function extractSeriesLabel(dp: DataPoint): string {
   if (!dp.labels || Object.keys(dp.labels).length === 0) return 'Total';
   return dp.labels['target'] ?? dp.labels['pod'] ?? dp.labels['instance']
@@ -45,10 +51,12 @@ function displayUnit(unit?: string): string {
 }
 
 export function buildBarSpec(name: string, qr: QueryResult): VegaLiteSpec {
-  const values: VegaDataPoint[] = (qr.data ?? []).map((dp) => ({
-    series: extractSeriesLabel(dp),
-    value: transformValue(dp.value, qr.unit),
-  }));
+  const values: VegaDataPoint[] = (qr.data ?? [])
+    .filter((dp) => !isHarnessPod(extractSeriesLabel(dp)))
+    .map((dp) => ({
+      series: extractSeriesLabel(dp),
+      value: transformValue(dp.value, qr.unit),
+    }));
 
   const yUnit = displayUnit(qr.unit);
   const yTitle = yUnit ? `${qr.description ?? name} (${yUnit})` : (qr.description ?? name);
@@ -76,11 +84,13 @@ export function buildBarSpec(name: string, qr: QueryResult): VegaLiteSpec {
 }
 
 export function buildLineSpec(name: string, qr: QueryResult): VegaLiteSpec {
-  const values: VegaDataPoint[] = (qr.data ?? []).map((dp) => ({
-    series: extractSeriesLabel(dp),
-    timestamp: dp.timestamp,
-    value: transformValue(dp.value, qr.unit),
-  }));
+  const values: VegaDataPoint[] = (qr.data ?? [])
+    .filter((dp) => !isHarnessPod(extractSeriesLabel(dp)))
+    .map((dp) => ({
+      series: extractSeriesLabel(dp),
+      timestamp: dp.timestamp,
+      value: transformValue(dp.value, qr.unit),
+    }));
 
   const yUnit = displayUnit(qr.unit);
   const yTitle = yUnit ? `${qr.description ?? name} (${yUnit})` : (qr.description ?? name);
