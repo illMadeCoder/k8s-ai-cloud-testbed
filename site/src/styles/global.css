@@ -271,52 +271,47 @@ details.section > details.section > summary.section-title code {
 
 /* Collapse bar (Reddit-style left edge) */
 
-details.section,
-details.block-topic {
+details.section {
   position: relative;
 }
 
-.section-collapse-bar {
+details.section > .section-collapse-bar {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 4px;
+  width: 3px;
   padding: 0;
   background: var(--border);
   cursor: pointer;
   z-index: 2;
+  transition: width 0.12s ease, background-color 0.12s ease;
   clip-path: inset(var(--_bar-top, 0) 0 0 0);
 }
 
-.section-collapse-bar::before {
+/* Wider invisible hit area for easier clicking */
+details.section > .section-collapse-bar::before {
   content: '';
   position: absolute;
   top: 0;
-  left: -12px;
-  width: 32px;
+  left: -6px;
+  width: 20px;
   bottom: 0;
 }
 
-.section-collapse-bar:hover {
-  width: 6px;
+details.section > .section-collapse-bar:hover {
+  width: 4px;
   background: var(--accent);
 }
 
-.section-collapse-bar:focus-visible {
-  width: 6px;
+details.section > .section-collapse-bar:focus-visible {
+  width: 4px;
   background: var(--accent);
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  box-shadow: 2px 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-details:not([open]) > .section-collapse-bar {
+details.section:not([open]) > .section-collapse-bar {
   display: none;
-}
-
-/* Nested sections: offset for bar stacking */
-details.section > details.section {
-  margin-left: 8px;
 }
 
 .tag {
@@ -426,8 +421,8 @@ details.section > details.section {
     padding: 0.5rem;
   }
 
-  .section-collapse-bar::before {
-    left: -14px;
-    width: 36px;
+  details.section > .section-collapse-bar::before {
+    left: -8px;
+    width: 28px;
   }
 }
