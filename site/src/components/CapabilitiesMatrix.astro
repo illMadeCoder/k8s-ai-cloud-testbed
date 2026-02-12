@@ -11,108 +11,94 @@ const { matrix } = Astro.props;
 <details class="section">
   <summary class="section-title">Capabilities Matrix</summary>
 
-  {matrix.summary && (
-    <div class="cap-summary">
-      <p>{matrix.summary}</p>
-    </div>
-  )}
+  <div class="cap-list">
+    {matrix.summary && (
+      <p class="cap-summary">{matrix.summary}</p>
+    )}
 
-  <div class="cap-categories">
     {matrix.categories.map((category) => (
-      <div class="cap-category">
-        <h4 class="cap-category-title">{category.name}</h4>
-        <div class="cap-entries">
-          {category.capabilities.map((cap) => (
-            <div class="cap-entry">
-              <div class="cap-entry-name">{cap.name}</div>
-              <div class="cap-entry-values">
-                {matrix.technologies.map((tech) => (
-                  <div class="cap-value-row">
-                    <span class="cap-tech-label">{tech}</span>
-                    <span class="cap-tech-text">{cap.values[tech] || '—'}</span>
-                  </div>
-                ))}
-              </div>
+      <Fragment>
+        <div class="cap-category-label">{category.name}</div>
+        {category.capabilities.map((cap) => (
+          <div class="cap-panel">
+            <div class="cap-panel-header">
+              <span class="cap-panel-name">{cap.name}</span>
             </div>
-          ))}
-        </div>
-      </div>
+            <div class="cap-panel-body">
+              {matrix.technologies.map((tech) => (
+                <div class="cap-tech-card">
+                  <span class="cap-tech-label">{tech}</span>
+                  <p class="cap-tech-text">{cap.values[tech] || '—'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Fragment>
     ))}
   </div>
 </details>
 
 <style>
-  .cap-summary {
-    margin-bottom: 1.25rem;
-    padding: 0.75rem 1rem;
-    background: var(--bg-surface);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 var(--radius) var(--radius) 0;
+  .cap-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
   }
 
-  .cap-summary p {
+  .cap-summary {
     margin: 0;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.9rem;
     color: var(--text);
-    font-size: 0.95rem;
     line-height: 1.65;
   }
 
-  .cap-categories {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
+  .cap-category-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    padding: 0.5rem 0 0;
   }
 
-  .cap-category {
+  .cap-panel {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
   }
 
-  .cap-category-title {
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--accent);
-    padding: 0.6rem 1.25rem;
-    margin: 0;
-    background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  .cap-panel-header {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border);
   }
 
-  .cap-entries {
+  .cap-panel-name {
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    font-weight: 600;
+    background: none;
+    padding: 0;
+  }
+
+  .cap-panel-body {
     display: flex;
     flex-direction: column;
   }
 
-  .cap-entry {
-    padding: 1rem 1.25rem;
+  .cap-tech-card {
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border);
   }
 
-  .cap-entry:last-child {
+  .cap-tech-card:last-child {
     border-bottom: none;
-  }
-
-  .cap-entry-name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 0.6rem;
-  }
-
-  .cap-entry-values {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .cap-value-row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
   }
 
   .cap-tech-label {
@@ -127,36 +113,28 @@ const { matrix } = Astro.props;
     border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
     border-radius: 3px;
     padding: 0.15rem 0.5rem;
-    min-width: 7.5rem;
-    text-align: center;
-    flex-shrink: 0;
   }
 
   .cap-tech-text {
     font-size: 0.9rem;
     line-height: 1.6;
     color: var(--text);
+    margin: 0.35rem 0 0;
   }
 
-  /* Desktop: side-by-side tech value cards */
   @media (min-width: 768px) {
-    .cap-entry-values {
+    .cap-panel-body {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 0.75rem;
     }
 
-    .cap-value-row {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 0.4rem;
-      background: var(--bg-surface);
-      border-radius: var(--radius);
-      padding: 0.75rem;
+    .cap-tech-card {
+      border-bottom: none;
+      border-right: 1px solid var(--border);
     }
 
-    .cap-tech-label {
-      align-self: flex-start;
+    .cap-tech-card:last-child {
+      border-right: none;
     }
   }
 </style>
