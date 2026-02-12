@@ -147,9 +147,9 @@ const verdictLabel = verdict
         <details class="overview-item" open>
           <summary class="overview-item-title">Questions</summary>
           <div class="overview-item-content">
-            <ol class="study-questions-list">
-              {experiment.study.questions.map((q) => <li>{q}</li>)}
-            </ol>
+            <ul class="study-questions-list">
+              {experiment.study.questions.map((q, i) => <li data-n={i + 1}>{q}</li>)}
+            </ul>
           </div>
         </details>
       )}
@@ -382,16 +382,31 @@ const verdictLabel = verdict
     line-height: 1.6;
   }
   .study-questions-list {
+    list-style: none;
     margin: 0;
-    padding-left: 1.25rem;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
   }
   .study-questions-list li {
+    padding: 0.6rem 1rem 0.6rem 2.25rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    position: relative;
     color: var(--text);
     font-size: 0.9rem;
-    line-height: 1.5;
+    line-height: 1.55;
+  }
+  .study-questions-list li::before {
+    content: attr(data-n);
+    position: absolute;
+    left: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent);
   }
   .focus-tags {
     display: flex;
@@ -479,6 +494,12 @@ const verdictLabel = verdict
 
     .metric-panel-insight {
       padding: 0.5rem 0.75rem;
+    }
+
+    .metric-panel {
+      border-left: none;
+      border-right: none;
+      border-radius: 0;
     }
 
     .overview-item-content {

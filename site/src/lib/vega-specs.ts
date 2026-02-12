@@ -58,13 +58,11 @@ export function buildBarSpec(name: string, qr: QueryResult): VegaLiteSpec {
       value: transformValue(dp.value, qr.unit),
     }));
 
-  const yUnit = displayUnit(qr.unit);
-  const yTitle = yUnit ? `${qr.description ?? name} (${yUnit})` : (qr.description ?? name);
+  const xUnit = displayUnit(qr.unit);
+  const xTitle = xUnit ? `${qr.description ?? name} (${xUnit})` : (qr.description ?? name);
 
   const seriesCount = values.length;
-  const hasLongLabels = values.some((v) => v.series.length > 15);
-  const needsAngle = seriesCount > 3 || hasLongLabels;
-  const height = Math.min(350, Math.max(250, 200 + seriesCount * 40));
+  const height = Math.max(seriesCount * 40 + 60, 120);
 
   return {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
@@ -73,12 +71,12 @@ export function buildBarSpec(name: string, qr: QueryResult): VegaLiteSpec {
     data: { values },
     mark: { type: 'bar', tooltip: true, cornerRadiusEnd: 4 },
     encoding: {
-      x: {
+      y: {
         field: 'series', type: 'nominal', title: null,
         sort: { field: 'value', order: 'descending' as const },
-        axis: { labelAngle: needsAngle ? -45 : 0, labelLimit: 200 },
+        axis: { labelLimit: 180 },
       },
-      y: { field: 'value', type: 'quantitative', title: yTitle },
+      x: { field: 'value', type: 'quantitative', title: xTitle },
     },
   };
 }
