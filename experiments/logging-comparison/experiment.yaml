@@ -15,7 +15,6 @@ spec:
       - targetAnalysis
       - performanceAnalysis
       - metricInsights
-      - finopsAnalysis
       - body
       - capabilitiesMatrix
       - feedback
