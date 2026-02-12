@@ -26,7 +26,14 @@ const chartId = `vega-${Math.random().toString(36).slice(2, 10)}`;
       var border = style.getPropertyValue('--border').trim();
       var accent = style.getPropertyValue('--accent').trim();
       var fontMono = style.getPropertyValue('--font-mono').trim();
-      vegaEmbed(el, spec, {
+      var patchedSpec = JSON.parse(JSON.stringify(spec));
+      if (patchedSpec.encoding && patchedSpec.encoding.color) {
+        patchedSpec.encoding.color.legend = Object.assign(
+          patchedSpec.encoding.color.legend || {},
+          { titleColor: text, labelColor: text, titleFont: fontMono, labelFont: fontMono }
+        );
+      }
+      vegaEmbed(el, patchedSpec, {
         actions: false,
         renderer: 'svg',
         config: {
@@ -39,6 +46,14 @@ const chartId = `vega-${Math.random().toString(36).slice(2, 10)}`;
             gridColor: border,
             domainColor: border,
             tickColor: border,
+            labelFont: fontMono,
+            titleFont: fontMono,
+            labelFontSize: 11,
+            titleFontSize: 12,
+          },
+          legend: {
+            labelColor: text,
+            titleColor: text,
             labelFont: fontMono,
             titleFont: fontMono,
             labelFontSize: 11,
