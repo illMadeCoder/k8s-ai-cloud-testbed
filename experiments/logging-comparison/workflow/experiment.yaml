@@ -1,9 +1,9 @@
 # Logging Comparison - Validation + Steady-State Observation Workflow
 # Verifies Loki, ELK, and log generator are healthy, then observes for 2h
 apiVersion: argoproj.io/v1alpha1
-kind: Workflow
+kind: WorkflowTemplate
 metadata:
-  generateName: logging-comparison-validation-
+  name: logging-comparison-validation
   namespace: argo-workflows
 spec:
   entrypoint: validate-logging-comparison
