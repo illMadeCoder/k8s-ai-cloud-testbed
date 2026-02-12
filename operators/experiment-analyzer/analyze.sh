@@ -566,6 +566,18 @@ jq --slurpfile analysis "${FINAL_FILE}" \
   '. + {analysis: $analysis[0]}' \
   "${SUMMARY_FILE}" > "${ENRICHED_FILE}"
 
+# Ensure architectureDiagramFormat is set when diagram contains Mermaid syntax
+if jq -e '.analysis.architectureDiagram' "${ENRICHED_FILE}" > /dev/null 2>&1; then
+  if ! jq -e '.analysis.architectureDiagramFormat' "${ENRICHED_FILE}" > /dev/null 2>&1; then
+    DIAGRAM_CONTENT=$(jq -r '.analysis.architectureDiagram // ""' "${ENRICHED_FILE}")
+    if echo "${DIAGRAM_CONTENT}" | grep -qE '^(flowchart|graph|sequenceDiagram|classDiagram)'; then
+      echo "==> Auto-setting architectureDiagramFormat to 'mermaid' (detected Mermaid syntax)"
+      jq '.analysis.architectureDiagramFormat = "mermaid"' "${ENRICHED_FILE}" > "${ENRICHED_FILE}.tmp" \
+        && mv "${ENRICHED_FILE}.tmp" "${ENRICHED_FILE}"
+    fi
+  fi
+fi
+
 # ============================================================================
 # Verbose logging: Upload all intermediate pass outputs to S3
 # ============================================================================

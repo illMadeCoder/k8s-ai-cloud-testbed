@@ -15,9 +15,18 @@ const chartId = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
 
 <script define:vars={{ diagram, chartId }} is:inline>
   (function() {
+    var attempts = 0;
     function render() {
       if (typeof window.mermaidLib === 'undefined') {
-        setTimeout(render, 100);
+        if (++attempts < 50) {
+          setTimeout(render, 100);
+        } else {
+          var el = document.getElementById(chartId);
+          if (el) {
+            el.innerHTML = '<pre style="color:var(--text-muted);font-size:0.75rem;white-space:pre;overflow-x:auto">' +
+              diagram.replace(/</g, '&lt;') + '</pre>';
+          }
+        }
         return;
       }
 

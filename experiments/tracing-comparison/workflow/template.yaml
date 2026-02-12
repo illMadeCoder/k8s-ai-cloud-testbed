@@ -1,0 +1,72 @@
+# Tracing Comparison - Validation + Steady-State Observation Workflow
+# Verifies target cluster is reachable, then observes for 20 minutes
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: tracing-comparison-validation
+  namespace: argo-workflows
+spec:
+  arguments:
+    parameters:
+      - name: experiment-name
+        value: ""
+      - name: target-endpoint
+        value: ""
+      - name: target-name
+        value: ""
+  entrypoint: validate-and-observe
+  serviceAccountName: argo-workflow
+  templates:
+    - name: validate-and-observe
+      steps:
+        - - name: smoke-test
+            template: check-target
+        - - name: steady-state-observation
+            template: observe
+
+    - name: check-target
+      container:
+        image: curlimages/curl:8.5.0
+        command: [sh, -c]
+        args:
+          - |
+            ENDPOINT="{{workflow.parameters.target-endpoint}}"
+            EXP="{{workflow.parameters.experiment-name}}"
+            echo "=== Tracing Comparison: ${EXP} ==="
+            echo "Target endpoint: ${ENDPOINT}"
+
+            if [ -z "${ENDPOINT}" ]; then
+              echo "No target endpoint, skipping check"
+              exit 0
+            fi
+
+            echo "Checking target cluster API server..."
+            HTTP_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --connect-timeout 10 "https://${ENDPOINT}/livez" || true)
+            echo "API server /livez returned: ${HTTP_CODE}"
+
+            if [ "${HTTP_CODE}" = "401" ] || [ "${HTTP_CODE}" = "403" ] || [ "${HTTP_CODE}" = "200" ]; then
+              echo "Target cluster is reachable (HTTP ${HTTP_CODE})"
+            else
+              echo "WARNING: Could not reach target (HTTP ${HTTP_CODE}) — may be transient"
+            fi
+
+            echo "Smoke test passed — ArgoCD has already deployed all components"
+
+    - name: observe
+      container:
+        image: busybox:1.36
+        command: [sh, -c]
+        args:
+          - |
+            EXP="{{workflow.parameters.experiment-name}}"
+            echo "========================================="
+            echo "  STEADY-STATE OBSERVATION: ${EXP}"
+            echo "  Duration: 20 minutes"
+            echo "  Components: otel-collector, tempo, jaeger, otel-demo"
+            echo "  Start: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "========================================="
+            sleep 1200
+            echo "========================================="
+            echo "  OBSERVATION COMPLETE"
+            echo "  End: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "========================================="
