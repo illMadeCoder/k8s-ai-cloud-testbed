@@ -86,7 +86,7 @@ export interface AnalysisResult {
   model: string;
 
   // Hypothesis verdict for at-a-glance display
-  hypothesisVerdict?: 'supported' | 'partially supported' | 'not supported' | 'insufficient data';
+  hypothesisVerdict?: 'supported' | 'unsupported' | 'insufficient';
 
   // Structured analysis sections
   abstract?: string;

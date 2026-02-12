@@ -136,7 +136,7 @@ type AnalysisResult struct {
 	Model           string            `json:"model"`
 
 	// Hypothesis verdict — structured enum for at-a-glance display in stats row.
-	// Values: "supported", "partially supported", "not supported", "insufficient data"
+	// Values: "supported", "unsupported", "insufficient"
 	HypothesisVerdict string `json:"hypothesisVerdict,omitempty"`
 
 	// Structured analysis sections

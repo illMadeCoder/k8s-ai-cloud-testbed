@@ -367,22 +367,16 @@ const verdictLabel = verdict
   .verdict-supported .verdict-value {
     color: #22c55e;
   }
-  .verdict-partially-supported {
-    background: color-mix(in srgb, #eab308 15%, var(--bg-surface));
-  }
-  .verdict-partially-supported .verdict-value {
-    color: #eab308;
-  }
-  .verdict-not-supported {
+  .verdict-unsupported {
     background: color-mix(in srgb, #ef4444 15%, var(--bg-surface));
   }
-  .verdict-not-supported .verdict-value {
+  .verdict-unsupported .verdict-value {
     color: #ef4444;
   }
-  .verdict-insufficient-data {
+  .verdict-insufficient {
     background: var(--bg-surface);
   }
-  .verdict-insufficient-data .verdict-value {
+  .verdict-insufficient .verdict-value {
     color: var(--text-muted);
   }
   .current-run {
@@ -403,15 +397,11 @@ const verdictLabel = verdict
     background: color-mix(in srgb, #22c55e 15%, transparent);
     color: #22c55e;
   }
-  .verdict-badge-partially-supported {
-    background: color-mix(in srgb, #eab308 15%, transparent);
-    color: #eab308;
-  }
-  .verdict-badge-not-supported {
+  .verdict-badge-unsupported {
     background: color-mix(in srgb, #ef4444 15%, transparent);
     color: #ef4444;
   }
-  .verdict-badge-insufficient-data {
+  .verdict-badge-insufficient {
     background: var(--bg-surface);
     color: var(--text-muted);
   }
