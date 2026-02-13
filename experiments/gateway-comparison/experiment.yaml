@@ -165,6 +165,7 @@ spec:
           params:
             replicaCount: "2"
     - name: loadgen
+      depends: [app]
       cluster:
         type: gke
         machineType: e2-standard-2
