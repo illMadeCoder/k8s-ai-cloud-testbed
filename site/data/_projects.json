@@ -1,0 +1,24 @@
+{
+  "projects": [
+    {
+      "id": "this-lab",
+      "name": "This Lab",
+      "description": "Building and benchmarking the lab itself — operator lifecycle, observability stack, CI/CD, site publishing"
+    },
+    {
+      "id": "ecosystem-comparisons",
+      "name": "Ecosystem Comparisons",
+      "description": "Head-to-head comparisons of CNCF and commercial tools across ingress, service mesh, and more"
+    },
+    {
+      "id": "modern-database-survey",
+      "name": "Modern Database Survey",
+      "description": "Benchmarking cloud-native databases — NewSQL, distributed KV, time-series, and object storage"
+    },
+    {
+      "id": "messages-and-streams",
+      "name": "Messages and Streams",
+      "description": "Evaluating message brokers and streaming platforms — Kafka, NATS, Pulsar, RabbitMQ, and beyond"
+    }
+  ]
+}

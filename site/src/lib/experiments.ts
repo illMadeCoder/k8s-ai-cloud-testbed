@@ -221,6 +221,23 @@ export function groupByDomain(experiments: ExperimentSummary[]): Record<string, 
 }
 
 /**
+ * Group experiments by project field.
+ */
+export function groupByProject(experiments: ExperimentSummary[]): Record<string, ExperimentGroup[]> {
+  const groups = groupExperiments(experiments);
+  const result: Record<string, ExperimentGroup[]> = {};
+
+  for (const group of groups) {
+    const project = group.latest.project;
+    if (!project) continue;
+    if (!result[project]) result[project] = [];
+    result[project].push(group);
+  }
+
+  return result;
+}
+
+/**
  * Filter to comparison-type experiments only.
  */
 export function getComparisons(experiments: ExperimentSummary[]): ExperimentGroup[] {
@@ -236,16 +253,21 @@ export function getStats(experiments: ExperimentSummary[]): {
   domainCount: number;
   componentCount: number;
   totalRuns: number;
+  totalCostUSD: number;
 } {
   const groups = groupExperiments(experiments);
   const domains = new Set(groups.map((g) => deriveDomain(g.tags)));
   const components = new Set<string>();
+  let totalCostUSD = 0;
 
   for (const exp of experiments) {
     for (const target of exp.targets) {
       for (const comp of target.components ?? []) {
         components.add(comp);
       }
+    }
+    if (exp.costEstimate?.totalUSD) {
+      totalCostUSD += exp.costEstimate.totalUSD;
     }
   }
 
@@ -254,6 +276,7 @@ export function getStats(experiments: ExperimentSummary[]): {
     domainCount: domains.size,
     componentCount: components.size,
     totalRuns: experiments.length,
+    totalCostUSD,
   };
 }
 

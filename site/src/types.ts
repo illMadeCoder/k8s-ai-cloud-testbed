@@ -9,6 +9,7 @@ export interface ExperimentSummary {
   durationSeconds: number;
   phase: string;
   tags?: string[];
+  project?: string;
   study?: StudyContext;
   analysisConfig?: { sections: string[] };
   hypothesis?: HypothesisContext;
