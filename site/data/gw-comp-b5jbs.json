@@ -1,0 +1,207 @@
+{
+  "name": "gw-comp-b5jbs",
+  "namespace": "experiments",
+  "description": "Gateway comparison v2 — NGINX Ingress vs Traefik vs Envoy Gateway with load testing, per-gateway resource profiling, and latency benchmarks",
+  "createdAt": "2026-02-13T21:49:11Z",
+  "completedAt": "2026-02-13T23:46:49.950029222Z",
+  "durationSeconds": 7058.950029222,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "networking",
+    "gateway"
+  ],
+  "hypothesis": {
+    "claim": "Under load, Envoy Gateway's two-process architecture (separate control plane + Envoy data-plane proxy) will consume more total resources than NGINX Ingress's single-process model, but deliver lower tail latency because Envoy's event-driven C++ proxy handles concurrent connections more efficiently than NGINX's worker-process model",
+    "questions": [
+      "What is the idle CPU/memory footprint of each gateway controller and data plane?",
+      "How do per-gateway resource profiles change from idle to loaded (50 concurrent users)?",
+      "What are the p50/p90/p99 latency distributions per gateway under sustained load?",
+      "Which gateway achieves the highest throughput ceiling before error rates increase?",
+      "How does Envoy Gateway's data-plane proxy (envoy-default-*) contribute to total resource usage?"
+    ],
+    "focus": [
+      "resource efficiency under load",
+      "latency percentiles (p50/p90/p99)",
+      "throughput and error rates",
+      "idle-vs-loaded resource delta"
+    ]
+  },
+  "analyzerConfig": {
+    "sections": [
+      "abstract",
+      "targetAnalysis",
+      "performanceAnalysis",
+      "metricInsights",
+      "finopsAnalysis",
+      "secopsAnalysis",
+      "body",
+      "capabilitiesMatrix",
+      "feedback",
+      "architectureDiagram"
+    ]
+  },
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "gw-comp-b5jbs-app",
+      "clusterType": "gke",
+      "machineType": "e2-standard-4",
+      "nodeCount": 1
+    },
+    {
+      "name": "loadgen",
+      "clusterName": "gw-comp-b5jbs-loadgen",
+      "clusterType": "gke",
+      "machineType": "e2-standard-2",
+      "nodeCount": 1,
+      "components": [
+        "Component/k6-gateway-loadtest"
+      ]
+    }
+  ],
+  "workflow": {
+    "name": "gw-comp-b5jbs-validation",
+    "template": "gateway-comparison-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-13T23:01:00Z",
+    "finishedAt": "2026-02-13T23:46:35Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-13T23:46:50.136503135Z",
+    "source": "target:cadvisor",
+    "timeRange": {
+      "start": "2026-02-13T21:49:11Z",
+      "end": "2026-02-13T23:46:50.136503135Z",
+      "duration": "1h57m39.136503135s",
+      "stepSeconds": 0
+    },
+    "queries": {
+      "cpu_by_pod": {
+        "query": "container_cpu_usage_seconds_total by pod (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "CPU usage by pod (cumulative seconds)",
+        "data": [
+          {
+            "labels": {
+              "pod": "ingress-nginx-controller-766749c598-8svfp"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 4.071722
+          },
+          {
+            "labels": {
+              "pod": "envoy-gateway-56646c568b-w8kkq"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 5.726675
+          },
+          {
+            "labels": {
+              "pod": "kube-state-metrics-0"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 2.4347950000000003
+          },
+          {
+            "labels": {
+              "pod": "operator-64d66c8747-zrmmc"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 4.25824
+          },
+          {
+            "labels": {
+              "pod": "traefik-6865bcdd9c-x5zx7"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 2.505602
+          }
+        ]
+      },
+      "cpu_total": {
+        "query": "sum(container_cpu_usage_seconds_total) (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "Total CPU usage (cumulative seconds)",
+        "data": [
+          {
+            "labels": {
+              "scope": "total"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 18.997034000000003
+          }
+        ]
+      },
+      "memory_by_pod": {
+        "query": "container_memory_working_set_bytes by pod (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Memory working set by pod",
+        "data": [
+          {
+            "labels": {
+              "pod": "operator-64d66c8747-zrmmc"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 23736320
+          },
+          {
+            "labels": {
+              "pod": "traefik-6865bcdd9c-x5zx7"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 29749248
+          },
+          {
+            "labels": {
+              "pod": "ingress-nginx-controller-766749c598-8svfp"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 30920704
+          },
+          {
+            "labels": {
+              "pod": "envoy-gateway-56646c568b-w8kkq"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 35590144
+          },
+          {
+            "labels": {
+              "pod": "kube-state-metrics-0"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 38301696
+          }
+        ]
+      },
+      "memory_total": {
+        "query": "sum(container_memory_working_set_bytes) (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Total memory working set",
+        "data": [
+          {
+            "labels": {
+              "scope": "total"
+            },
+            "timestamp": "2026-02-13T23:46:50.136503135Z",
+            "value": 158298112
+          }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.07882494199297901,
+    "durationHours": 1.9608194525616667,
+    "perTarget": {
+      "app": 0.052549961328652674,
+      "loadgen": 0.026274980664326337
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
