@@ -11,6 +11,7 @@
     "networking",
     "gateway"
   ],
+  "project": "ecosystem-comparisons",
   "targets": [
     {
       "name": "app",

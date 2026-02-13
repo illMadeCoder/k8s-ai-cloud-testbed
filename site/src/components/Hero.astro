@@ -4,9 +4,11 @@ interface Props {
   domainCount: number;
   componentCount: number;
   totalRuns: number;
+  totalCostUSD: number;
 }
 
-const { experimentCount, domainCount, componentCount, totalRuns } = Astro.props;
+const { experimentCount, domainCount, componentCount, totalRuns, totalCostUSD } = Astro.props;
+const costDisplay = `$${totalCostUSD.toFixed(2)}`;
 ---
 
 <section class="py-12 md:py-16">
@@ -35,6 +37,10 @@ const { experimentCount, domainCount, componentCount, totalRuns } = Astro.props;
         <div class="flex flex-col">
           <span class="text-2xl font-bold font-mono text-accent">{componentCount}</span>
           <span class="text-xs text-text-muted uppercase tracking-wider font-semibold">Components</span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-2xl font-bold font-mono text-accent">{costDisplay}</span>
+          <span class="text-xs text-text-muted uppercase tracking-wider font-semibold">Total OpEx</span>
         </div>
       </div>
     </div>

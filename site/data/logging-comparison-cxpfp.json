@@ -11,6 +11,7 @@
     "observability",
     "logging"
   ],
+  "project": "this-lab",
   "study": {
     "hypothesis": "Loki will use significantly fewer resources than Elasticsearch for equivalent log ingestion volume, but Elasticsearch will offer richer full-text query capabilities",
     "questions": [

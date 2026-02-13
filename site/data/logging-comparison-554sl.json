@@ -11,6 +11,7 @@
     "observability",
     "logging"
   ],
+  "project": "this-lab",
   "study": {
     "hypothesis": "Loki will use significantly fewer resources than Elasticsearch for equivalent log ingestion volume because it indexes only labels rather than full log content, but Elasticsearch will offer richer full-text query capabilities because its inverted index enables arbitrary field searches that LogQL's label-based filtering cannot match",
     "questions": [
