@@ -12,24 +12,137 @@ spec:
       helm:
         releaseName: mimir
         parameters:
+          # Deployment mode
           - name: deploymentMode
             value: monolithic
+
+          # S3 storage config (common)
           - name: mimir.structuredConfig.common.storage.backend
             value: s3
+          - name: mimir.structuredConfig.common.storage.s3.endpoint
+            value: minio.minio.svc:9000
+          - name: mimir.structuredConfig.common.storage.s3.bucket_name
+            value: mimir-blocks
+          - name: mimir.structuredConfig.common.storage.s3.access_key_id
+            value: minio
+          - name: mimir.structuredConfig.common.storage.s3.secret_access_key
+            value: minio123
+          - name: mimir.structuredConfig.common.storage.s3.insecure
+            value: "true"
+
+          # Blocks storage
+          - name: mimir.structuredConfig.blocks_storage.backend
+            value: s3
+          - name: mimir.structuredConfig.blocks_storage.s3.endpoint
+            value: minio.minio.svc:9000
+          - name: mimir.structuredConfig.blocks_storage.s3.bucket_name
+            value: mimir-blocks
+          - name: mimir.structuredConfig.blocks_storage.s3.access_key_id
+            value: minio
+          - name: mimir.structuredConfig.blocks_storage.s3.secret_access_key
+            value: minio123
+          - name: mimir.structuredConfig.blocks_storage.s3.insecure
+            value: "true"
           - name: mimir.structuredConfig.blocks_storage.tsdb.block_ranges_period
             value: "2h"
+
+          # Ruler storage
+          - name: mimir.structuredConfig.ruler_storage.backend
+            value: s3
+          - name: mimir.structuredConfig.ruler_storage.s3.endpoint
+            value: minio.minio.svc:9000
+          - name: mimir.structuredConfig.ruler_storage.s3.bucket_name
+            value: mimir-ruler
+          - name: mimir.structuredConfig.ruler_storage.s3.access_key_id
+            value: minio
+          - name: mimir.structuredConfig.ruler_storage.s3.secret_access_key
+            value: minio123
+          - name: mimir.structuredConfig.ruler_storage.s3.insecure
+            value: "true"
+
+          # Alertmanager storage
+          - name: mimir.structuredConfig.alertmanager_storage.backend
+            value: s3
+          - name: mimir.structuredConfig.alertmanager_storage.s3.endpoint
+            value: minio.minio.svc:9000
+          - name: mimir.structuredConfig.alertmanager_storage.s3.bucket_name
+            value: mimir-alertmanager
+          - name: mimir.structuredConfig.alertmanager_storage.s3.access_key_id
+            value: minio
+          - name: mimir.structuredConfig.alertmanager_storage.s3.secret_access_key
+            value: minio123
+          - name: mimir.structuredConfig.alertmanager_storage.s3.insecure
+            value: "true"
+
+          # Retention
+          - name: mimir.structuredConfig.limits.compactor_blocks_retention_period
+            value: "2h"
+
+          # Mimir process resources
+          - name: mimir.resources.requests.cpu
+            value: 200m
+          - name: mimir.resources.requests.memory
+            value: 512Mi
+          - name: mimir.resources.limits.cpu
+            value: "1"
+          - name: mimir.resources.limits.memory
+            value: 2Gi
+
+          # Monolithic deployment
           - name: monolithic.replicas
             value: "1"
           - name: monolithic.resources.requests.cpu
-            value: 100m
+            value: 200m
           - name: monolithic.resources.requests.memory
-            value: 256Mi
+            value: 512Mi
+          - name: monolithic.resources.limits.cpu
+            value: "1"
           - name: monolithic.resources.limits.memory
-            value: 1Gi
+            value: 2Gi
           - name: monolithic.persistentVolume.enabled
+            value: "false"
+
+          # Disable distributed components (monolithic mode)
+          - name: ingester.replicas
+            value: "0"
+          - name: distributor.replicas
+            value: "0"
+          - name: querier.replicas
+            value: "0"
+          - name: query_frontend.replicas
+            value: "0"
+          - name: query_scheduler.replicas
+            value: "0"
+          - name: ruler.replicas
+            value: "0"
+          - name: compactor.replicas
+            value: "0"
+          - name: store_gateway.replicas
+            value: "0"
+          - name: alertmanager.replicas
+            value: "0"
+          - name: overrides_exporter.replicas
+            value: "0"
+
+          # Disable nginx, use gateway instead
+          - name: nginx.enabled
             value: "false"
           - name: minio.enabled
             value: "false"
+
+          # Gateway for API access
+          - name: gateway.enabledNonEnterprise
+            value: "true"
+          - name: gateway.replicas
+            value: "1"
+          - name: gateway.resources.requests.cpu
+            value: 50m
+          - name: gateway.resources.requests.memory
+            value: 64Mi
+          - name: gateway.resources.limits.cpu
+            value: 200m
+          - name: gateway.resources.limits.memory
+            value: 256Mi
   parameters:
     - name: deploymentMode
       type: string

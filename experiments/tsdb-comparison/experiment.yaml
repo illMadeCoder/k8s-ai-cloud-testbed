@@ -7,9 +7,8 @@ spec:
   description: "TSDB comparison v2 - Prometheus vs VictoriaMetrics vs Mimir resource efficiency under identical workload"
   tags: ["comparison", "observability", "metrics"]
   publish: true
-  ttlDays: 7
 
-  analysis:
+  analyzerConfig:
     sections:
       - abstract
       - targetAnalysis
@@ -22,8 +21,8 @@ spec:
       - feedback
       - architectureDiagram
 
-  study:
-    hypothesis: "VictoriaMetrics will be the most resource-efficient for single-node deployments because its merge-tree storage engine and single-binary architecture avoid the per-component overhead of distributed systems, while Mimir's monolithic mode will require higher base resources due to its object-storage dependency (MinIO) and embedded microservices architecture"
+  hypothesis:
+    claim: "VictoriaMetrics will be the most resource-efficient for single-node deployments because its merge-tree storage engine and single-binary architecture avoid the per-component overhead of distributed systems, while Mimir's monolithic mode will require higher base resources due to its object-storage dependency (MinIO) and embedded microservices architecture"
     questions:
       - "What is the steady-state CPU and memory footprint of each TSDB under identical 1k-series ingestion workload?"
       - "How do resource usage patterns differ over a 90-minute window (approaching Prometheus block rotation)?"
@@ -50,6 +49,29 @@ spec:
             grafana.enabled: "true"
             prometheus.prometheusSpec.retention: "24h"
             alertmanager.enabled: "false"
+            # Remote write to Mimir so it receives metrics
+            prometheus.prometheusSpec.remoteWrite[0].url: "http://mimir-gateway.mimir.svc:80/api/v1/push"
+            prometheus.prometheusSpec.remoteWrite[0].headers.X-Scope-OrgID: "anonymous"
+            # Resources for larger node
+            prometheus.prometheusSpec.resources.requests.cpu: "100m"
+            prometheus.prometheusSpec.resources.requests.memory: "256Mi"
+            prometheus.prometheusSpec.resources.limits.cpu: "1"
+            prometheus.prometheusSpec.resources.limits.memory: "1Gi"
+            # Discover all ServiceMonitors
+            prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues: "false"
+            prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues: "false"
+            # Disable unnecessary components
+            nodeExporter.enabled: "false"
+            defaultRules.create: "false"
+            kubeApiServer.enabled: "false"
+            kubelet.enabled: "false"
+            kubeControllerManager.enabled: "false"
+            coreDns.enabled: "false"
+            kubeEtcd.enabled: "false"
+            kubeScheduler.enabled: "false"
+            kubeProxy.enabled: "false"
+            prometheusOperator.tls.enabled: "false"
+            prometheusOperator.admissionWebhooks.enabled: "false"
         - app: victoria-metrics
         - app: mimir
         - app: minio
