@@ -1,29 +1,24 @@
 ---
 import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
-import DomainCard from '../components/DomainCard.astro';
-import FeaturedComparison from '../components/FeaturedComparison.astro';
 import ExperimentGroupCard from '../components/ExperimentGroupCard.astro';
+import ProjectCard from '../components/ProjectCard.astro';
 import {
   loadAllExperiments,
   groupExperiments,
-  getComparisons,
+  groupByProject,
   getStats,
-  groupByDomain,
-  formatDisplayName,
 } from '../lib/experiments';
 import { loadCategories } from '../lib/categories';
+import { loadProjects } from '../lib/projects';
 
 const experiments = loadAllExperiments();
 const groups = groupExperiments(experiments);
 const stats = getStats(experiments);
-const comparisons = getComparisons(experiments);
-const byDomain = groupByDomain(experiments);
 const categories = loadCategories();
+const projects = loadProjects();
+const projectGroups = groupByProject(experiments);
 const recentGroups = groups.slice(0, 6);
-const base = import.meta.env.BASE_URL;
-
-const demoGroup = groups.find((g) => g.baseName === 'ui-showcase-demo');
 ---
 
 <Base title="K8s Cloud TestBed — Automated Kubernetes Benchmarks">
@@ -33,61 +28,55 @@ const demoGroup = groups.find((g) => g.baseName === 'ui-showcase-demo');
     componentCount={stats.componentCount}
     totalRuns={stats.totalRuns}
   >
-    {demoGroup && (
-      <a href={`${base}experiments/${demoGroup.baseName}/`}
-        class="demo-card">
-        <div class="demo-top">
-          <span class="demo-badge">Live Demo</span>
-          <span class="demo-hint">Explore the full analysis experience</span>
+    <div class="arch">
+      <div class="arch-node arch-hub">
+        <div class="arch-name">Hub Cluster</div>
+        <div class="arch-detail">Talos Linux · Experiment CRDs</div>
+      </div>
+      <div class="conn-fan">
+        <div class="conn-cell"><div class="conn-v"></div><div class="conn-arrow"></div></div>
+        <div class="conn-cell"><div class="conn-v"></div><div class="conn-arrow"></div></div>
+        <div class="conn-cell"><div class="conn-v"></div><div class="conn-arrow"></div></div>
+      </div>
+      <div class="arch-row">
+        <div class="arch-node">
+          <div class="arch-name">GKE</div>
+          <div class="arch-detail">Google Cloud</div>
         </div>
-        <h2 class="demo-title">{formatDisplayName(demoGroup.baseName)}</h2>
-        <p class="demo-desc">{demoGroup.latest.description}</p>
-        <div class="demo-features">
-          <span class="demo-feature">Mermaid diagrams</span>
-          <span class="demo-feature">Vega-Lite charts</span>
-          <span class="demo-feature">Capabilities matrix</span>
-          <span class="demo-feature">AI narrative</span>
+        <div class="arch-node">
+          <div class="arch-name">EKS</div>
+          <div class="arch-detail">AWS</div>
         </div>
-        <span class="demo-cta">View demo experiment &rarr;</span>
-      </a>
-    )}
+        <div class="arch-node">
+          <div class="arch-name">AKS</div>
+          <div class="arch-detail">Azure</div>
+        </div>
+      </div>
+      <div class="conn-merge">
+        <div class="conn-merge-stems">
+          <div class="conn-cell"><div class="conn-v-short"></div></div>
+          <div class="conn-cell"><div class="conn-v-short"></div></div>
+          <div class="conn-cell"><div class="conn-v-short"></div></div>
+        </div>
+        <div class="conn-h"></div>
+        <div class="conn-v-center"></div>
+        <div class="conn-arrow"></div>
+        <div class="conn-label">metrics</div>
+      </div>
+      <div class="arch-node arch-ai">
+        <div class="arch-name">AI Analysis</div>
+        <div class="arch-detail">Claude · Agentic</div>
+      </div>
+      <div class="conn-single">
+        <div class="conn-v-center"></div>
+        <div class="conn-arrow"></div>
+      </div>
+      <div class="arch-node arch-here">
+        <span class="arch-here-ping"></span>
+        <div class="arch-name">You are here</div>
+      </div>
+    </div>
   </Hero>
-
-  {comparisons.length > 0 && (
-    <section class="mb-12">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-semibold">Featured Comparisons</h2>
-        <a href={`${base}comparisons/`} class="text-sm text-accent hover:text-accent-hover no-underline">
-          View all &rarr;
-        </a>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {comparisons.slice(0, 3).map((group) => (
-          <FeaturedComparison group={group} />
-        ))}
-      </div>
-    </section>
-  )}
-
-  <section class="mb-12">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold">Browse by Domain</h2>
-      <a href={`${base}categories/`} class="text-sm text-accent hover:text-accent-hover no-underline">
-        All categories &rarr;
-      </a>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {categories.map((cat) => (
-        <DomainCard
-          id={cat.id}
-          name={cat.name}
-          description={cat.description}
-          subdomains={cat.subdomains}
-          experimentCount={(byDomain[cat.id] ?? []).length}
-        />
-      ))}
-    </div>
-  </section>
 
   <section class="mb-12">
     <h2 class="text-xl font-semibold mb-4">Recent Experiments</h2>
@@ -109,121 +98,101 @@ const demoGroup = groups.find((g) => g.baseName === 'ui-showcase-demo');
   </section>
 
   <section class="mb-12">
-    <details class="bg-bg-card border border-border rounded p-6 shadow">
-      <summary class="text-lg font-semibold cursor-pointer select-none hover:text-accent transition-colors">
-        How It Works
-      </summary>
-      <div class="mt-4 space-y-4 text-sm text-text-muted leading-relaxed">
-        <p>
-          Each experiment is defined as a Kubernetes custom resource (Experiment CRD) with a declarative YAML spec
-          describing the target infrastructure, components to deploy, and metrics to collect.
-        </p>
-        <div class="flex flex-wrap gap-2 items-center font-mono text-xs">
-          <span class="px-2 py-1 bg-bg-surface rounded border border-border">Experiment YAML</span>
-          <span>&rarr;</span>
-          <span class="px-2 py-1 bg-bg-surface rounded border border-border">Operator</span>
-          <span>&rarr;</span>
-          <span class="px-2 py-1 bg-bg-surface rounded border border-border">Crossplane → GKE</span>
-          <span>&rarr;</span>
-          <span class="px-2 py-1 bg-bg-surface rounded border border-border">ArgoCD Deploy</span>
-          <span>&rarr;</span>
-          <span class="px-2 py-1 bg-bg-surface rounded border border-border">Argo Workflows</span>
-          <span>&rarr;</span>
-          <span class="px-2 py-1 bg-bg-surface rounded border border-border">Metrics</span>
-          <span>&rarr;</span>
-          <span class="px-2 py-1 bg-bg-surface rounded border border-border">AI Analysis</span>
-          <span>&rarr;</span>
-          <span class="px-2 py-1 bg-accent/10 text-accent rounded border border-accent/30">Published Here</span>
-        </div>
-        <p>
-          The experiment operator provisions GKE clusters via Crossplane, deploys components through ArgoCD,
-          runs validation workflows with Argo Workflows, collects metrics from VictoriaMetrics, generates AI analysis
-          using Claude, and auto-publishes results to this site.
-        </p>
-      </div>
-    </details>
+    <h2 class="text-xl font-semibold mb-4">Projects</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {projects.map((p) => (
+        <ProjectCard
+          id={p.id}
+          name={p.name}
+          description={p.description}
+          experimentCount={(projectGroups[p.id] ?? []).length}
+        />
+      ))}
+    </div>
   </section>
+
 </Base>
 
 <style>
-  .demo-card {
-    display: block;
-    background: var(--bg-card);
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    border-radius: var(--radius);
-    padding: 1.5rem;
-    text-decoration: none;
-    transition: border-color 0.15s ease;
-  }
-
-  .demo-card:hover {
-    border-color: var(--accent);
-  }
-
-  .demo-top {
+  .arch {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    justify-content: center;
+    padding: 0.5rem 0;
+    width: 100%;
+    min-height: 100%;
+    --line: color-mix(in srgb, var(--accent) 50%, transparent);
   }
 
-  .demo-badge {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0.25rem 0.6rem;
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    color: var(--accent);
-    border-radius: 2px;
-  }
-
-  .demo-hint {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-  }
-
-  .demo-title {
+  /* --- nodes --- */
+  .arch-node {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.6rem 1.25rem;
+    text-align: center;
     font-family: var(--font-mono);
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: var(--text);
-    margin: 0 0 0.5rem;
-    transition: color 0.15s ease;
+    background: transparent;
   }
+  .arch-hub { width: 80%; }
+  .arch-name { font-size: 0.9rem; font-weight: 700; color: var(--text); line-height: 1.3; }
+  .arch-detail { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; line-height: 1.3; }
+  .arch-row { display: flex; gap: 0.5rem; width: 90%; justify-content: center; }
+  .arch-row .arch-node { flex: 1; min-width: 0; padding: 0.5rem 0.4rem; }
+  .arch-ai { width: 55%; }
 
-  .demo-card:hover .demo-title {
-    color: var(--accent);
+  /* --- shared connector primitives --- */
+  .conn-v { width: 1px; height: 14px; background: var(--line); }
+  .conn-v-short { width: 1px; height: 6px; background: var(--line); }
+  .conn-v-center { width: 1px; height: 10px; background: var(--line); margin: 0 auto; }
+  .conn-h { width: 100%; height: 1px; background: var(--line); }
+  .conn-arrow {
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--line);
+    margin: 0 auto;
   }
-
-  .demo-desc {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    line-height: 1.6;
-    margin: 0 0 1rem;
-  }
-
-  .demo-features {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-  }
-
-  .demo-feature {
+  .conn-cell { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+  .conn-label {
     font-family: var(--font-mono);
     font-size: 0.7rem;
-    padding: 0.3rem 0.6rem;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 2px;
+    font-weight: 600;
     color: var(--text);
+    letter-spacing: 0.06em;
+    text-align: center;
+    margin-top: 0.2rem;
   }
 
-  .demo-cta {
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--accent);
+  /* --- fan-out: hub → 3 clouds --- */
+  .conn-fan { display: flex; gap: 0.5rem; width: 90%; }
+
+  /* --- merge: 3 clouds → 1 --- */
+  .conn-merge { width: 90%; }
+  .conn-merge-stems { display: flex; gap: 0.5rem; }
+
+  /* --- single line --- */
+  .conn-single { display: flex; flex-direction: column; align-items: center; }
+
+  /* --- you are here --- */
+  .arch-here {
+    position: relative;
+    border-color: var(--accent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent);
+    padding: 0.5rem 1.25rem;
+  }
+  .arch-here .arch-name { color: var(--accent); font-size: 0.8rem; }
+  .arch-here-ping {
+    position: absolute;
+    top: -3px; right: -3px;
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--accent);
+    animation: ping 2s ease-in-out infinite;
+  }
+  @keyframes ping {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--accent); }
+    50% { opacity: 0.4; box-shadow: 0 0 10px var(--accent); }
   }
 </style>
