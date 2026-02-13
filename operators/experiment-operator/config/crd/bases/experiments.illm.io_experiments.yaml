@@ -65,9 +65,10 @@ spec:
           spec:
             description: spec defines the desired state of Experiment
             properties:
-              analysis:
-                description: Configures which AI analysis sections to generate.
-                  If omitted, no AI analysis is performed.
+              analyzerConfig:
+                description: Configures which AI analysis sections to generate
+                  on experiment completion. When publish is true and analyzerConfig
+                  is nil, default sections are used.
                 properties:
                   sections:
                     description: Analysis sections to generate. The analyzer only
@@ -119,6 +120,10 @@ spec:
                       type: string
                     description:
                       description: Human-readable chart title.
+                      type: string
+                    group:
+                      description: Optional grouping label for organizing metrics
+                        in the UI.
                       type: string
                   required:
                   - name
@@ -210,23 +215,58 @@ spec:
                   benchmark site and whether AI analysis is generated. When false
                   (default), results are only stored in S3.
                 type: boolean
-              study:
-                description: Study provides context about what the experiment is
-                  trying to learn. Passed to the AI analyzer for goal-aware analysis.
+              hypothesis:
+                description: Describes the claim being tested and optional success
+                  criteria. This is the central organizing principle — the AI
+                  analyzer uses it to produce focused, goal-aware analysis.
                 properties:
-                  focus:
-                    description: Key areas for deep analysis.
-                    items:
-                      type: string
-                    type: array
-                  hypothesis:
-                    description: Expected outcome or claim being tested.
+                  claim:
+                    description: States the expected outcome being tested.
                     type: string
                   questions:
                     description: Specific things the experiment should answer.
                     items:
                       type: string
                     type: array
+                  focus:
+                    description: Key areas for deep analysis.
+                    items:
+                      type: string
+                    type: array
+                  successCriteria:
+                    description: Machine-evaluable thresholds for hypothesis validation.
+                      When all criteria pass, the hypothesis is validated; if any
+                      fail, invalidated. If omitted, the AI analyzer decides.
+                    items:
+                      properties:
+                        metric:
+                          description: Metric query name to evaluate (must match
+                            a key in spec.metrics).
+                          pattern: ^[a-z][a-z0-9_]*$
+                          type: string
+                        operator:
+                          description: Comparison operator.
+                          enum:
+                          - lt
+                          - lte
+                          - gt
+                          - gte
+                          type: string
+                        value:
+                          description: Threshold to compare against.
+                          type: string
+                        description:
+                          description: Human-readable explanation of what this
+                            criterion tests.
+                          type: string
+                      required:
+                      - metric
+                      - operator
+                      - value
+                      type: object
+                    type: array
+                required:
+                - claim
                 type: object
               tags:
                 description: Tags for categorization on the benchmark site.
@@ -332,6 +372,10 @@ spec:
                 - Succeeded
                 - Failed
                 - Skipped
+              hypothesisResult:
+                description: Machine-evaluated verdict from success criteria. Values
+                  are validated, invalidated, insufficient, or empty.
+                type: string
               completedAt:
                 description: CompletedAt is the timestamp when the experiment reached
                   a terminal state
