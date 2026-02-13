@@ -4,7 +4,7 @@ metadata:
   generateName: logging-comparison-
   namespace: experiments
 spec:
-  description: "Loki vs Elasticsearch logging comparison — steady-state resource usage under controlled log volume (iteration 2: fixed ES deployment, 2h observation window, upgraded node)"
+  description: "Loki vs Elasticsearch logging comparison v3 — phased observation (warm-up/steady-state/cooldown) with per-stack resource profiling over 75-min window, informed by 21 prior runs"
   tags: ["comparison", "observability", "logging"]
   publish: true
 
@@ -14,79 +14,157 @@ spec:
       - targetAnalysis
       - performanceAnalysis
       - metricInsights
+      - finopsAnalysis
+      - secopsAnalysis
       - body
       - capabilitiesMatrix
       - feedback
       - architectureDiagram
 
   hypothesis:
-    claim: "Loki will use significantly fewer resources than Elasticsearch for equivalent log ingestion volume because it indexes only labels rather than full log content, but Elasticsearch will offer richer full-text query capabilities because its inverted index enables arbitrary field searches that LogQL's label-based filtering cannot match"
+    claim: "Loki will consume 40-60% fewer CPU cores and 50-70% less memory than Elasticsearch at steady-state because it indexes only label metadata rather than full log content, but Elasticsearch's inverted index will enable richer ad-hoc full-text queries that LogQL's label-based filtering cannot match — prior runs consistently showed Loki's resource advantage but were too short to capture ES index stabilization"
     questions:
-      - "What is the CPU and memory overhead difference between Loki and Elasticsearch at steady-state log ingestion?"
-      - "How do LogQL and Lucene/KQL compare for common operational log queries?"
-      - "Which stack is more cost-effective for a small-to-medium Kubernetes cluster?"
+      - "What is the steady-state CPU and memory delta between the Loki stack (loki+promtail) and ES stack (elasticsearch+fluent-bit) after ES index warm-up completes?"
+      - "How does Elasticsearch resource usage change across warm-up vs steady-state phases as index segments merge?"
+      - "What is the per-component resource breakdown — how much do the collectors (promtail, fluent-bit) contribute vs the backends (loki, elasticsearch)?"
+      - "Which stack is more cost-effective for a small-to-medium Kubernetes cluster at 100 logs/sec sustained?"
     focus:
-      - "resource efficiency"
-      - "query capability"
-      - "storage architecture"
+      - "resource efficiency after warm-up"
+      - "phase-aware resource profiling"
+      - "per-component resource attribution"
+      - "storage architecture trade-offs"
       - "operational complexity"
 
-  # Custom metrics — rate-based CPU, per-stack aggregation, storage
   metrics:
-    # Per-stack CPU rate (the key comparison metric)
+    # === Loki stack (loki + promtail) ===
     - name: loki_stack_cpu
       query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",pod=~"loki.*|promtail.*",container!="POD",container!=""}[5m]))'
       type: range
       unit: cores
+      group: loki
       description: "Loki stack CPU usage (loki + promtail)"
-    - name: es_stack_cpu
-      query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",pod=~"elasticsearch.*|fluent-bit.*",container!="POD",container!=""}[5m]))'
+    - name: loki_cpu
+      query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",pod=~"loki-.*",container!="POD",container!=""}[5m]))'
       type: range
       unit: cores
-      description: "Elasticsearch stack CPU usage (ES + fluent-bit)"
-    # Per-stack memory
+      group: loki
+      description: "Loki backend CPU usage"
+    - name: promtail_cpu
+      query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",pod=~"promtail.*",container!="POD",container!=""}[5m]))'
+      type: range
+      unit: cores
+      group: loki
+      description: "Promtail collector CPU usage"
     - name: loki_stack_memory
       query: 'sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",pod=~"loki.*|promtail.*",container!="POD",container!=""})'
       type: range
       unit: bytes
+      group: loki
       description: "Loki stack memory (loki + promtail)"
+    - name: loki_memory
+      query: 'sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",pod=~"loki-.*",container!="POD",container!=""})'
+      type: range
+      unit: bytes
+      group: loki
+      description: "Loki backend memory"
+    - name: promtail_memory
+      query: 'sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",pod=~"promtail.*",container!="POD",container!=""})'
+      type: range
+      unit: bytes
+      group: loki
+      description: "Promtail collector memory"
+
+    # === Elasticsearch stack (elasticsearch + fluent-bit) ===
+    - name: es_stack_cpu
+      query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",pod=~"elasticsearch.*|fluent-bit.*",container!="POD",container!=""}[5m]))'
+      type: range
+      unit: cores
+      group: elasticsearch
+      description: "Elasticsearch stack CPU usage (ES + fluent-bit)"
+    - name: es_cpu
+      query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",pod=~"elasticsearch.*",container!="POD",container!=""}[5m]))'
+      type: range
+      unit: cores
+      group: elasticsearch
+      description: "Elasticsearch backend CPU usage"
+    - name: fluentbit_cpu
+      query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",pod=~"fluent-bit.*",container!="POD",container!=""}[5m]))'
+      type: range
+      unit: cores
+      group: elasticsearch
+      description: "Fluent Bit collector CPU usage"
     - name: es_stack_memory
       query: 'sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",pod=~"elasticsearch.*|fluent-bit.*",container!="POD",container!=""})'
       type: range
       unit: bytes
+      group: elasticsearch
       description: "Elasticsearch stack memory (ES + fluent-bit)"
-    # Per-pod detail (for drill-down)
-    - name: cpu_rate_by_pod
-      query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",container!="POD",container!=""}[5m])) by (pod)'
-      type: range
-      unit: cores
-      description: "CPU rate by pod"
-    - name: memory_by_pod
-      query: 'sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",container!="POD",container!=""}) by (pod)'
+    - name: es_memory
+      query: 'sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",pod=~"elasticsearch.*",container!="POD",container!=""})'
       type: range
       unit: bytes
+      group: elasticsearch
+      description: "Elasticsearch backend memory"
+    - name: fluentbit_memory
+      query: 'sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",pod=~"fluent-bit.*",container!="POD",container!=""})'
+      type: range
+      unit: bytes
+      group: elasticsearch
+      description: "Fluent Bit collector memory"
+
+    # === Drill-down (per-pod detail) ===
+    - name: cpu_rate_by_pod
+      query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"kube-system|gke-managed-system|gmp-system|gmp-public|observability",pod!~"alloy-.*|ts-vm-hub-.*",container!="POD",container!=""}[5m])) by (pod)'
+      type: range
+      unit: cores
+      group: drill-down
+      description: "CPU rate by pod"
+    - name: memory_by_pod
+      query: 'sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"kube-system|gke-managed-system|gmp-system|gmp-public|observability",pod!~"alloy-.*|ts-vm-hub-.*",container!="POD",container!=""}) by (pod)'
+      type: range
+      unit: bytes
+      group: drill-down
       description: "Memory working set by pod"
-    # Peak instantaneous values for summary cards
+
+    # === Peak instant queries (summary cards) ===
     - name: loki_cpu_peak
       query: 'max_over_time(sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",pod=~"loki.*|promtail.*",container!="POD",container!=""}[5m]))[${DURATION}:])'
       type: instant
       unit: cores
+      group: loki
       description: "Loki stack peak CPU"
     - name: es_cpu_peak
       query: 'max_over_time(sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",pod=~"elasticsearch.*|fluent-bit.*",container!="POD",container!=""}[5m]))[${DURATION}:])'
       type: instant
       unit: cores
+      group: elasticsearch
       description: "ES stack peak CPU"
     - name: loki_memory_peak
       query: 'max_over_time(sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",pod=~"loki.*|promtail.*",container!="POD",container!=""})[${DURATION}:])'
       type: instant
       unit: bytes
+      group: loki
       description: "Loki stack peak memory"
     - name: es_memory_peak
       query: 'max_over_time(sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",pod=~"elasticsearch.*|fluent-bit.*",container!="POD",container!=""})[${DURATION}:])'
       type: instant
       unit: bytes
+      group: elasticsearch
       description: "ES stack peak memory"
+
+    # === Cluster totals ===
+    - name: cpu_total
+      query: 'sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"kube-system|gke-managed-system|gmp-system|gmp-public|observability",pod!~"alloy-.*|ts-vm-hub-.*"}[5m]))'
+      type: range
+      unit: cores
+      group: cluster
+      description: "Total workload CPU rate"
+    - name: memory_total
+      query: 'sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"kube-system|gke-managed-system|gmp-system|gmp-public|observability",pod!~"alloy-.*|ts-vm-hub-.*"})'
+      type: range
+      unit: bytes
+      group: cluster
+      description: "Total workload memory"
 
   targets:
     - name: app
@@ -107,6 +185,6 @@ spec:
             logRate: "100"
 
   workflow:
-    template: logging-comparison-validation
+    template: logging-comparison-v3
     completion:
       mode: workflow

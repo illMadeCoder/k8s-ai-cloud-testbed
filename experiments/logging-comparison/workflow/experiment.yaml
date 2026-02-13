@@ -1,9 +1,11 @@
-# Logging Comparison - Validation + Steady-State Observation Workflow
-# Verifies target cluster is reachable, then observes for 2h
+# Logging Comparison v3 — Phased Observation Workflow
+# 3 steps: smoke-test → wait-for-stacks (5 min) → phased-observation (70 min)
+# Phases: warm-up (15 min) → steady-state (45 min) → cooldown (10 min)
+# Total duration: ~75 min
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: logging-comparison-validation
+  name: logging-comparison-v3
   namespace: argo-workflows
 spec:
   arguments:
@@ -21,8 +23,10 @@ spec:
       steps:
         - - name: smoke-test
             template: check-target
-        - - name: steady-state-observation
-            template: observe
+        - - name: wait-for-stacks
+            template: wait-for-stacks
+        - - name: observe
+            template: phased-observation
 
     - name: check-target
       container:
@@ -32,7 +36,7 @@ spec:
           - |
             ENDPOINT="{{workflow.parameters.target-endpoint}}"
             EXP="{{workflow.parameters.experiment-name}}"
-            echo "=== Logging Comparison: ${EXP} ==="
+            echo "=== Logging Comparison v3: ${EXP} ==="
             echo "Target endpoint: ${ENDPOINT}"
 
             if [ -z "${ENDPOINT}" ]; then
@@ -52,7 +56,7 @@ spec:
 
             echo "Smoke test passed — ArgoCD has already deployed all components"
 
-    - name: observe
+    - name: wait-for-stacks
       container:
         image: busybox:1.36
         command: [sh, -c]
@@ -60,12 +64,67 @@ spec:
           - |
             EXP="{{workflow.parameters.experiment-name}}"
             echo "========================================="
-            echo "  STEADY-STATE OBSERVATION: ${EXP}"
-            echo "  Duration: 2 hours"
-            echo "  Log generator rate: 100 lines/sec"
+            echo "  WAITING FOR STACK SYNC: ${EXP}"
+            echo "  Polling every 30s for up to 5 minutes"
             echo "  Start: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "========================================="
-            sleep 7200
+
+            # Give ArgoCD time to sync all logging components
+            # (loki, promtail, elasticsearch, fluent-bit, log-generator)
+            ATTEMPTS=10
+            for i in $(seq 1 $ATTEMPTS); do
+              echo "[$(date -u +%H:%M:%S)] Wait cycle $i/$ATTEMPTS..."
+              sleep 30
+            done
+
+            echo "========================================="
+            echo "  STACK SYNC WAIT COMPLETE"
+            echo "  End: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "========================================="
+
+    - name: phased-observation
+      container:
+        image: busybox:1.36
+        command: [sh, -c]
+        args:
+          - |
+            EXP="{{workflow.parameters.experiment-name}}"
+            echo "========================================="
+            echo "  PHASED OBSERVATION: ${EXP}"
+            echo "  Total duration: 70 minutes"
+            echo "  Start: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "========================================="
+            echo ""
+
+            # Phase 1: Warm-up (0-15 min)
+            echo ">>> PHASE 1: WARM-UP (0-15 min)"
+            echo ">>> Observing: Loki compactor init, ES index creation & segment merges"
+            echo ">>> Purpose: Let both stacks stabilize before measurement"
+            echo ">>> Log generator already running at 100 logs/sec"
+            echo ">>> Start: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            sleep 900
+            echo ">>> PHASE 1 COMPLETE: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+
+            # Phase 2: Steady-state (15-60 min)
+            echo ">>> PHASE 2: STEADY-STATE MEASUREMENT (15-60 min)"
+            echo ">>> Main measurement window — 45 minutes"
+            echo ">>> Both stacks should be fully warmed up"
+            echo ">>> ES index segments merged, Loki compactor settled"
+            echo ">>> Prometheus scraping at 15s intervals"
+            echo ">>> Start: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            sleep 2700
+            echo ">>> PHASE 2 COMPLETE: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+
+            # Phase 3: Cooldown (60-70 min)
+            echo ">>> PHASE 3: COOLDOWN (60-70 min)"
+            echo ">>> Purpose: Observe resource release and GC behavior"
+            echo ">>> Start: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            sleep 600
+            echo ">>> PHASE 3 COMPLETE: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+
             echo "========================================="
             echo "  OBSERVATION COMPLETE"
             echo "  End: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
