@@ -138,11 +138,11 @@ const machineVerdict = getMachineVerdict(experiment);
 </details>
 
 {(hypothesisClaim || questions.length > 0 || focusAreas.length > 0 || hasRichAnalysis || analysis?.summary) && (
-  <details class="section overview">
+  <details class="section overview" open>
     <summary class="section-title">Overview</summary>
     <div class="overview-inner">
       {hypothesisClaim && (
-        <details class="overview-item">
+        <details class="overview-item" open>
           <summary class="overview-item-title">Hypothesis</summary>
           <div class="overview-item-content">
             <p class="study-hypothesis-text">{hypothesisClaim}</p>
@@ -150,7 +150,7 @@ const machineVerdict = getMachineVerdict(experiment);
         </details>
       )}
       {hasRichAnalysis && analysis && (
-        <details class="overview-item">
+        <details class="overview-item" open>
           <summary class="overview-item-title">Abstract</summary>
           <div class="overview-item-content">
             <AnalysisAbstract
@@ -162,7 +162,7 @@ const machineVerdict = getMachineVerdict(experiment);
         </details>
       )}
       {questions.length > 0 && (
-        <details class="overview-item">
+        <details class="overview-item" open>
           <summary class="overview-item-title">Questions</summary>
           <div class="overview-item-content">
             <ol class="study-questions-list">
@@ -172,7 +172,7 @@ const machineVerdict = getMachineVerdict(experiment);
         </details>
       )}
       {focusAreas.length > 0 && (
-        <details class="overview-item">
+        <details class="overview-item" open>
           <summary class="overview-item-title">Focus Areas</summary>
           <div class="overview-item-content">
             <div class="focus-tags">
