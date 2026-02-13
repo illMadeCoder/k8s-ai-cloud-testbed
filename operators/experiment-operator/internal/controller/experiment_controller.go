@@ -1023,6 +1023,12 @@ func (r *ExperimentReconciler) reconcileProvisioning(ctx context.Context, exp *e
 		}
 	}
 
+	// Copy app cluster kubeconfig to loadgen clusters for cross-cluster access
+	if err := r.copyAppKubeconfigToLoadgen(ctx, exp); err != nil {
+		log.Error(err, "Failed to copy app kubeconfig to loadgen clusters")
+		// Non-fatal: continue with phase transition
+	}
+
 	// Copy kubeconfigs to experiments namespace for tutorial access
 	if exp.Spec.Tutorial != nil && exp.Spec.Tutorial.ExposeKubeconfig {
 		if err := r.copyKubeconfigSecrets(ctx, exp); err != nil {
@@ -1182,13 +1188,21 @@ func (r *ExperimentReconciler) reconcileReady(ctx context.Context, exp *experime
 		}
 	}
 
-	// Build workflow params: inject experiment-name and first target endpoint
-	// so WorkflowTemplates can reach the deployed application.
+	// Build workflow params: inject experiment-name and per-target endpoints
+	// so WorkflowTemplates can reach the deployed applications.
 	wfSpec := exp.Spec.Workflow.DeepCopy()
 	if wfSpec.Params == nil {
 		wfSpec.Params = make(map[string]string)
 	}
 	wfSpec.Params["experiment-name"] = exp.Name
+	// Per-target named params (e.g. app-endpoint, loadgen-endpoint)
+	for i, target := range exp.Spec.Targets {
+		if i < len(exp.Status.Targets) && exp.Status.Targets[i].Endpoint != "" {
+			wfSpec.Params[target.Name+"-endpoint"] = exp.Status.Targets[i].Endpoint
+			wfSpec.Params[target.Name+"-name"] = target.Name
+		}
+	}
+	// Backward compat: keep generic params pointing to first target
 	for i, target := range exp.Spec.Targets {
 		if i < len(exp.Status.Targets) && exp.Status.Targets[i].Endpoint != "" {
 			wfSpec.Params["target-endpoint"] = exp.Status.Targets[i].Endpoint
@@ -1423,6 +1437,111 @@ func (r *ExperimentReconciler) copyTailscaleSecret(ctx context.Context, targetKu
 			return nil
 		}
 		return fmt.Errorf("failed to create operator-oauth secret on target: %w", err)
+	}
+
+	return nil
+}
+
+// copyAppKubeconfigToLoadgen copies the "app" target's kubeconfig to non-app GKE targets
+// as a Secret, so components on those targets (e.g. k6 load generators) can access the app cluster.
+func (r *ExperimentReconciler) copyAppKubeconfigToLoadgen(ctx context.Context, exp *experimentsv1alpha1.Experiment) error {
+	log := logf.FromContext(ctx)
+
+	// Find the "app" target's kubeconfig
+	var appKubeconfig []byte
+	for i, target := range exp.Spec.Targets {
+		if target.Name != "app" {
+			continue
+		}
+		if i >= len(exp.Status.Targets) || exp.Status.Targets[i].ClusterName == "" {
+			return nil // App target not ready yet
+		}
+		var err error
+		appKubeconfig, err = r.ClusterManager.GetClusterKubeconfig(ctx, exp.Status.Targets[i].ClusterName, target.Cluster.Type)
+		if err != nil {
+			return fmt.Errorf("failed to get app cluster kubeconfig: %w", err)
+		}
+		break
+	}
+	if appKubeconfig == nil {
+		return nil // No app target found
+	}
+
+	// Copy to each non-app, non-hub GKE target
+	for i, target := range exp.Spec.Targets {
+		if target.Name == "app" || target.Cluster.Type == "hub" {
+			continue
+		}
+		if i >= len(exp.Status.Targets) || exp.Status.Targets[i].ClusterName == "" {
+			continue
+		}
+
+		clusterName := exp.Status.Targets[i].ClusterName
+		loadgenKubeconfig, err := r.ClusterManager.GetClusterKubeconfig(ctx, clusterName, target.Cluster.Type)
+		if err != nil {
+			log.Error(err, "Failed to get loadgen kubeconfig", "cluster", clusterName)
+			continue
+		}
+
+		// Build client for loadgen cluster
+		targetCfg, err := clientcmd.RESTConfigFromKubeConfig(loadgenKubeconfig)
+		if err != nil {
+			log.Error(err, "Failed to parse loadgen kubeconfig", "cluster", clusterName)
+			continue
+		}
+		targetClient, err := kubernetes.NewForConfig(targetCfg)
+		if err != nil {
+			log.Error(err, "Failed to create loadgen clientset", "cluster", clusterName)
+			continue
+		}
+
+		// Ensure experiment namespace exists on loadgen
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: exp.Name,
+			},
+		}
+		if _, err := targetClient.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{}); err != nil {
+			if !errors.IsAlreadyExists(err) {
+				log.Error(err, "Failed to create namespace on loadgen", "cluster", clusterName, "namespace", exp.Name)
+				continue
+			}
+		}
+
+		// Create or update the app-cluster-kubeconfig Secret
+		secretName := "app-cluster-kubeconfig"
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: exp.Name,
+				Labels: map[string]string{
+					"experiment": exp.Name,
+				},
+			},
+			Data: map[string][]byte{
+				"kubeconfig": appKubeconfig,
+			},
+		}
+		if _, err := targetClient.CoreV1().Secrets(exp.Name).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+			if errors.IsAlreadyExists(err) {
+				existing, getErr := targetClient.CoreV1().Secrets(exp.Name).Get(ctx, secretName, metav1.GetOptions{})
+				if getErr != nil {
+					log.Error(getErr, "Failed to get existing app kubeconfig secret on loadgen", "cluster", clusterName)
+					continue
+				}
+				existing.Data = secret.Data
+				if _, updateErr := targetClient.CoreV1().Secrets(exp.Name).Update(ctx, existing, metav1.UpdateOptions{}); updateErr != nil {
+					log.Error(updateErr, "Failed to update app kubeconfig secret on loadgen", "cluster", clusterName)
+					continue
+				}
+				log.Info("Updated app cluster kubeconfig on loadgen cluster", "cluster", clusterName)
+			} else {
+				log.Error(err, "Failed to create app kubeconfig secret on loadgen", "cluster", clusterName)
+				continue
+			}
+		} else {
+			log.Info("Copied app cluster kubeconfig to loadgen cluster", "cluster", clusterName, "namespace", exp.Name)
+		}
 	}
 
 	return nil

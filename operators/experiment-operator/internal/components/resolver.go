@@ -175,7 +175,8 @@ var componentCategory = map[string]string{
 	// storage
 	"minio": "storage",
 	// testing
-	"k6": "testing",
+	"k6":                    "testing",
+	"k6-gateway-loadtest":   "testing",
 	// workflows
 	"argo-workflows": "workflows",
 }
