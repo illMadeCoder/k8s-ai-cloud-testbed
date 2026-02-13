@@ -186,7 +186,9 @@ code {
 
 details.section {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
   padding: 0;
   margin: 0;
 }
@@ -197,16 +199,16 @@ details.section + details.section {
 }
 
 details.section:first-of-type {
-  border-radius: var(--radius) var(--radius) 0 0;
+  border-radius: 0;
   margin-top: 2rem;
 }
 
 details.section:last-of-type {
-  border-radius: 0 0 var(--radius) var(--radius);
+  border-radius: 0;
 }
 
 details.section:only-of-type {
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 
 details.section > summary.section-title {
@@ -354,24 +356,6 @@ details.section > details.section > summary.section-title code {
 }
 
 @media (max-width: 640px) {
-  details.section {
-    border-left: none;
-    border-right: none;
-    border-radius: 0;
-  }
-
-  details.section:first-of-type {
-    border-radius: 0;
-  }
-
-  details.section:last-of-type {
-    border-radius: 0;
-  }
-
-  details.section:only-of-type {
-    border-radius: 0;
-  }
-
   details.section > :not(summary):not(details) {
     padding: 0.5rem;
   }
