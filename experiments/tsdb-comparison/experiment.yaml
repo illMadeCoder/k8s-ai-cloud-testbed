@@ -8,7 +8,7 @@ spec:
   tags: ["comparison", "observability", "metrics"]
   publish: true
 
-  analysis:
+  analyzerConfig:
     sections:
       - abstract
       - targetAnalysis
@@ -21,8 +21,8 @@ spec:
       - feedback
       - architectureDiagram
 
-  study:
-    hypothesis: "VictoriaMetrics will be the most resource-efficient for single-node deployments because its merge-tree storage engine and single-binary architecture avoid the per-component overhead of distributed systems, while Mimir's monolithic mode will require higher base resources due to its object-storage dependency (MinIO) and embedded microservices architecture"
+  hypothesis:
+    claim: "VictoriaMetrics will be the most resource-efficient for single-node deployments because its merge-tree storage engine and single-binary architecture avoid the per-component overhead of distributed systems, while Mimir's monolithic mode will require higher base resources due to its object-storage dependency (MinIO) and embedded microservices architecture"
     questions:
       - "What is the steady-state CPU and memory footprint of each TSDB under identical 1k-series ingestion workload?"
       - "How do resource usage patterns differ over a 90-minute window (approaching Prometheus block rotation)?"
