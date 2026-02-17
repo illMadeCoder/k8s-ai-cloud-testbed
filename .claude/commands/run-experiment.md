@@ -273,8 +273,10 @@ Run all of these checks and track their results (PASS/WARN/FAIL):
 
 **Check 4: Workload Pod Visibility**
 - Check if any non-infrastructure pods appear in `metrics.queries` data (e.g., `cpu_by_pod.data`)
-- Infrastructure pods match patterns: `prometheus-*`, `grafana-*`, `alertmanager-*`, `kube-state-metrics-*`, `node-exporter-*`, `operator-*`, `alloy-*`
-- If ALL pods are infrastructure → FAIL ("No workload pods visible in cadvisor metrics")
+- Infrastructure pod prefixes: `prometheus-*`, `alertmanager-*`, `grafana-*`, `kube-state-metrics-*`, `node-exporter-*`, `kube-prometheus-stack-*`, `alloy-*`, `ts-vm-hub-*`, `tailscale-operator-*`, `operator-*`
+- Classify each pod in the data as infrastructure or workload
+- Report: "Pod visibility: X infrastructure, Y workload (pod-names...)"
+- If ALL pods are infrastructure → FAIL ("No workload pods visible in metrics")
 - If at least one non-infrastructure pod appears → PASS
 - If no pod-level metrics exist → N/A
 
@@ -418,16 +420,23 @@ Report the quality scorecard with all warnings. Proceed to Step 7 but include th
 2. **Run root cause diagnostics** based on which checks failed:
 
    **If custom metrics empty + source is cadvisor:**
-   - Check if the experiment has `metrics-agent` and `metrics-egress` components:
+   - Check if the experiment has `kube-prometheus-stack`, `metrics-agent`, and `metrics-egress` components:
      ```bash
-     grep -c 'metrics-agent\|metrics-egress' experiments/{name}/experiment.yaml
+     grep -c 'kube-prometheus-stack\|metrics-agent\|metrics-egress' experiments/{name}/experiment.yaml
      ```
-   - If missing: report root cause: "experiment lacks metrics-agent + metrics-egress components needed to forward custom metrics from target → hub VictoriaMetrics"
-   - If present: check operator logs for metric collection details:
+   - If `kube-prometheus-stack` missing: report root cause: "experiment lacks kube-prometheus-stack — the operator queries target-local Prometheus for custom metrics via ServiceMonitor scrapes"
+   - If `metrics-agent`/`metrics-egress` missing: report root cause: "experiment lacks metrics-agent + metrics-egress — needed for hub VM fallback path"
+   - Check for `$NAMESPACE` vs `$EXPERIMENT` in queries:
+     ```bash
+     grep '\$NAMESPACE' experiments/{name}/experiment.yaml
+     ```
+   - If `$NAMESPACE` found: report root cause: "`$NAMESPACE` resolves to the Experiment CR namespace ('experiments'), not the target namespace where pods run. Use `$EXPERIMENT` instead."
+   - If all components present and queries correct, check operator logs:
      ```bash
      kubectl logs deployment/experiment-operator-controller-manager \
-       -n experiment-operator-system --tail=100 2>&1 | grep -i "metric\|query\|custom"
+       -n experiment-operator-system --tail=100 2>&1 | grep -i "metric\|query\|custom\|prometheus\|local"
      ```
+   - Note: the operator now tries local Prometheus first (via `DiscoverMonitoringServices`), then falls back to hub VM. Check logs for "Discovered local Prometheus" or "Local Prometheus discovery failed".
 
    **If workload pod not visible in cadvisor:**
    - Check operator logs for pod deployment info (target cluster is likely cleaned up by now):
@@ -435,7 +444,8 @@ Report the quality scorecard with all warnings. Proceed to Step 7 but include th
      kubectl logs deployment/experiment-operator-controller-manager \
        -n experiment-operator-system --tail=100 2>&1 | grep -i "{instance-name}"
      ```
-   - Suggest: pod labels may not be picked up, pod may have completed before cadvisor scrape, or pod name doesn't match expected patterns
+   - Common causes: monitoring stack pods (prometheus, grafana, etc.) are now filtered as infrastructure but may have been the only pods visible. Check if the workload pod (e.g., naive-db-0) was present and running during metrics collection.
+   - Infrastructure pods are filtered by prefix: `prometheus-`, `alertmanager-`, `grafana-`, `kube-state-metrics-`, `node-exporter-`, `kube-prometheus-stack-`, `alloy-`, `ts-vm-hub-`, `tailscale-operator-`, `operator-`
 
    **If machine verdict insufficient:**
    - Parse `summary.hypothesis.criteria` and list which criteria have `passed: null` and why
@@ -449,7 +459,11 @@ Report the quality scorecard with all warnings. Proceed to Step 7 but include th
 4. **Present remediation options** via `AskUserQuestion`:
 
    **Option 1: "Fix and re-run" (Recommended)**
-   - Explain what needs to change based on the root cause diagnosis (e.g., "add metrics-agent + metrics-egress to experiment")
+   - Explain what needs to change based on the root cause diagnosis, with specific fixes:
+     - Missing `kube-prometheus-stack`: add `- app: kube-prometheus-stack` to target components
+     - Missing `metrics-agent`/`metrics-egress`: add `- app: metrics-agent` and `- app: metrics-egress` to target components
+     - `$NAMESPACE` in queries: replace all `namespace=~"$NAMESPACE"` with `namespace=~"$EXPERIMENT"` in experiment.yaml
+     - Missing load generation: add load-test step to workflow template
    - If user picks this: make the fix to the experiment YAML, delete the current experiment (`kubectl delete experiment {instance-name} -n experiments`), close the PR (`gh pr close {pr-number} --delete-branch`), then loop back to Step 3 (Apply Experiment) with the fixed YAML
 
    **Option 2: "Merge anyway"**

@@ -239,9 +239,11 @@ func CollectMetricsFromTarget(ctx context.Context, kubeconfig []byte, endpoints 
 	}
 
 	// Build substitution variables (same as CollectMetricsSnapshot)
+	// On target clusters, pods deploy to the experiment-named namespace
+	// (e.g., "db-baseline-fsync-b8twf"), not the Experiment CR's namespace ("experiments").
 	vars := map[string]string{
 		"$EXPERIMENT": exp.Name,
-		"$NAMESPACE":  exp.Namespace,
+		"$NAMESPACE":  exp.Name,
 		"$DURATION":   promDuration(duration),
 	}
 
@@ -377,32 +379,32 @@ func queryInstantViaProxy(ctx context.Context, restClient rest.Interface, ep Mon
 // to focus on workload metrics.
 func defaultTargetQueries() []experimentsv1alpha1.MetricsQuery {
 	sysNS := `kube-system|gke-managed-system|gmp-system|gmp-public|kube-node-lease|kube-public|observability`
-	harnessPods := `alloy-.*|ts-vm-hub-.*`
+	infraPods := `alloy-.*|ts-vm-hub-.*|prometheus-.*|alertmanager-.*|grafana-.*|kube-state-metrics-.*|node-exporter-.*|kube-prometheus-stack-.*|tailscale-operator-.*|operator-.*`
 	return []experimentsv1alpha1.MetricsQuery{
 		{
 			Name:        "cpu_by_pod",
-			Query:       fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{namespace!~"%s",pod!~"%s",container!="POD",container!=""}[1m])) by (pod)`, sysNS, harnessPods),
+			Query:       fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{namespace!~"%s",pod!~"%s",container!="POD",container!=""}[1m])) by (pod)`, sysNS, infraPods),
 			Type:        "range",
 			Unit:        "cores",
 			Description: "CPU usage by pod",
 		},
 		{
 			Name:        "memory_by_pod",
-			Query:       fmt.Sprintf(`sum(container_memory_working_set_bytes{namespace!~"%s",pod!~"%s",container!="POD",container!=""}) by (pod)`, sysNS, harnessPods),
+			Query:       fmt.Sprintf(`sum(container_memory_working_set_bytes{namespace!~"%s",pod!~"%s",container!="POD",container!=""}) by (pod)`, sysNS, infraPods),
 			Type:        "range",
 			Unit:        "bytes",
 			Description: "Memory working set by pod",
 		},
 		{
 			Name:        "cpu_total",
-			Query:       fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{namespace!~"%s",pod!~"%s"}[1m]))`, sysNS, harnessPods),
+			Query:       fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{namespace!~"%s",pod!~"%s"}[1m]))`, sysNS, infraPods),
 			Type:        "range",
 			Unit:        "cores",
 			Description: "Total CPU usage",
 		},
 		{
 			Name:        "memory_total",
-			Query:       fmt.Sprintf(`sum(container_memory_working_set_bytes{namespace!~"%s",pod!~"%s"})`, sysNS, harnessPods),
+			Query:       fmt.Sprintf(`sum(container_memory_working_set_bytes{namespace!~"%s",pod!~"%s"})`, sysNS, infraPods),
 			Type:        "range",
 			Unit:        "bytes",
 			Description: "Total memory working set",
@@ -435,11 +437,17 @@ var systemNamespaces = map[string]bool{
 	"observability":      true,
 }
 
-// isHarnessPod returns true for pods that are part of the experiment harness
-// (observability/infra layers) rather than the experiment workload.
-func isHarnessPod(pod string) bool {
-	harnessPrefixes := []string{"alloy-", "ts-vm-hub-"}
-	for _, p := range harnessPrefixes {
+// isInfrastructurePod returns true for pods that are part of the experiment
+// infrastructure (observability/monitoring/operators) rather than the workload.
+func isInfrastructurePod(pod string) bool {
+	infraPrefixes := []string{
+		"alloy-", "ts-vm-hub-",                    // harness
+		"prometheus-", "alertmanager-", "grafana-", // kube-prometheus-stack
+		"kube-state-metrics-", "node-exporter-",    // kube-prometheus-stack exporters
+		"kube-prometheus-stack-",                    // catch-all for helm release
+		"tailscale-operator-", "operator-",         // operators
+	}
+	for _, p := range infraPrefixes {
 		if strings.HasPrefix(pod, p) {
 			return true
 		}
@@ -607,8 +615,8 @@ func parseCadvisorMetrics(text string, cpuByPod, memByPod map[string]float64) {
 			continue
 		}
 
-		// Skip harness pods deployed to experiment namespace
-		if isHarnessPod(pod) {
+		// Skip infrastructure pods deployed to experiment namespace
+		if isInfrastructurePod(pod) {
 			continue
 		}
 

@@ -138,6 +138,23 @@ The `generateName` prefix should be an abbreviation of the experiment name follo
 
 If any target exceeds 40 chars, shorten the `generateName` prefix and warn the user.
 
+### Metrics Pipeline Requirements
+
+For published experiments (`publish: true`) with custom metrics:
+- **Always include these components** on targets that have application workloads:
+  - `kube-prometheus-stack` — Prometheus scrapes ServiceMonitors and serves the Prometheus API
+  - `metrics-agent` — Grafana Alloy scrapes cadvisor + annotated pods and remote-writes to hub VictoriaMetrics
+  - `metrics-egress` — Tailscale egress service enabling remote-write to hub VM
+- **How metrics collection works:**
+  1. Prometheus scrapes application ServiceMonitors on the target cluster
+  2. The operator queries the target's local Prometheus via K8s API proxy for custom PromQL queries
+  3. Hub VictoriaMetrics is a fallback path (receives cadvisor + annotated pod metrics via Alloy remote-write)
+- **Variable reference for PromQL queries:**
+  - `$EXPERIMENT` — resolves to the experiment instance name (e.g., `db-baseline-fsync-b8twf`). Use this for namespace filters on target clusters where pods deploy to the experiment-named namespace.
+  - `$NAMESPACE` — also resolves to the experiment instance name on target clusters. Prefer `$EXPERIMENT` for clarity.
+  - `$DURATION` — resolves to the experiment duration as a Prometheus duration string (e.g., `1h30m`). Use in `rate()` or `histogram_quantile()` for full-window aggregation.
+- **Pod annotations for Alloy discovery:** Application pods should have `prometheus.io/scrape: "true"`, `prometheus.io/port`, and `prometheus.io/path` annotations in their pod template for Alloy to discover and forward metrics to hub VM.
+
 ### YAML Structure
 
 Generate `experiments/{name}/experiment.yaml` following these patterns:
@@ -198,11 +215,25 @@ spec:
       - "{focus1}"
 
   metrics:
-    # TODO: Add PromQL queries for the specific stacks being compared
-    # See experiments/logging-comparison/experiment.yaml for examples
+    # Generate PromQL queries for the specific app being measured.
     # Metric names must match ^[a-z][a-z0-9_]*$
     # Types: instant (bar charts) or range (time-series line charts)
-    # Variables: $EXPERIMENT, $NAMESPACE, $DURATION
+    # Variables: $EXPERIMENT (preferred for namespace), $DURATION
+    #
+    # For naive-db: generate these 10 queries:
+    #   write_p99_latency, write_p50_latency, fsync_p99_latency, fsync_p50_latency,
+    #   read_p99_latency, write_throughput, read_throughput, total_rows,
+    #   write_latency_over_time, fsync_latency_over_time
+    #   Use: naivedb_write_duration_seconds_bucket, naivedb_fsync_duration_seconds_bucket,
+    #        naivedb_read_duration_seconds_bucket, naivedb_operations_total, naivedb_rows_total
+    #   Filter: namespace=~"$EXPERIMENT"
+    #
+    # For hello-app: generate HTTP latency queries using standard Go HTTP metrics
+    #
+    # For unknown apps: at minimum include workload CPU/memory queries:
+    #   cpu_by_pod, memory_by_pod (using container_cpu_usage_seconds_total,
+    #   container_memory_working_set_bytes with namespace=~"$EXPERIMENT")
+    #   Add TODO for custom application-specific queries
     []
 ```
 
@@ -236,13 +267,24 @@ Tags are used for site categorization. Always include:
 2. The domain: `observability`, `networking`, `storage`, `cicd`
 3. Specific technology tags (lowercase): `prometheus`, `loki`, `gateway`, `envoy`, `tracing`, etc.
 
+### Load Generation Validation
+
+For `baseline` and `comparison` experiments:
+- **Load generation is required** — baselines and comparisons need traffic to produce meaningful metrics
+- Check if the app component has an embedded load generator (`k8s/loadgen.yaml` in the component directory):
+  - If yes: the workflow just needs a warm-up + observation window (load runs alongside the app)
+  - If no: the workflow MUST include an explicit load-test step (curl loops, k6, etc.)
+- For `tutorial` and `demo` types, load generation is optional
+
 ### Hypothesis Guidance (comparisons)
 
 Ask the user for a 1-2 sentence claim about expected outcome. If they don't have one, generate a reasonable placeholder based on the components being compared. Include 2-3 questions the experiment should answer and 2-3 focus areas.
 
 ### Metrics Guidance (comparisons/baselines)
 
-For published experiments, add a `metrics: []` placeholder with TODO comments explaining the pattern. Metrics are highly experiment-specific (PromQL queries referencing exact pod labels) and are best added after the first run reveals the actual label set. Point the user to `experiments/logging-comparison/experiment.yaml` or `experiments/gateway-comparison/experiment.yaml` as examples.
+For published experiments, generate actual PromQL queries based on the app components (see the metrics section in YAML Structure above). If the app has known instrumentation (naive-db, hello-app), generate the full query set. For unknown apps, generate workload CPU/memory queries and add TODOs for custom metrics.
+
+**Important:** Use `$EXPERIMENT` (not `$NAMESPACE`) for namespace filters in queries. On target clusters, pods deploy to the experiment-named namespace, and `$EXPERIMENT` resolves correctly to this name.
 
 ## Step 4: Write the File
 
@@ -257,6 +299,25 @@ Run experiment-validator agent with the experiment name
 ```
 
 Report the validation results. If there are failures, fix them and re-validate.
+
+### Component Pipeline Validation
+
+After the experiment-validator passes, run these additional checks:
+
+1. **Metrics pipeline completeness:** If `publish: true` and custom `metrics:` are defined, verify these components are present on the target:
+   - `kube-prometheus-stack` (required for ServiceMonitor scraping + local Prometheus API)
+   - `metrics-agent` (required for cadvisor + annotated pod metrics forwarding)
+   - `metrics-egress` (required for Tailscale egress to hub VM)
+   - If any are missing, warn: "Published experiment with custom metrics requires kube-prometheus-stack, metrics-agent, and metrics-egress components"
+
+2. **Load generation:** If type is `baseline` or `comparison`, check that load generation exists:
+   - Check `experiments/{name}/workflow/template.yaml` for load-test steps, OR
+   - Check if the app component has `k8s/loadgen.yaml`
+   - If neither exists, warn: "Baseline/comparison experiments need load generation for meaningful metrics"
+
+3. **Query variable check:** If any queries use `$NAMESPACE`, warn and suggest replacing with `$EXPERIMENT`:
+   - `grep '$NAMESPACE' experiments/{name}/experiment.yaml`
+   - "$NAMESPACE resolves to the Experiment CR namespace ('experiments'), not the target namespace. Use $EXPERIMENT instead."
 
 ## Step 6: Generate WorkflowTemplate
 

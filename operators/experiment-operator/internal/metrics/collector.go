@@ -288,12 +288,12 @@ func CollectSummary(exp *experimentsv1alpha1.Experiment) *ExperimentSummary {
 // defaultQueries returns the built-in metrics queries used when spec.metrics is empty.
 func defaultQueries() []experimentsv1alpha1.MetricsQuery {
 	sysNS := `kube-system|gke-managed-system|gmp-system|gmp-public|kube-node-lease|kube-public|observability`
-	harnessPods := `alloy-.*|ts-vm-hub-.*`
+	infraPods := `alloy-.*|ts-vm-hub-.*|prometheus-.*|alertmanager-.*|grafana-.*|kube-state-metrics-.*|node-exporter-.*|kube-prometheus-stack-.*|tailscale-operator-.*|operator-.*`
 	return []experimentsv1alpha1.MetricsQuery{
-		{Name: "cpu_by_pod", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s",container!="POD",container!=""}[1m])) by (pod)`, sysNS, harnessPods), Type: "range", Unit: "cores", Description: "CPU usage by pod"},
-		{Name: "memory_by_pod", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s",container!="POD",container!=""}) by (pod)`, sysNS, harnessPods), Type: "range", Unit: "bytes", Description: "Memory working set by pod"},
-		{Name: "cpu_total", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s"}[1m]))`, sysNS, harnessPods), Type: "range", Unit: "cores", Description: "Total CPU usage"},
-		{Name: "memory_total", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s"})`, sysNS, harnessPods), Type: "range", Unit: "bytes", Description: "Total memory working set"},
+		{Name: "cpu_by_pod", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s",container!="POD",container!=""}[1m])) by (pod)`, sysNS, infraPods), Type: "range", Unit: "cores", Description: "CPU usage by pod"},
+		{Name: "memory_by_pod", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s",container!="POD",container!=""}) by (pod)`, sysNS, infraPods), Type: "range", Unit: "bytes", Description: "Memory working set by pod"},
+		{Name: "cpu_total", Query: fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s"}[1m]))`, sysNS, infraPods), Type: "range", Unit: "cores", Description: "Total CPU usage"},
+		{Name: "memory_total", Query: fmt.Sprintf(`sum(container_memory_working_set_bytes{experiment="$EXPERIMENT",namespace!~"%s",pod!~"%s"})`, sysNS, infraPods), Type: "range", Unit: "bytes", Description: "Total memory working set"},
 	}
 }
 

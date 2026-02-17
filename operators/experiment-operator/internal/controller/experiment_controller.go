@@ -313,28 +313,59 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 				log.Info("Cadvisor metrics returned empty", "cluster", clusterName)
 			}
 
-			// If spec.metrics is defined, also query hub VM for custom PromQL queries
-			// and merge results. This gives us both: cadvisor instant data + rich
-			// custom time-series from hub VictoriaMetrics.
-			if len(exp.Spec.Metrics) > 0 && r.MetricsURL != "" {
-				log.Info("Custom metrics defined, also querying hub VM", "cluster", clusterName, "queryCount", len(exp.Spec.Metrics))
-				hubResult, hubErr := metrics.CollectMetricsSnapshot(ctx, r.MetricsURL, exp)
-				if hubErr != nil {
-					log.Error(hubErr, "Hub VM custom metrics query failed", "cluster", clusterName)
-				} else if hubResult != nil && !metrics.AllQueriesEmpty(hubResult) {
-					if metricsResult != nil {
-						// Merge: keep cadvisor basics, add custom query results
-						for k, v := range hubResult.Queries {
-							metricsResult.Queries[k] = v
+			// If spec.metrics is defined, try local Prometheus first (has ServiceMonitor
+			// scrape data), then fall back to hub VM for custom PromQL queries.
+			if len(exp.Spec.Metrics) > 0 {
+				var customMerged bool
+
+				// Try local Prometheus first — it has ServiceMonitor scrape data
+				endpoints, discErr := metrics.DiscoverMonitoringServices(ctx, kubeconfig, exp.Name)
+				if discErr == nil && len(endpoints) > 0 {
+					log.Info("Discovered local Prometheus on tailscale target, querying custom metrics",
+						"cluster", clusterName, "endpoints", len(endpoints))
+					localResult, collectErr := metrics.CollectMetricsFromTarget(ctx, kubeconfig, endpoints, exp)
+					if collectErr == nil && localResult != nil && !metrics.AllQueriesEmpty(localResult) {
+						if metricsResult != nil {
+							for k, v := range localResult.Queries {
+								metricsResult.Queries[k] = v
+							}
+						} else {
+							metricsResult = localResult
 						}
-						log.Info("Merged hub VM custom queries into cadvisor result",
-							"cluster", clusterName, "hubQueries", len(hubResult.Queries))
+						customMerged = true
+						log.Info("Merged local Prometheus custom queries into result",
+							"cluster", clusterName, "localQueries", len(localResult.Queries))
+					} else if collectErr != nil {
+						log.Error(collectErr, "Local Prometheus custom query failed", "cluster", clusterName)
 					} else {
-						metricsResult = hubResult
-						log.Info("Using hub VM result (cadvisor was empty)", "cluster", clusterName)
+						log.Info("Local Prometheus custom queries returned empty", "cluster", clusterName)
 					}
-				} else {
-					log.Info("Hub VM custom queries returned empty", "cluster", clusterName)
+				} else if discErr != nil {
+					log.Info("Local Prometheus discovery failed, will try hub VM",
+						"cluster", clusterName, "error", discErr)
+				}
+
+				// Fall back to hub VM if local Prometheus didn't yield custom metrics
+				if !customMerged && r.MetricsURL != "" {
+					log.Info("Falling back to hub VM for custom metrics",
+						"cluster", clusterName, "queryCount", len(exp.Spec.Metrics))
+					hubResult, hubErr := metrics.CollectMetricsSnapshot(ctx, r.MetricsURL, exp)
+					if hubErr != nil {
+						log.Error(hubErr, "Hub VM custom metrics query failed", "cluster", clusterName)
+					} else if hubResult != nil && !metrics.AllQueriesEmpty(hubResult) {
+						if metricsResult != nil {
+							for k, v := range hubResult.Queries {
+								metricsResult.Queries[k] = v
+							}
+							log.Info("Merged hub VM custom queries into result",
+								"cluster", clusterName, "hubQueries", len(hubResult.Queries))
+						} else {
+							metricsResult = hubResult
+							log.Info("Using hub VM result (cadvisor was empty)", "cluster", clusterName)
+						}
+					} else {
+						log.Info("Hub VM custom queries returned empty", "cluster", clusterName)
+					}
 				}
 			}
 			continue

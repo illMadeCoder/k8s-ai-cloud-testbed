@@ -47,70 +47,70 @@ spec:
 
   metrics:
     - name: write_p99_latency
-      query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"$NAMESPACE\"}[$DURATION])) by (le))"
+      query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
       type: instant
       unit: seconds
       description: "P99 write latency including fsync"
       group: latency
 
     - name: write_p50_latency
-      query: "histogram_quantile(0.5, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"$NAMESPACE\"}[$DURATION])) by (le))"
+      query: "histogram_quantile(0.5, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
       type: instant
       unit: seconds
       description: "P50 write latency including fsync"
       group: latency
 
     - name: fsync_p99_latency
-      query: "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"$NAMESPACE\"}[$DURATION])) by (le))"
+      query: "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
       type: instant
       unit: seconds
       description: "P99 fsync-only latency"
       group: latency
 
     - name: fsync_p50_latency
-      query: "histogram_quantile(0.5, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"$NAMESPACE\"}[$DURATION])) by (le))"
+      query: "histogram_quantile(0.5, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
       type: instant
       unit: seconds
       description: "P50 fsync-only latency"
       group: latency
 
     - name: read_p99_latency
-      query: "histogram_quantile(0.99, sum(rate(naivedb_read_duration_seconds_bucket{namespace=~\"$NAMESPACE\"}[$DURATION])) by (le))"
+      query: "histogram_quantile(0.99, sum(rate(naivedb_read_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
       type: instant
       unit: seconds
       description: "P99 read latency (page cache)"
       group: latency
 
     - name: write_throughput
-      query: "sum(rate(naivedb_operations_total{op=\"write\", namespace=~\"$NAMESPACE\"}[$DURATION]))"
+      query: "sum(rate(naivedb_operations_total{op=\"write\", namespace=~\"$EXPERIMENT\"}[$DURATION]))"
       type: instant
       unit: ops/s
       description: "Write operations per second"
       group: throughput
 
     - name: read_throughput
-      query: "sum(rate(naivedb_operations_total{op=\"read\", namespace=~\"$NAMESPACE\"}[$DURATION]))"
+      query: "sum(rate(naivedb_operations_total{op=\"read\", namespace=~\"$EXPERIMENT\"}[$DURATION]))"
       type: instant
       unit: ops/s
       description: "Read operations per second"
       group: throughput
 
     - name: total_rows
-      query: "naivedb_rows_total{namespace=~\"$NAMESPACE\"}"
+      query: "naivedb_rows_total{namespace=~\"$EXPERIMENT\"}"
       type: instant
       unit: rows
       description: "Total rows written"
       group: throughput
 
     - name: write_latency_over_time
-      query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"$NAMESPACE\"}[1m])) by (le))"
+      query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[1m])) by (le))"
       type: range
       unit: seconds
       description: "P99 write latency over time"
       group: latency
 
     - name: fsync_latency_over_time
-      query: "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"$NAMESPACE\"}[1m])) by (le))"
+      query: "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[1m])) by (le))"
       type: range
       unit: seconds
       description: "P99 fsync latency over time"
