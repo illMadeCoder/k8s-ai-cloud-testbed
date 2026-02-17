@@ -397,7 +397,35 @@ Only use these lightweight images in workflow templates:
 
 Use the `Write` tool to create `experiments/{name}/workflow/template.yaml`.
 
-## Step 7: Check Component Images
+## Step 7: Apply Component CRs
+
+The operator resolves component sources from Component CRs in the hub cluster. If a Component CR
+doesn't exist, the operator falls back to a path without the `/k8s` suffix, which causes ArgoCD
+to scan the entire component directory (including `component.yaml`, `Dockerfile`, `src/`) and fail.
+
+For each component with a local `component.yaml` (under `components/`):
+
+1. **Check if CR exists** in the cluster:
+   ```bash
+   kubectl get component {component-name} -o name 2>&1
+   ```
+
+2. **If not found**, apply it:
+   ```bash
+   kubectl apply -f components/{category}/{component-name}/component.yaml
+   ```
+
+3. **If found**, verify the source path matches the local file (in case it was updated):
+   ```bash
+   kubectl get component {component-name} -o jsonpath='{.spec.sources[0].path}'
+   ```
+
+Report status per component:
+- `[OK] {component} — Component CR exists, path correct`
+- `[APPLIED] {component} — Component CR applied to cluster`
+- `[SKIPPED] {component} — Helm chart, no local component.yaml`
+
+## Step 8: Check Component Images
 
 For each component referenced in the experiment, determine whether it needs a custom-built image:
 
@@ -420,7 +448,7 @@ For each component referenced in the experiment, determine whether it needs a cu
    Watch CI: gh run watch {run-id}
    ```
 
-## Step 8: Summary
+## Step 9: Summary
 
 Tell the user:
 1. **Files created:**
