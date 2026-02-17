@@ -226,7 +226,78 @@ Get the hypothesis result:
 kubectl get experiment {instance-name} -n experiments -o jsonpath='{.status.hypothesisResult}'
 ```
 
-Then proceed to Step 6 if `publish: true`, otherwise skip to Step 8.
+Then proceed to Step 5.5 if `publish: true`, otherwise skip to Step 8.
+
+## Step 5.5: Results Quality Assessment (publish: true only)
+
+Skip this step entirely if `spec.publish` is not true.
+
+Immediately after the experiment reaches Complete, fetch the raw results from S3 and assess data quality before waiting for the analyzer.
+
+### Fetch summary.json from S3
+
+```bash
+kubectl run -n seaweedfs s3fetch-{instance-name} --rm -it --restart=Never \
+  --image=curlimages/curl:8.5.0 -- \
+  curl -s http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333/experiment-results/{instance-name}/summary.json
+```
+
+Parse the JSON output. If the fetch fails or returns empty, log toil and skip quality assessment (proceed to Step 6).
+
+### Quality Checks
+
+Run all of these checks and track their results (PASS/WARN/FAIL):
+
+**Check 1: Custom Metric Completeness**
+- Read the experiment YAML's `spec.metrics[]` to get the list of expected custom metrics
+- For each, check if it appears in `summary.metrics.queries` with:
+  - `error` is null/absent (query didn't fail)
+  - `data` array is non-empty (query returned results)
+- Report: `Custom metrics: X/Y collected` with per-metric pass/fail
+- If 0/Y collected → FAIL
+- If partial (>0 but <Y) → WARN
+- If Y/Y → PASS
+- If no custom metrics defined in spec → PASS (skip this check)
+
+**Check 2: Metrics Source**
+- Check `summary.metrics.source`
+- `"target:cadvisor"` means only cadvisor infrastructure metrics were collected (the operator fell back because it couldn't reach target Prometheus/VM)
+- If source is `"target:cadvisor"` AND the experiment has custom metrics defined → WARN
+- Otherwise → PASS
+
+**Check 3: Hypothesis Machine Verdict**
+- Check `summary.hypothesis.machineVerdict` (if success criteria are defined in the experiment YAML)
+- `"insufficient"` → FAIL (metrics missing, criteria couldn't be evaluated)
+- `"confirmed"` or `"rejected"` → PASS (criteria were evaluable)
+- No success criteria defined → N/A (skip this check)
+
+**Check 4: Workload Pod Visibility**
+- Check if any non-infrastructure pods appear in `metrics.queries` data (e.g., `cpu_by_pod.data`)
+- Infrastructure pods match patterns: `prometheus-*`, `grafana-*`, `alertmanager-*`, `kube-state-metrics-*`, `node-exporter-*`, `operator-*`, `alloy-*`
+- If ALL pods are infrastructure → FAIL ("No workload pods visible in cadvisor metrics")
+- If at least one non-infrastructure pod appears → PASS
+- If no pod-level metrics exist → N/A
+
+### Quality Scorecard
+
+Report the results as a scorecard:
+```
+Results Quality:
+  [PASS] Experiment completed (38m, $0.017)
+  [FAIL] Custom metrics: 0/10 collected
+  [WARN] Metrics source: target:cadvisor (no custom metric pipeline)
+  [FAIL] Workload pods: 0 visible in cadvisor
+  [N/A]  Machine verdict: no success criteria defined
+```
+
+Determine the overall quality gate status:
+- Any FAIL → `qualityGate = "fail"`
+- Any WARN (no FAILs) → `qualityGate = "warn"`
+- All PASS/N/A → `qualityGate = "pass"`
+
+Store the quality gate status and scorecard for use in Steps 6.5, 7, and 8.
+
+Proceed to Step 6 (Track Analyzer).
 
 ### On Failed
 
@@ -281,7 +352,7 @@ Report transitions:
   ```bash
   kubectl logs job/{instance-name}-analyzer -n experiment-operator-system --tail=10 2>/dev/null
   ```
-- **Succeeded**: "Analysis complete! Results enriched with AI insights."
+- **Succeeded**: "Analysis complete! Results enriched with AI insights." Then run the AI verdict check (see below).
 - **Failed**: Log toil, show analyzer job logs, and ask user how to proceed:
   ```bash
   bd create --title="Analyzer failed for {instance-name}" --type=bug --priority=3 -l toil -l {name} -l analyzer
@@ -297,6 +368,101 @@ If the analyzer times out (15 minutes), log toil:
 ```bash
 bd create --title="Analyzer timeout (15m) for {instance-name}" --type=bug --priority=3 -l toil -l {name} -l analyzer -l timing
 ```
+
+### AI Verdict Check (after analyzer succeeds)
+
+After the analyzer succeeds, re-fetch the enriched summary.json from S3 (the analyzer updates it with AI analysis):
+
+```bash
+kubectl run -n seaweedfs s3fetch2-{instance-name} --rm -it --restart=Never \
+  --image=curlimages/curl:8.5.0 -- \
+  curl -s http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333/experiment-results/{instance-name}/summary.json
+```
+
+**Check 5: AI Hypothesis Verdict**
+- Check `summary.analysis.hypothesisVerdict`
+- `"insufficient"` → FAIL (AI confirms data quality is too low for conclusions)
+- `"confirmed"` or `"rejected"` → PASS
+- Absent → N/A
+- Extract the first 1-2 sentences of `summary.analysis.abstract` as a concise explanation
+
+Update the quality scorecard from Step 5.5 with this new check:
+```
+  [FAIL] AI verdict: insufficient — "no application-level latency, throughput, or I/O metrics..."
+```
+
+Recalculate the overall quality gate status (a new FAIL here can change `"warn"` → `"fail"`).
+
+If the analyzer failed, was skipped, or timed out, mark the AI verdict check as N/A and don't change the quality gate status.
+
+Proceed to Step 6.5.
+
+## Step 6.5: Quality Gate Decision (publish: true only)
+
+Skip this step entirely if `spec.publish` is not true.
+
+This is the critical decision point. Behavior depends on the quality gate status determined in Steps 5.5 and 6.
+
+### If `qualityGate == "pass"`
+
+Proceed directly to Step 7 (PR Management) as normal.
+
+### If `qualityGate == "warn"`
+
+Report the quality scorecard with all warnings. Proceed to Step 7 but include the warnings in the PR summary.
+
+### If `qualityGate == "fail"`
+
+1. **Report the full quality scorecard** with all failures highlighted.
+
+2. **Run root cause diagnostics** based on which checks failed:
+
+   **If custom metrics empty + source is cadvisor:**
+   - Check if the experiment has `metrics-agent` and `metrics-egress` components:
+     ```bash
+     grep -c 'metrics-agent\|metrics-egress' experiments/{name}/experiment.yaml
+     ```
+   - If missing: report root cause: "experiment lacks metrics-agent + metrics-egress components needed to forward custom metrics from target → hub VictoriaMetrics"
+   - If present: check operator logs for metric collection details:
+     ```bash
+     kubectl logs deployment/experiment-operator-controller-manager \
+       -n experiment-operator-system --tail=100 2>&1 | grep -i "metric\|query\|custom"
+     ```
+
+   **If workload pod not visible in cadvisor:**
+   - Check operator logs for pod deployment info (target cluster is likely cleaned up by now):
+     ```bash
+     kubectl logs deployment/experiment-operator-controller-manager \
+       -n experiment-operator-system --tail=100 2>&1 | grep -i "{instance-name}"
+     ```
+   - Suggest: pod labels may not be picked up, pod may have completed before cadvisor scrape, or pod name doesn't match expected patterns
+
+   **If machine verdict insufficient:**
+   - Parse `summary.hypothesis.criteria` and list which criteria have `passed: null` and why
+
+3. **Log toil:**
+   ```bash
+   bd create --title="Quality gate failed: {instance-name} - {primary failure reason}" \
+     --type=bug --priority=2 -l toil -l {name} -l quality
+   ```
+
+4. **Present remediation options** via `AskUserQuestion`:
+
+   **Option 1: "Fix and re-run" (Recommended)**
+   - Explain what needs to change based on the root cause diagnosis (e.g., "add metrics-agent + metrics-egress to experiment")
+   - If user picks this: make the fix to the experiment YAML, delete the current experiment (`kubectl delete experiment {instance-name} -n experiments`), close the PR (`gh pr close {pr-number} --delete-branch`), then loop back to Step 3 (Apply Experiment) with the fixed YAML
+
+   **Option 2: "Merge anyway"**
+   - Warn: "Results will be published with insufficient data quality"
+   - Proceed to Step 7 (PR Management) with a warning banner in the PR summary
+
+   **Option 3: "Skip (keep PR open)"**
+   - Leave PR open for manual review later
+   - Report the PR URL and stop (proceed to Step 8 summary)
+
+   **Option 4: "Abort (delete experiment + close PR)"**
+   - Clean up: `kubectl delete experiment {instance-name} -n experiments` and `gh pr close {pr-number} --delete-branch`
+   - Proceed to Step 8 summary with abort status
 
 ## Step 7: PR Management (publish: true only)
 
@@ -322,7 +488,25 @@ bd create --title="No PR created for published experiment {instance-name}" --typ
 gh pr view {pr-number} --json title,state,additions,deletions,url
 ```
 
-Report: PR #{number}: "{title}" (+{additions}, -{deletions})
+Report with quality context:
+
+If `qualityGate == "pass"`:
+```
+PR #{number}: "{title}" (+{additions}, -{deletions})
+Quality: PASS ({X}/{Y} metrics, hypothesis {verdict})
+```
+
+If `qualityGate == "warn"`:
+```
+PR #{number}: "{title}" (+{additions}, -{deletions})
+Quality: WARN ({warnings summary})
+```
+
+If `qualityGate == "fail"` (user chose "Merge anyway" in Step 6.5):
+```
+PR #{number}: "{title}" (+{additions}, -{deletions})
+Quality: FAIL ({X}/{Y} custom metrics, AI verdict: {verdict})
+```
 
 ### Ask user what to do
 
@@ -367,10 +551,11 @@ Duration:    Xm (if calculable)
 Results:     {resultsURL or "N/A"}
 Hypothesis:  {hypothesisResult or "N/A"}
 Analysis:    {analysisPhase or "N/A"}
-PR:          {publishPRURL} ({Merged/Open}) or "N/A"
+Quality:     {PASS|WARN|FAIL} ({summary, e.g. "10/10 metrics, hypothesis validated" or "0/10 metrics, verdict: insufficient"})
+PR:          {publishPRURL} ({Merged/Open/Blocked by quality gate/Closed}) or "N/A"
 ```
 
-For non-publish experiments, omit the Analysis and PR lines.
+For non-publish experiments, omit the Analysis, Quality, and PR lines.
 
 ### Toil sync
 
