@@ -432,13 +432,17 @@ func (r *ExperimentReconciler) collectAndStoreResults(ctx context.Context, exp *
 	// Commit results to GitHub and run AI analysis only for publishable experiments.
 	// Non-publish experiments are stored in S3 only (no site publish, no AI analysis cost).
 	if exp.Spec.Publish && exp.Status.Phase == experimentsv1alpha1.PhaseComplete {
-		// Commit results to GitHub for benchmark site (best-effort, non-fatal).
+		// Publish results via PR for review before going live on the benchmark site.
 		if r.GitClient != nil {
-			if err := r.GitClient.CommitResult(ctx, exp.Name, summary); err != nil {
-				log.Error(err, "Failed to commit results to GitHub — non-fatal", "repo", r.GitClient.RepoPath())
+			branch, prNum, prURL, err := r.GitClient.PublishExperimentResult(ctx, exp.Name, summary)
+			if err != nil {
+				log.Error(err, "Failed to publish results PR — non-fatal", "repo", r.GitClient.RepoPath())
 			} else {
 				exp.Status.Published = true
-				log.Info("Results committed to GitHub", "experiment", exp.Name, "repo", r.GitClient.RepoPath())
+				exp.Status.PublishBranch = branch
+				exp.Status.PublishPRNumber = prNum
+				exp.Status.PublishPRURL = prURL
+				log.Info("Experiment results PR created", "pr", prURL, "branch", branch)
 			}
 		}
 
@@ -623,6 +627,10 @@ func (r *ExperimentReconciler) createAnalysisJob(ctx context.Context, exp *exper
 								{
 									Name:  "GITHUB_REPO",
 									Value: r.GitHubRepo,
+								},
+								{
+									Name:  "GITHUB_BRANCH",
+									Value: fmt.Sprintf("experiment/%s", exp.Name),
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{

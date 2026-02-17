@@ -383,6 +383,18 @@ type ExperimentStatus struct {
 	// +optional
 	Published bool `json:"published,omitempty"`
 
+	// PublishBranch is the git branch where experiment results were committed
+	// +optional
+	PublishBranch string `json:"publishBranch,omitempty"`
+
+	// PublishPRNumber is the GitHub PR number for reviewing experiment results
+	// +optional
+	PublishPRNumber int `json:"publishPRNumber,omitempty"`
+
+	// PublishPRURL is the GitHub PR URL for reviewing experiment results
+	// +optional
+	PublishPRURL string `json:"publishPRURL,omitempty"`
+
 	// AnalysisJobName is the name of the AI analyzer Job (empty if not launched)
 	// +optional
 	AnalysisJobName string `json:"analysisJobName,omitempty"`
