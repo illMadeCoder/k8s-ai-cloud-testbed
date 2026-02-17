@@ -2,14 +2,14 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: custom-db
+  name: naive-db
   labels:
-    app: custom-db
+    app: naive-db
     release: kube-prometheus-stack
 spec:
   selector:
     matchLabels:
-      app: custom-db
+      app: naive-db
   endpoints:
     - port: http
       interval: 15s

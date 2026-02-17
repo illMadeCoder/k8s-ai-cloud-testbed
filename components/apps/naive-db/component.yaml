@@ -1,0 +1,17 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Component
+metadata:
+  name: naive-db
+spec:
+  type: app
+  description: "Naive fsync-per-write database - single i32 column, no WAL, baseline for storage benchmarks"
+  sources:
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
+      targetRevision: HEAD
+      path: components/apps/naive-db/k8s
+  observability:
+    serviceMonitor: true
+    podLabels:
+      app: naive-db
+    metricsPort: 8080
+    metricsPath: /metrics

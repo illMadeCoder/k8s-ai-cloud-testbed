@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: naive-db
+  labels:
+    app: naive-db
+spec:
+  serviceName: naive-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: naive-db
+  template:
+    metadata:
+      labels:
+        app: naive-db
+    spec:
+      containers:
+        - name: naive-db
+          image: ghcr.io/illmadecoder/naive-db:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: DATA_DIR
+              value: /data
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
