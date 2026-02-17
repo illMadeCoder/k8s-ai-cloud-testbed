@@ -1,0 +1,63 @@
+{
+  "name": "db-baseline-fsync-whgd7",
+  "namespace": "experiments",
+  "description": "Baseline: naive fsync-per-write store on GKE PD-SSD — measures the floor cost of durable 4-byte sequential writes with no WAL, no batching, no optimization",
+  "createdAt": "2026-02-17T22:22:58Z",
+  "completedAt": "2026-02-17T23:01:44.106780594Z",
+  "durationSeconds": 2326.106780594,
+  "phase": "Complete",
+  "tags": [
+    "baseline",
+    "storage",
+    "database"
+  ],
+  "hypothesis": {
+    "claim": "A naive fsync-per-write store on GKE PD-SSD achieves \u003c5ms p99 write latency for sequential 4-byte writes, establishing the floor cost of durable persistence",
+    "questions": [
+      "What is the true fsync cost on GKE PD-SSD for single-row durable writes?",
+      "How does read latency compare to write latency when reads are served from page cache?",
+      "What sustained write throughput is achievable with fsync-per-write serialization?"
+    ],
+    "focus": [
+      "fsync latency distribution on cloud block storage",
+      "write throughput ceiling under serialized I/O",
+      "page cache hit rate for sequential reads"
+    ]
+  },
+  "analyzerConfig": {
+    "sections": [
+      "abstract",
+      "targetAnalysis",
+      "performanceAnalysis",
+      "metricInsights",
+      "finopsAnalysis",
+      "body",
+      "feedback",
+      "architectureDiagram"
+    ]
+  },
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "db-baseline-fsync-whgd7-app",
+      "clusterType": "gke",
+      "machineType": "e2-standard-4",
+      "nodeCount": 1
+    }
+  ],
+  "workflow": {
+    "name": "db-baseline-fsync-whgd7-validation",
+    "template": "db-baseline-fsync-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-17T22:36:11Z",
+    "finishedAt": "2026-02-17T23:01:40Z"
+  },
+  "costEstimate": {
+    "totalUSD": 0.017316572699977557,
+    "durationHours": 0.6461407723872222,
+    "perTarget": {
+      "app": 0.017316572699977557
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
