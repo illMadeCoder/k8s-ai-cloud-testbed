@@ -226,27 +226,62 @@ On experiment completion, the operator creates an analyzer Job (`experiment-anal
 that uses Claude Code CLI to generate AI analysis (summary, per-metric insights, recommendations).
 The analysis is merged into `summary.json` and committed to the benchmark site.
 
-The analyzer uses the full Claude Code credentials file (`~/.claude/.credentials.json`) which
-contains a refresh token, enabling automatic token renewal. The credentials file is stored in
-OpenBao as a single JSON blob and mounted into the analyzer container via a Kubernetes Secret volume.
+#### Credential Persistence (PVC Strategy)
 
-**Setup: Store Claude Code credentials in OpenBao**
+The analyzer authenticates via Claude Code OAuth credentials (access token + refresh token).
+OAuth refresh tokens are **single-use and rotated** — each token refresh invalidates the
+previous refresh token and issues a new one. This creates a token chain problem:
+
+- If the local CLI and the analyzer both start from the same refresh token, whichever
+  refreshes first invalidates the other's copy.
+- Access tokens expire after ~24h, so the analyzer must be able to refresh independently.
+
+**Solution: PVC-based independent token chain.** The analyzer stores credentials on a
+PersistentVolumeClaim (`claude-credentials-pvc`, 1Mi, `local-path-retain` storage class).
+An init container conditionally seeds from the K8s Secret only if the PVC is empty:
+
+```
+First run:  Secret → PVC (seed) → analyzer refreshes → new tokens written to PVC
+Next runs:  PVC already has tokens → skip seed → analyzer refreshes from PVC tokens
+```
+
+After the first successful refresh, the analyzer maintains its own independent token chain
+on the PVC, completely decoupled from the local CLI's token chain. Both share the same
+subscription but hold different, independently-rotating credentials.
+
+**Key files:**
+- PVC manifest: `platform/manifests/experiment-operator-config/claude-credentials-pvc.yaml`
+- Init container logic: `operators/experiment-operator/internal/controller/experiment_controller.go`
+  (search for `claude-home` volume)
+- Seed secret: `claude-auth` in `experiment-operator-system` (synced from OpenBao via ESO)
+
+#### Initial Setup / Re-seeding
+
+Seed credentials into OpenBao when setting up the analyzer for the first time, or when
+re-seeding is needed (PVC deleted, tokens expired from prolonged inactivity >30 days):
 
 ```bash
-# Store full credentials file (contains refresh token for auto-renewal):
-bao kv put secret/experiment-operator/claude-auth credentials="$(cat ~/.claude/.credentials.json)"
+# 1. Store current credentials in OpenBao (seeds the PVC on next analyzer run):
+kubectl exec -n openbao openbao-0 -- sh -c \
+  "BAO_TOKEN='<root_token>' bao kv put secret/experiment-operator/claude-auth \
+  credentials='$(cat ~/.claude/.credentials.json)'"
 
-# ESO syncs it to K8s Secret automatically via:
-#   platform/manifests/external-secrets-config/claude-auth-secret.yaml
-
-# Force ESO refresh if needed (normally refreshes every 1h):
+# 2. Force ESO to sync immediately:
 kubectl annotate externalsecret claude-auth -n experiment-operator-system \
   force-sync=$(date +%s) --overwrite
 
-# Restart operator to pick up new env (if needed)
-kubectl rollout restart deployment/experiment-operator-controller-manager \
-  -n experiment-operator-system
+# 3. Clear the PVC so the init container re-seeds (only if re-seeding):
+kubectl delete pvc claude-credentials-pvc -n experiment-operator-system
+kubectl apply -f platform/manifests/experiment-operator-config/claude-credentials-pvc.yaml
+
+# 4. Next analyzer Job run will seed from Secret → PVC, then refresh independently.
 ```
+
+**Important:** After re-seeding, the local CLI's refresh token is shared with the analyzer
+exactly once. The first analyzer run that successfully refreshes will fork the token chain.
+After that point, do NOT re-seed again — the analyzer's PVC tokens are independent and
+re-seeding would break the analyzer's chain (the local CLI will have already rotated past
+the OpenBao copy).
 
 Analyzer image: `ghcr.io/illmadecoder/experiment-analyzer` (built by CI on changes to `operators/experiment-analyzer/`).
 
@@ -282,8 +317,18 @@ secrets from OpenBao to K8s Secrets via `ClusterSecretStore` named `openbao`.
 
 | OpenBao Path | K8s Secret | Namespace | Purpose | ExternalSecret Manifest |
 |-------------|------------|-----------|---------|------------------------|
-| `secret/experiment-operator/claude-auth` | `claude-auth` | `experiment-operator-system` | Claude Code credentials file (with refresh token) for AI analysis | `platform/manifests/external-secrets-config/claude-auth-secret.yaml` |
+| `secret/experiment-operator/claude-auth` | `claude-auth` | `experiment-operator-system` | Claude Code credentials (seed only — see PVC strategy in §6) | `platform/manifests/external-secrets-config/claude-auth-secret.yaml` |
 | `secret/experiment-operator/github-api-token` | `github-api-token` | `experiment-operator-system` | GitHub PAT for site auto-publish + analyzer commits | `platform/manifests/external-secrets-config/github-api-token-secret.yaml` |
+
+### Analyzer Credentials PVC
+
+The `claude-credentials-pvc` PVC in `experiment-operator-system` persists the analyzer's
+OAuth tokens across Job runs. See §6 for the full credential persistence strategy.
+
+- Manifest: `platform/manifests/experiment-operator-config/claude-credentials-pvc.yaml`
+- Storage class: `local-path-retain` (survives PVC recreation)
+- Size: 1Mi (holds a single JSON credentials file)
+- **Do NOT delete** unless re-seeding is required (breaks the analyzer's token chain)
 
 ### Managing Secrets
 
