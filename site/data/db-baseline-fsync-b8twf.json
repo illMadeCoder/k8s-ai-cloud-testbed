@@ -1,0 +1,233 @@
+{
+  "name": "db-baseline-fsync-b8twf",
+  "namespace": "experiments",
+  "description": "Baseline: naive fsync-per-write store on GKE PD-SSD — measures the floor cost of durable 4-byte sequential writes with no WAL, no batching, no optimization",
+  "createdAt": "2026-02-17T19:49:55Z",
+  "completedAt": "2026-02-17T20:28:47.57557094Z",
+  "durationSeconds": 2332.57557094,
+  "phase": "Complete",
+  "tags": [
+    "baseline",
+    "storage",
+    "database"
+  ],
+  "hypothesis": {
+    "claim": "A naive fsync-per-write store on GKE PD-SSD achieves \u003c5ms p99 write latency for sequential 4-byte writes, establishing the floor cost of durable persistence",
+    "questions": [
+      "What is the true fsync cost on GKE PD-SSD for single-row durable writes?",
+      "How does read latency compare to write latency when reads are served from page cache?",
+      "What sustained write throughput is achievable with fsync-per-write serialization?"
+    ],
+    "focus": [
+      "fsync latency distribution on cloud block storage",
+      "write throughput ceiling under serialized I/O",
+      "page cache hit rate for sequential reads"
+    ]
+  },
+  "analyzerConfig": {
+    "sections": [
+      "abstract",
+      "targetAnalysis",
+      "performanceAnalysis",
+      "metricInsights",
+      "finopsAnalysis",
+      "body",
+      "feedback",
+      "architectureDiagram"
+    ]
+  },
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "db-baseline-fsync-b8twf-app",
+      "clusterType": "gke",
+      "machineType": "e2-standard-4",
+      "nodeCount": 1
+    }
+  ],
+  "workflow": {
+    "name": "db-baseline-fsync-b8twf-validation",
+    "template": "db-baseline-fsync-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-17T20:03:00Z",
+    "finishedAt": "2026-02-17T20:28:44Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-17T20:28:47.779364865Z",
+    "source": "target:cadvisor",
+    "timeRange": {
+      "start": "2026-02-17T19:49:55Z",
+      "end": "2026-02-17T20:28:47.779364865Z",
+      "duration": "38m52.779364865s",
+      "stepSeconds": 0
+    },
+    "queries": {
+      "cpu_by_pod": {
+        "query": "container_cpu_usage_seconds_total by pod (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "CPU usage by pod (cumulative seconds)",
+        "data": [
+          {
+            "labels": {
+              "pod": "kube-prometheus-stack-grafana-bc567b59-pbp2h"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 27.278012
+          },
+          {
+            "labels": {
+              "pod": "kube-state-metrics-0"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 2.213209
+          },
+          {
+            "labels": {
+              "pod": "kube-prometheus-stack-kube-state-metrics-5fd9c8df8b-ghbdh"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 7.159979
+          },
+          {
+            "labels": {
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-4zvw4"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 2.69537
+          },
+          {
+            "labels": {
+              "pod": "operator-64d66c8747-dm65b"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 3.145989
+          },
+          {
+            "labels": {
+              "pod": "alertmanager-kube-prometheus-stack-alertmanager-0"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 1.207769
+          },
+          {
+            "labels": {
+              "pod": "prometheus-kube-prometheus-stack-prometheus-0"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 23.720502999999997
+          },
+          {
+            "labels": {
+              "pod": "kube-prometheus-stack-operator-64f77b4cbc-wqjwj"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 9.634928
+          }
+        ]
+      },
+      "cpu_total": {
+        "query": "sum(container_cpu_usage_seconds_total) (cadvisor)",
+        "type": "instant",
+        "unit": "cores",
+        "description": "Total CPU usage (cumulative seconds)",
+        "data": [
+          {
+            "labels": {
+              "scope": "total"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 77.055759
+          }
+        ]
+      },
+      "memory_by_pod": {
+        "query": "container_memory_working_set_bytes by pod (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Memory working set by pod",
+        "data": [
+          {
+            "labels": {
+              "pod": "prometheus-kube-prometheus-stack-prometheus-0"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 324681728
+          },
+          {
+            "labels": {
+              "pod": "kube-prometheus-stack-grafana-bc567b59-pbp2h"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 295591936
+          },
+          {
+            "labels": {
+              "pod": "kube-state-metrics-0"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 44101632
+          },
+          {
+            "labels": {
+              "pod": "kube-prometheus-stack-kube-state-metrics-5fd9c8df8b-ghbdh"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 17248256
+          },
+          {
+            "labels": {
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-4zvw4"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 10399744
+          },
+          {
+            "labels": {
+              "pod": "operator-64d66c8747-dm65b"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 29761536
+          },
+          {
+            "labels": {
+              "pod": "kube-prometheus-stack-operator-64f77b4cbc-wqjwj"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 20328448
+          },
+          {
+            "labels": {
+              "pod": "alertmanager-kube-prometheus-stack-alertmanager-0"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 31055872
+          }
+        ]
+      },
+      "memory_total": {
+        "query": "sum(container_memory_working_set_bytes) (cadvisor)",
+        "type": "instant",
+        "unit": "bytes",
+        "description": "Total memory working set",
+        "data": [
+          {
+            "labels": {
+              "scope": "total"
+            },
+            "timestamp": "2026-02-17T20:28:47.779364865Z",
+            "value": 773169152
+          }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.017364729250331112,
+    "durationHours": 0.6479376585944444,
+    "perTarget": {
+      "app": 0.017364729250331112
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
