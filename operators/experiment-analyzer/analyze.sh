@@ -163,6 +163,77 @@ run_pass() {
   return 1
 }
 
+# --- Helper: validate Mermaid diagram structure ---
+# Returns non-empty string describing issues if validation fails
+validate_diagram() {
+  local diagram="$1"
+  local issues=""
+
+  # Count nodes: lines matching id["..."] or id(...) or id[...] patterns (excluding subgraph/end lines)
+  local node_count
+  node_count=$(printf '%s\n' "${diagram}" | grep -cE '^\s*[a-zA-Z_][a-zA-Z0-9_]*(\["|(\("|{")|\["|\[)' 2>/dev/null || echo 0)
+  if [ "${node_count}" -gt 10 ]; then
+    issues="${issues}Has ${node_count} nodes (max 10). "
+  elif [ "${node_count}" -gt 8 ]; then
+    issues="${issues}Has ${node_count} nodes (recommended max 8). "
+  fi
+
+  # Count subgraphs
+  local subgraph_count
+  subgraph_count=$(printf '%s\n' "${diagram}" | grep -cE '^\s*subgraph\b' 2>/dev/null || echo 0)
+  if [ "${subgraph_count}" -gt 4 ]; then
+    issues="${issues}Has ${subgraph_count} subgraphs (max 4). "
+  fi
+
+  # Check for nested subgraphs (subgraph before its corresponding end)
+  local depth=0 max_depth=0
+  while IFS= read -r line; do
+    if echo "${line}" | grep -qE '^\s*subgraph\b'; then
+      depth=$((depth + 1))
+      [ "${depth}" -gt "${max_depth}" ] && max_depth=${depth}
+    elif echo "${line}" | grep -qE '^\s*end\s*$'; then
+      [ "${depth}" -gt 0 ] && depth=$((depth - 1))
+    fi
+  done <<< "${diagram}"
+  if [ "${max_depth}" -gt 1 ]; then
+    issues="${issues}Nested subgraphs (depth ${max_depth}, max 1). "
+  fi
+
+  # Check longest label (text inside ["..."] or ["...<br/>..."])
+  local longest_label
+  longest_label=$(printf '%s\n' "${diagram}" | grep -oE '\["[^"]*"\]' | sed 's/\["//;s/"\]//' | sed 's/<br\/>/\n/g' | awk '{ if (length > max) max = length } END { print max+0 }')
+  if [ "${longest_label}" -gt 30 ]; then
+    issues="${issues}Longest label is ${longest_label} chars (max 30). "
+  fi
+
+  printf '%s' "${issues}"
+}
+
+# --- Helper: check diagram rendered width via mmdc ---
+check_diagram_width() {
+  local diagram="$1" max_width="${2:-900}"
+
+  # Skip if mmdc not available
+  if ! command -v mmdc > /dev/null 2>&1; then
+    return 0
+  fi
+
+  printf '%s\n' "${diagram}" > "${WORK_DIR}/diagram_check.mmd"
+  if ! mmdc -i "${WORK_DIR}/diagram_check.mmd" -o "${WORK_DIR}/diagram_check.svg" \
+       -t dark -b transparent --puppeteerConfigFile /dev/null 2>/dev/null; then
+    echo "WARNING: mmdc render failed — skipping width check" >&2
+    return 0
+  fi
+
+  local svg_width
+  svg_width=$(grep -oP 'viewBox="[0-9.]+ [0-9.]+ \K[0-9.]+' "${WORK_DIR}/diagram_check.svg" 2>/dev/null | head -1)
+  if [ -n "${svg_width}" ] && [ "${svg_width%.*}" -gt "${max_width}" ]; then
+    printf '%s' "${svg_width%.*}"
+    return 1
+  fi
+  return 0
+}
+
 SUMMARY_DATA=$(cat "${SUMMARY_FILE}")
 
 # Extract hypothesis context if present (claim, questions, focus from experiment spec)
@@ -300,13 +371,18 @@ Rules:
 - "metricInsights" must have one entry per metric key in metrics.queries, using exact key names
 - Reference specific numbers from the data (CPU cores, memory bytes, durations)
 - Be technical and concise — this is for infrastructure engineers
-- "architectureDiagram": Mermaid flowchart diagram. Use ONLY 'flowchart TD' syntax.
-  Use 'subgraph' for cluster boundaries. Node format: id["Label<br/>Annotation"].
-  Edge format: source -->|label| target. Show ONLY the target cluster(s) and
-  experiment workloads — omit the hub cluster entirely (no operator pod,
-  no Tailscale VPN, no hub-side agents). Focus on the components under test,
-  grouped by role, with data flow between them. Omit ConfigMaps/Secrets/RBAC.
-  Max 10-20 nodes. Single JSON string with \n for line breaks.
+- "architectureDiagram": Mermaid flowchart for an 800px-wide container.
+  SYNTAX: 'flowchart TD' only. 'subgraph' for boundaries (max 3, NO nesting).
+  Node: id["Short Label"]. Max 3 words per label, NO resource metrics in labels.
+  Edge: source -->|label| target. Edge labels 1-2 words max.
+  Max 8 nodes total. Fewer is better.
+  CONTENT: Only target cluster workloads under test — omit hub cluster, operators,
+  kube-state-metrics, node-exporter, ConfigMaps, Secrets, RBAC.
+  Group by role (e.g. "Ingestion", "Storage", "Query").
+  LAYOUT: Keep nodes vertical. Max 2 nodes at the same horizontal level per subgraph.
+  For comparisons with parallel stacks, use one subgraph per stack connected from
+  a shared source at top.
+  Single JSON string with \n for line breaks.
 - "architectureDiagramFormat": "mermaid"
 - Output ONLY the JSON object, no markdown fences or extra text
 
@@ -319,6 +395,61 @@ ${PLAN_DATA}
 ${STUDY_CONTEXT}
 EXPERIMENT DATA:
 ${SUMMARY_DATA}" "${PASS2_FILE}" || true
+
+# --- Diagram validation + retry ---
+if section_requested "architectureDiagram"; then
+  DIAGRAM_TEXT=$(jq -r '.architectureDiagram // ""' "${PASS2_FILE}" 2>/dev/null)
+  if [ -n "${DIAGRAM_TEXT}" ] && [ "${DIAGRAM_TEXT}" != "null" ]; then
+    DIAGRAM_DECODED=$(printf '%b' "${DIAGRAM_TEXT}")
+
+    # Layer B: Structural validation
+    STRUCT_ISSUES=$(validate_diagram "${DIAGRAM_DECODED}" || true)
+
+    # Layer C: SVG width check (only if structural validation passed)
+    WIDTH_ISSUE=""
+    if [ -z "${STRUCT_ISSUES}" ]; then
+      RENDERED_WIDTH=$(check_diagram_width "${DIAGRAM_DECODED}" 900 || true)
+      if [ -n "${RENDERED_WIDTH}" ] && [ "${RENDERED_WIDTH}" != "0" ]; then
+        WIDTH_ISSUE="Diagram rendered to ${RENDERED_WIDTH}px wide (must fit 800px). "
+      fi
+    fi
+
+    ALL_ISSUES="${STRUCT_ISSUES}${WIDTH_ISSUE}"
+    if [ -n "${ALL_ISSUES}" ]; then
+      echo "==> Diagram validation failed: ${ALL_ISSUES}"
+      echo "==> Retrying diagram generation with tighter constraints..."
+
+      RETRY_FILE="${WORK_DIR}/diagram_retry.json"
+      RETRY_PROMPT="You previously generated a Mermaid architecture diagram that has issues:
+${ALL_ISSUES}
+
+Fix the diagram. Output ONLY a JSON object with a single key:
+{\"architectureDiagram\": \"<fixed mermaid flowchart>\"}
+
+Rules:
+- flowchart TD only, max 6 nodes, max 2 subgraphs (NO nesting)
+- Labels: max 2 words, no resource metrics
+- Edge labels: 1-2 words max
+- Keep it simple and vertical — must fit an 800px container
+- Single JSON string with \\n for line breaks
+- Output ONLY the JSON object, no markdown fences
+
+Original diagram:
+${DIAGRAM_TEXT}"
+
+      if run_pass "diagram_retry" "${RETRY_PROMPT}" "${RETRY_FILE}"; then
+        # Merge retry diagram back into pass 2 output
+        jq -s '.[0] * .[1]' "${PASS2_FILE}" "${RETRY_FILE}" > "${PASS2_FILE}.tmp" \
+          && mv "${PASS2_FILE}.tmp" "${PASS2_FILE}"
+        echo "==> Diagram retry merged into pass 2 output"
+      else
+        echo "WARNING: Diagram retry failed — using original diagram"
+      fi
+    else
+      echo "==> Diagram validation passed"
+    fi
+  fi
+fi
 
 else
   echo "==> Skipping pass 2 (core) — no relevant sections requested"
@@ -498,8 +629,12 @@ Each block has a "type" field. Available types:
                Fields: type, capability, values
   table      — Data table. "headers" array + "rows" (array of string arrays) + "caption".
                Fields: type, headers, rows, caption (optional)
-  architecture — Mermaid flowchart diagram. "diagram" is 'flowchart TD' syntax with \\n.
+  architecture — Mermaid flowchart diagram. Same rules as top-level architectureDiagram:
+               max 8 nodes, max 3 subgraphs (no nesting), short labels (max 3 words).
+               "diagram" is 'flowchart TD' syntax with \\n.
                "format" must be "mermaid". "caption" optional.
+               Only include if the body needs a DIFFERENT view (e.g. data flow detail).
+               Do NOT duplicate the top-level architectureDiagram.
                Fields: type, diagram, format, caption (optional)
   callout    — Emphasis box. "variant" (info|warning|success|finding) + "title" + "content".
                Fields: type, variant, title, content
@@ -660,7 +795,7 @@ for artifact in \
 done
 
 # Upload raw JSONL outputs (the full claude response before extraction) and stderr
-for pass_name in pass_1_plan pass_2_core pass_3_finops_secops pass_4_capabilities pass_5_body_synthesis; do
+for pass_name in pass_1_plan pass_2_core pass_3_finops_secops pass_4_capabilities pass_5_body_synthesis diagram_retry; do
   for suffix in _raw.json _stderr.log; do
     LOCAL="${WORK_DIR}/${pass_name}${suffix}"
     if [ -f "${LOCAL}" ] && [ -s "${LOCAL}" ]; then
