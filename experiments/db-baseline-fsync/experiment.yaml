@@ -45,35 +45,6 @@ spec:
         - app: metrics-egress
 
   metrics:
-    # Diagnostic queries — remove after debugging
-    - name: diag_up_targets
-      query: "count(up)"
-      type: instant
-      unit: count
-      description: "Diagnostic: total scrape targets in Prometheus"
-      group: diagnostic
-
-    - name: diag_naivedb_up
-      query: "up{job=\"naive-db\"}"
-      type: instant
-      unit: count
-      description: "Diagnostic: naive-db scrape target status"
-      group: diagnostic
-
-    - name: diag_naivedb_any
-      query: "count({__name__=~\"naivedb.*\"})"
-      type: instant
-      unit: count
-      description: "Diagnostic: any naivedb metrics (no namespace filter)"
-      group: diagnostic
-
-    - name: diag_rows_nofilter
-      query: "naivedb_rows_total"
-      type: instant
-      unit: rows
-      description: "Diagnostic: total rows without namespace filter"
-      group: diagnostic
-
     - name: write_p99_latency
       query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
       type: instant
