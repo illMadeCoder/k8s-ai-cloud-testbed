@@ -1,0 +1,445 @@
+{
+  "name": "db-baseline-fsync-c6wcb",
+  "namespace": "experiments",
+  "description": "Baseline: naive fsync-per-write store on GKE PD-SSD — measures the floor cost of durable 4-byte sequential writes with no WAL, no batching, no optimization",
+  "createdAt": "2026-02-18T02:42:46Z",
+  "completedAt": "2026-02-18T03:20:21.11944666Z",
+  "durationSeconds": 2255.11944666,
+  "phase": "Complete",
+  "tags": [
+    "baseline",
+    "storage",
+    "database"
+  ],
+  "hypothesis": {
+    "claim": "A naive fsync-per-write store on GKE PD-SSD achieves \u003c5ms p99 write latency for sequential 4-byte writes, establishing the floor cost of durable persistence",
+    "questions": [
+      "What is the true fsync cost on GKE PD-SSD for single-row durable writes?",
+      "How does read latency compare to write latency when reads are served from page cache?",
+      "What sustained write throughput is achievable with fsync-per-write serialization?"
+    ],
+    "focus": [
+      "fsync latency distribution on cloud block storage",
+      "write throughput ceiling under serialized I/O",
+      "page cache hit rate for sequential reads"
+    ]
+  },
+  "analyzerConfig": {
+    "sections": [
+      "abstract",
+      "targetAnalysis",
+      "performanceAnalysis",
+      "metricInsights",
+      "finopsAnalysis",
+      "body",
+      "feedback",
+      "architectureDiagram"
+    ]
+  },
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "db-baseline-fsync-c6wcb-app",
+      "clusterType": "gke",
+      "machineType": "e2-standard-4",
+      "nodeCount": 1,
+      "components": [
+        "ConfigMap/alloy",
+        "ConfigMap/kube-prometheus-stack-alertmanager-overview",
+        "ConfigMap/kube-prometheus-stack-apiserver",
+        "ConfigMap/kube-prometheus-stack-cluster-total",
+        "ConfigMap/kube-prometheus-stack-controller-manager",
+        "ConfigMap/kube-prometheus-stack-etcd",
+        "ConfigMap/kube-prometheus-stack-grafana",
+        "ConfigMap/kube-prometheus-stack-grafana-config-dashboards",
+        "ConfigMap/kube-prometheus-stack-grafana-datasource",
+        "ConfigMap/kube-prometheus-stack-grafana-overview",
+        "ConfigMap/kube-prometheus-stack-k8s-coredns",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-cluster",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-multicluster",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-namespace",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-node",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-pod",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-workload",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-workloads-namespace",
+        "ConfigMap/kube-prometheus-stack-kubelet",
+        "ConfigMap/kube-prometheus-stack-namespace-by-pod",
+        "ConfigMap/kube-prometheus-stack-namespace-by-workload",
+        "ConfigMap/kube-prometheus-stack-node-cluster-rsrc-use",
+        "ConfigMap/kube-prometheus-stack-node-rsrc-use",
+        "ConfigMap/kube-prometheus-stack-nodes",
+        "ConfigMap/kube-prometheus-stack-nodes-aix",
+        "ConfigMap/kube-prometheus-stack-nodes-darwin",
+        "ConfigMap/kube-prometheus-stack-persistentvolumesusage",
+        "ConfigMap/kube-prometheus-stack-pod-total",
+        "ConfigMap/kube-prometheus-stack-prometheus",
+        "ConfigMap/kube-prometheus-stack-proxy",
+        "ConfigMap/kube-prometheus-stack-scheduler",
+        "ConfigMap/kube-prometheus-stack-workload-total",
+        "Namespace/observability",
+        "Secret/alertmanager-kube-prometheus-stack-alertmanager",
+        "Secret/kube-prometheus-stack-grafana",
+        "Service/alloy",
+        "Service/kube-prometheus-stack-alertmanager",
+        "Service/kube-prometheus-stack-grafana",
+        "Service/kube-prometheus-stack-kube-state-metrics",
+        "Service/kube-prometheus-stack-operator",
+        "Service/kube-prometheus-stack-prometheus",
+        "Service/kube-prometheus-stack-prometheus-node-exporter",
+        "Service/naive-db",
+        "Service/kube-prometheus-stack-coredns",
+        "Service/kube-prometheus-stack-kube-controller-manager",
+        "Service/kube-prometheus-stack-kube-etcd",
+        "Service/kube-prometheus-stack-kube-proxy",
+        "Service/kube-prometheus-stack-kube-scheduler",
+        "Service/vm-hub",
+        "ServiceAccount/alloy",
+        "ServiceAccount/kube-prometheus-stack-admission",
+        "ServiceAccount/kube-prometheus-stack-alertmanager",
+        "ServiceAccount/kube-prometheus-stack-grafana",
+        "ServiceAccount/kube-prometheus-stack-kube-state-metrics",
+        "ServiceAccount/kube-prometheus-stack-operator",
+        "ServiceAccount/kube-prometheus-stack-prometheus",
+        "ServiceAccount/kube-prometheus-stack-prometheus-node-exporter",
+        "MutatingWebhookConfiguration/kube-prometheus-stack-admission",
+        "ValidatingWebhookConfiguration/kube-prometheus-stack-admission",
+        "CustomResourceDefinition/alertmanagerconfigs.monitoring.coreos.com",
+        "CustomResourceDefinition/alertmanagers.monitoring.coreos.com",
+        "CustomResourceDefinition/podlogs.monitoring.grafana.com",
+        "CustomResourceDefinition/podmonitors.monitoring.coreos.com",
+        "CustomResourceDefinition/probes.monitoring.coreos.com",
+        "CustomResourceDefinition/prometheusagents.monitoring.coreos.com",
+        "CustomResourceDefinition/prometheuses.monitoring.coreos.com",
+        "CustomResourceDefinition/prometheusrules.monitoring.coreos.com",
+        "CustomResourceDefinition/scrapeconfigs.monitoring.coreos.com",
+        "CustomResourceDefinition/servicemonitors.monitoring.coreos.com",
+        "CustomResourceDefinition/thanosrulers.monitoring.coreos.com",
+        "DaemonSet/alloy",
+        "DaemonSet/kube-prometheus-stack-prometheus-node-exporter",
+        "Deployment/kube-prometheus-stack-grafana",
+        "Deployment/kube-prometheus-stack-kube-state-metrics",
+        "Deployment/kube-prometheus-stack-operator",
+        "StatefulSet/naive-db",
+        "Job/kube-prometheus-stack-admission-create",
+        "Job/naive-db-debug-scrape",
+        "Job/naive-db-loadgen",
+        "Alertmanager/kube-prometheus-stack-alertmanager",
+        "Prometheus/kube-prometheus-stack-prometheus",
+        "PrometheusRule/kube-prometheus-stack-alertmanager.rules",
+        "PrometheusRule/kube-prometheus-stack-config-reloaders",
+        "PrometheusRule/kube-prometheus-stack-etcd",
+        "PrometheusRule/kube-prometheus-stack-general.rules",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-cpu-usage-seconds-tot",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-cache",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-rss",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-swap",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-working-set-by",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-resource",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.pod-owner",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-availability.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-burnrate.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-histogram.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-slos",
+        "PrometheusRule/kube-prometheus-stack-kube-prometheus-general.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-prometheus-node-recording.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-scheduler.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-state-metrics",
+        "PrometheusRule/kube-prometheus-stack-kubelet.rules",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-apps",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-resources",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-storage",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-apiserver",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-controller-manager",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-kube-proxy",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-kubelet",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-scheduler",
+        "PrometheusRule/kube-prometheus-stack-node-exporter",
+        "PrometheusRule/kube-prometheus-stack-node-exporter.rules",
+        "PrometheusRule/kube-prometheus-stack-node-network",
+        "PrometheusRule/kube-prometheus-stack-node.rules",
+        "PrometheusRule/kube-prometheus-stack-prometheus",
+        "PrometheusRule/kube-prometheus-stack-prometheus-operator",
+        "ServiceMonitor/kube-prometheus-stack-alertmanager",
+        "ServiceMonitor/kube-prometheus-stack-apiserver",
+        "ServiceMonitor/kube-prometheus-stack-coredns",
+        "ServiceMonitor/kube-prometheus-stack-grafana",
+        "ServiceMonitor/kube-prometheus-stack-kube-controller-manager",
+        "ServiceMonitor/kube-prometheus-stack-kube-etcd",
+        "ServiceMonitor/kube-prometheus-stack-kube-proxy",
+        "ServiceMonitor/kube-prometheus-stack-kube-scheduler",
+        "ServiceMonitor/kube-prometheus-stack-kube-state-metrics",
+        "ServiceMonitor/kube-prometheus-stack-kubelet",
+        "ServiceMonitor/kube-prometheus-stack-operator",
+        "ServiceMonitor/kube-prometheus-stack-prometheus",
+        "ServiceMonitor/kube-prometheus-stack-prometheus-node-exporter",
+        "ServiceMonitor/naive-db",
+        "ClusterRole/alloy",
+        "ClusterRole/kube-prometheus-stack-admission",
+        "ClusterRole/kube-prometheus-stack-grafana-clusterrole",
+        "ClusterRole/kube-prometheus-stack-kube-state-metrics",
+        "ClusterRole/kube-prometheus-stack-operator",
+        "ClusterRole/kube-prometheus-stack-prometheus",
+        "ClusterRoleBinding/alloy",
+        "ClusterRoleBinding/kube-prometheus-stack-admission",
+        "ClusterRoleBinding/kube-prometheus-stack-grafana-clusterrolebinding",
+        "ClusterRoleBinding/kube-prometheus-stack-kube-state-metrics",
+        "ClusterRoleBinding/kube-prometheus-stack-operator",
+        "ClusterRoleBinding/kube-prometheus-stack-prometheus",
+        "Role/kube-prometheus-stack-admission",
+        "Role/kube-prometheus-stack-grafana",
+        "RoleBinding/kube-prometheus-stack-admission",
+        "RoleBinding/kube-prometheus-stack-grafana"
+      ]
+    }
+  ],
+  "workflow": {
+    "name": "db-baseline-fsync-c6wcb-validation",
+    "template": "db-baseline-fsync-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-18T02:54:33Z",
+    "finishedAt": "2026-02-18T03:20:09Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-18T03:20:22.072741586Z",
+    "source": "target:db-baseline-fsync-c6wcb/kube-prometheus-stack-prometheus",
+    "timeRange": {
+      "start": "2026-02-18T02:42:46Z",
+      "end": "2026-02-18T03:20:22.072653196Z",
+      "duration": "37m36.072653196s",
+      "stepSeconds": 60
+    },
+    "queries": {
+      "diag_naivedb_any": {
+        "query": "count({__name__=~\"naivedb.*\"})",
+        "type": "instant",
+        "unit": "count",
+        "description": "Diagnostic: any naivedb metrics (no namespace filter)",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 39
+          }
+        ]
+      },
+      "diag_naivedb_up": {
+        "query": "up{job=\"naive-db\"}",
+        "type": "instant",
+        "unit": "count",
+        "description": "Diagnostic: naive-db scrape target status",
+        "data": [
+          {
+            "labels": {
+              "__name__": "up",
+              "container": "naive-db",
+              "endpoint": "http",
+              "instance": "10.1.0.18:8080",
+              "job": "naive-db",
+              "namespace": "db-baseline-fsync-c6wcb",
+              "pod": "naive-db-0",
+              "service": "naive-db"
+            },
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 1
+          }
+        ]
+      },
+      "diag_rows_nofilter": {
+        "query": "naivedb_rows_total",
+        "type": "instant",
+        "unit": "rows",
+        "description": "Diagnostic: total rows without namespace filter",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "container": "naive-db",
+              "endpoint": "http",
+              "instance": "10.1.0.18:8080",
+              "job": "naive-db",
+              "namespace": "db-baseline-fsync-c6wcb",
+              "pod": "naive-db-0",
+              "service": "naive-db"
+            },
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 12753
+          }
+        ]
+      },
+      "diag_up_targets": {
+        "query": "count(up)",
+        "type": "instant",
+        "unit": "count",
+        "description": "Diagnostic: total scrape targets in Prometheus",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 14
+          }
+        ]
+      },
+      "fsync_latency_over_time": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"db-baseline-fsync-c6wcb\"}[1m])) by (le))",
+        "type": "range",
+        "unit": "seconds",
+        "description": "P99 fsync latency over time",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:08:46Z",
+            "value": 0.004963072148952677
+          },
+          {
+            "timestamp": "2026-02-18T03:09:46Z",
+            "value": 0.00496
+          },
+          {
+            "timestamp": "2026-02-18T03:10:46Z",
+            "value": 0.00496
+          },
+          {
+            "timestamp": "2026-02-18T03:11:46Z",
+            "value": 0.00496
+          }
+        ]
+      },
+      "fsync_p50_latency": {
+        "query": "histogram_quantile(0.5, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"db-baseline-fsync-c6wcb\"}[37m36s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "P50 fsync-only latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 0.0030006944444444447
+          }
+        ]
+      },
+      "fsync_p99_latency": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"db-baseline-fsync-c6wcb\"}[37m36s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "P99 fsync-only latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 0.004961375
+          }
+        ]
+      },
+      "read_p99_latency": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_read_duration_seconds_bucket{namespace=~\"db-baseline-fsync-c6wcb\"}[37m36s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "P99 read latency (page cache)",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 0.000023567567567567648
+          }
+        ]
+      },
+      "read_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"read\", namespace=~\"db-baseline-fsync-c6wcb\"}[37m36s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "Read operations per second",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 1.31310117464539
+          }
+        ]
+      },
+      "total_rows": {
+        "query": "naivedb_rows_total{namespace=~\"db-baseline-fsync-c6wcb\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "Total rows written",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "container": "naive-db",
+              "endpoint": "http",
+              "instance": "10.1.0.18:8080",
+              "job": "naive-db",
+              "namespace": "db-baseline-fsync-c6wcb",
+              "pod": "naive-db-0",
+              "service": "naive-db"
+            },
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 12753
+          }
+        ]
+      },
+      "write_latency_over_time": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"db-baseline-fsync-c6wcb\"}[1m])) by (le))",
+        "type": "range",
+        "unit": "seconds",
+        "description": "P99 write latency over time",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:08:46Z",
+            "value": 0.004963072148952677
+          },
+          {
+            "timestamp": "2026-02-18T03:09:46Z",
+            "value": 0.00496
+          },
+          {
+            "timestamp": "2026-02-18T03:10:46Z",
+            "value": 0.00496
+          },
+          {
+            "timestamp": "2026-02-18T03:11:46Z",
+            "value": 0.00496
+          }
+        ]
+      },
+      "write_p50_latency": {
+        "query": "histogram_quantile(0.5, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"db-baseline-fsync-c6wcb\"}[37m36s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "P50 write latency including fsync",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 0.003001041847542976
+          }
+        ]
+      },
+      "write_p99_latency": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"db-baseline-fsync-c6wcb\"}[37m36s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "P99 write latency including fsync",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 0.004962062858135093
+          }
+        ]
+      },
+      "write_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", namespace=~\"db-baseline-fsync-c6wcb\"}[37m36s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "Write operations per second",
+        "data": [
+          {
+            "timestamp": "2026-02-18T03:20:22Z",
+            "value": 2.629934131205674
+          }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.016788111436246672,
+    "durationHours": 0.6264220685166667,
+    "perTarget": {
+      "app": 0.016788111436246672
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  }
+}
