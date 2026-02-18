@@ -10,6 +10,8 @@ spec:
   selector:
     matchLabels:
       app: naive-db-fsync
+  targetLabels:
+    - app
   endpoints:
     - port: http
       interval: 15s
