@@ -288,6 +288,18 @@ Run all of these checks and track their results (PASS/WARN/FAIL):
 - If at least one non-infrastructure pod appears → PASS
 - If no pod-level metrics exist → N/A
 
+**Check 5: Presentation Sanity**
+- For each metric in `summary.metrics.queries` that has data:
+  - Read the `unit` field and `data[0].value`
+  - Flag if `unit` is null/empty for a metric that should have units
+    (latency metrics ending in `_latency`, `_p50`, `_p99` should have `unit: "seconds"`)
+  - Simulate formatting: for unit="seconds", check if value < 0.01 and would display
+    as "0.00s" with naive toFixed(2)
+  - Flag any metric where the formatted display would show "0.00" for a non-zero raw value
+- Report: "Presentation: X/Y metrics render correctly"
+- If any metric would render as "0.00" for a non-zero value → WARN
+- If unit is missing on a metric that should have one → WARN
+
 ### Quality Scorecard
 
 Report the results as a scorecard:
@@ -298,6 +310,7 @@ Results Quality:
   [WARN] Metrics source: target:cadvisor (no custom metric pipeline)
   [FAIL] Workload pods: 0 visible in cadvisor
   [N/A]  Machine verdict: no success criteria defined
+  [PASS] Presentation: 10/10 metrics render correctly
 ```
 
 Determine the overall quality gate status:
@@ -483,6 +496,7 @@ Report the quality scorecard with all warnings. Proceed to Step 7 but include th
    | Missing `metrics-agent`/`metrics-egress` | `add-metrics-pipeline` | Add `- app: metrics-agent` and `- app: metrics-egress` to target components |
    | `$NAMESPACE` in queries | `fix-namespace-var` | Replace all `$NAMESPACE` with `$EXPERIMENT` in experiment.yaml |
    | Missing load generation | `add-load-test` | Add load-test step to workflow template (if no `k8s/loadgen.yaml` exists) |
+   | Missing `unit` field on latency metrics | `add-metric-units` | Add `unit: seconds` to metrics ending in `_latency`, `_p50`, `_p99` in experiment.yaml |
 
    **Not auto-fixable** (escalate to user):
    - AI verdict `insufficient` but custom metrics are present — may be a data timing issue
