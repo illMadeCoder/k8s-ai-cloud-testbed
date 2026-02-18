@@ -1,0 +1,17 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Component
+metadata:
+  name: naive-db-fsync
+spec:
+  type: app
+  description: "Naive database with fsync-per-write — durable variant for fsync vs in-memory comparison"
+  sources:
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
+      targetRevision: HEAD
+      path: components/apps/naive-db-fsync/k8s
+  observability:
+    serviceMonitor: true
+    podLabels:
+      app: naive-db-fsync
+    metricsPort: 8080
+    metricsPath: /metrics

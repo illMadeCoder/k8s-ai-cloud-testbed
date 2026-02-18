@@ -10,7 +10,7 @@ mod handlers;
 mod metrics;
 mod store;
 
-use store::FileStore;
+use store::{FileStore, SyncMode};
 
 #[tokio::main]
 async fn main() {
@@ -18,14 +18,19 @@ async fn main() {
 
     let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| "/data".to_string());
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let sync_mode = SyncMode::from_env();
 
-    let store = Arc::new(FileStore::open_or_create(&data_dir).expect("failed to open store"));
+    info!(?sync_mode, "sync mode");
+
+    let store = Arc::new(FileStore::open_or_create(&data_dir, sync_mode).expect("failed to open store"));
     info!(rows = store.row_count(), "store ready");
     metrics::ROWS_TOTAL.set(store.row_count() as f64);
 
     let app = Router::new()
         .route("/write", post(handlers::write))
+        .route("/batch-write", post(handlers::batch_write))
         .route("/read/{row_id}", get(handlers::read))
+        .route("/scan", get(handlers::scan))
         .route("/health", get(handlers::health))
         .route("/ready", get(handlers::ready))
         .route("/metrics", get(handlers::serve_metrics))

@@ -1,0 +1,245 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Experiment
+metadata:
+  generateName: db-fvm-
+  namespace: experiments
+spec:
+  description: "Comparison: fsync-per-write (durable) vs no-fsync (volatile page cache) on GKE PD-SSD — measures the true cost of durability across sequential writes, burst writes, batch writes, reads, scans, and mixed OLTP workloads"
+  tags: ["comparison", "storage", "database", "baseline"]
+  publish: true
+
+  analyzerConfig:
+    sections:
+      - abstract
+      - capabilitiesMatrix
+      - targetAnalysis
+      - performanceAnalysis
+      - metricInsights
+      - finopsAnalysis
+      - body
+      - feedback
+      - architectureDiagram
+
+  hypothesis:
+    claim: "Skipping fsync reduces p99 write latency by 10x+ and increases sustained write throughput by 100x+, while read latency is identical between modes"
+    questions:
+      - "What is the true per-write cost of fsync on GKE PD-SSD?"
+      - "How does write throughput scale when freed from fsync serialization?"
+      - "Are read and scan operations independent of sync mode?"
+      - "How does amortized batch-fsync compare to per-write fsync cost?"
+    focus:
+      - "fsync vs page-cache write latency distribution"
+      - "throughput ceiling with and without durable writes"
+      - "batch amortization of fsync cost"
+      - "read path independence from sync mode"
+
+  targets:
+    - name: app
+      cluster:
+        type: gke
+        machineType: e2-standard-4
+        preemptible: true
+      components:
+        - app: naive-db-fsync
+        - app: naive-db-nosync
+        - app: db-benchmark-loadgen
+        - app: kube-prometheus-stack
+          params:
+            prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues: "false"
+        - app: metrics-agent
+        - app: metrics-egress
+
+  metrics:
+    # --- fsync variant ---
+    - name: fsync_write_p50
+      query: "histogram_quantile(0.5, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "Fsync variant: P50 write latency"
+      group: fsync
+
+    - name: fsync_write_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "Fsync variant: P99 write latency"
+      group: fsync
+
+    - name: fsync_fsync_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "Fsync variant: P99 fsync-only latency"
+      group: fsync
+
+    - name: fsync_read_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_read_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "Fsync variant: P99 read latency"
+      group: fsync
+
+    - name: fsync_write_throughput
+      query: "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}[$DURATION]))"
+      type: instant
+      unit: ops/s
+      description: "Fsync variant: write ops/sec"
+      group: fsync
+
+    - name: fsync_read_throughput
+      query: "sum(rate(naivedb_operations_total{op=\"read\", app=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}[$DURATION]))"
+      type: instant
+      unit: ops/s
+      description: "Fsync variant: read ops/sec"
+      group: fsync
+
+    # --- nosync variant ---
+    - name: nosync_write_p50
+      query: "histogram_quantile(0.5, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "NoSync variant: P50 write latency"
+      group: nosync
+
+    - name: nosync_write_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "NoSync variant: P99 write latency"
+      group: nosync
+
+    - name: nosync_fsync_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "NoSync variant: P99 fsync-only latency (should be ~0)"
+      group: nosync
+
+    - name: nosync_read_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_read_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "NoSync variant: P99 read latency"
+      group: nosync
+
+    - name: nosync_write_throughput
+      query: "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}[$DURATION]))"
+      type: instant
+      unit: ops/s
+      description: "NoSync variant: write ops/sec"
+      group: nosync
+
+    - name: nosync_read_throughput
+      query: "sum(rate(naivedb_operations_total{op=\"read\", app=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}[$DURATION]))"
+      type: instant
+      unit: ops/s
+      description: "NoSync variant: read ops/sec"
+      group: nosync
+
+    # --- batch writes ---
+    - name: fsync_batch_write_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_batch_write_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "Fsync variant: P99 batch write latency"
+      group: batch
+
+    - name: nosync_batch_write_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_batch_write_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "NoSync variant: P99 batch write latency"
+      group: batch
+
+    # --- timeseries ---
+    - name: write_latency_over_time
+      query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[1m])) by (le, app))"
+      type: range
+      unit: seconds
+      description: "P99 write latency over time by variant"
+      group: timeseries
+
+    - name: fsync_latency_over_time
+      query: "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[1m])) by (le, app))"
+      type: range
+      unit: seconds
+      description: "P99 fsync latency over time by variant"
+      group: timeseries
+
+    - name: write_throughput_over_time
+      query: "sum(rate(naivedb_operations_total{op=\"write\", namespace=~\"$EXPERIMENT\"}[1m])) by (app)"
+      type: range
+      unit: ops/s
+      description: "Write throughput over time by variant"
+      group: timeseries
+
+    - name: read_throughput_over_time
+      query: "sum(rate(naivedb_operations_total{op=\"read\", namespace=~\"$EXPERIMENT\"}[1m])) by (app)"
+      type: range
+      unit: ops/s
+      description: "Read throughput over time by variant"
+      group: timeseries
+
+    # --- resources ---
+    - name: fsync_cpu
+      query: "rate(container_cpu_usage_seconds_total{container=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}[1m])"
+      type: range
+      unit: cores
+      description: "Fsync variant: CPU usage"
+      group: resources
+
+    - name: nosync_cpu
+      query: "rate(container_cpu_usage_seconds_total{container=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}[1m])"
+      type: range
+      unit: cores
+      description: "NoSync variant: CPU usage"
+      group: resources
+
+    - name: fsync_memory
+      query: "container_memory_working_set_bytes{container=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}"
+      type: range
+      unit: bytes
+      description: "Fsync variant: memory usage"
+      group: resources
+
+    - name: nosync_memory
+      query: "container_memory_working_set_bytes{container=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}"
+      type: range
+      unit: bytes
+      description: "NoSync variant: memory usage"
+      group: resources
+
+    # --- totals ---
+    - name: fsync_total_rows
+      query: "naivedb_rows_total{app=\"naive-db-fsync\", namespace=~\"$EXPERIMENT\"}"
+      type: instant
+      unit: rows
+      description: "Fsync variant: total rows written"
+      group: totals
+
+    - name: nosync_total_rows
+      query: "naivedb_rows_total{app=\"naive-db-nosync\", namespace=~\"$EXPERIMENT\"}"
+      type: instant
+      unit: rows
+      description: "NoSync variant: total rows written"
+      group: totals
+
+    # --- cluster ---
+    - name: cluster_cpu
+      query: "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$EXPERIMENT\", container!=\"\"}[1m]))"
+      type: range
+      unit: cores
+      description: "Total workload CPU usage"
+      group: cluster
+
+    - name: cluster_memory
+      query: "sum(container_memory_working_set_bytes{namespace=~\"$EXPERIMENT\", container!=\"\"})"
+      type: range
+      unit: bytes
+      description: "Total workload memory usage"
+      group: cluster
+
+  workflow:
+    template: db-fsync-vs-memory-validation
+    completion:
+      mode: workflow

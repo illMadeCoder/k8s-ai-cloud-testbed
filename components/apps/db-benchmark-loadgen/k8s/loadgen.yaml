@@ -1,0 +1,207 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-benchmark-loadgen
+  labels:
+    app: db-benchmark-loadgen
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: db-benchmark-loadgen
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-dbs
+          image: curlimages/curl:8.5.0
+          command: [sh, -c]
+          args:
+            - |
+              echo "Waiting for naive-db-fsync and naive-db-nosync..."
+              for i in $(seq 1 60); do
+                fsync_ok=0
+                nosync_ok=0
+                if curl -sf http://naive-db-fsync/ready >/dev/null 2>&1; then
+                  fsync_ok=1
+                fi
+                if curl -sf http://naive-db-nosync/ready >/dev/null 2>&1; then
+                  nosync_ok=1
+                fi
+                if [ "$fsync_ok" -eq 1 ] && [ "$nosync_ok" -eq 1 ]; then
+                  echo "Both databases ready"
+                  exit 0
+                fi
+                echo "Attempt $i/60 — fsync=$fsync_ok nosync=$nosync_ok — retrying in 5s..."
+                sleep 5
+              done
+              echo "Databases not ready after 5 minutes"
+              exit 1
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.5.0
+          command: [sh, -c]
+          args:
+            - |
+              set -e
+              FSYNC="http://naive-db-fsync"
+              NOSYNC="http://naive-db-nosync"
+
+              # ============================================================
+              # Phase 1: Sequential writes with 10ms pacing (2000 per variant)
+              # ============================================================
+              echo "=== Phase 1: Sequential writes (10ms pacing) ==="
+              for variant in fsync nosync; do
+                if [ "$variant" = "fsync" ]; then URL="$FSYNC"; else URL="$NOSYNC"; fi
+                echo "--- $variant variant ---"
+                i=0
+                while [ "$i" -lt 2000 ]; do
+                  val=$((i + 1))
+                  curl -sf -X POST "$URL/write" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"value\": $val}" >/dev/null
+                  i=$((i + 1))
+                  # 10ms pacing — busybox sleep supports fractions
+                  sleep 0.01
+                  if [ $((i % 500)) -eq 0 ]; then
+                    echo "$variant writes: $i / 2000"
+                  fi
+                done
+                echo "$variant sequential writes complete: 2000"
+              done
+
+              # ============================================================
+              # Phase 2: Write burst — no pacing (1000 per variant)
+              # ============================================================
+              echo "=== Phase 2: Write burst (no pacing) ==="
+              for variant in fsync nosync; do
+                if [ "$variant" = "fsync" ]; then URL="$FSYNC"; else URL="$NOSYNC"; fi
+                echo "--- $variant variant ---"
+                start_ts=$(date +%s)
+                i=0
+                while [ "$i" -lt 1000 ]; do
+                  val=$((3000 + i))
+                  curl -sf -X POST "$URL/write" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"value\": $val}" >/dev/null
+                  i=$((i + 1))
+                  if [ $((i % 250)) -eq 0 ]; then
+                    elapsed=$(( $(date +%s) - start_ts ))
+                    rate=0
+                    if [ "$elapsed" -gt 0 ]; then rate=$((i / elapsed)); fi
+                    echo "$variant burst: $i / 1000 ($rate writes/sec)"
+                  fi
+                done
+                elapsed=$(( $(date +%s) - start_ts ))
+                echo "$variant burst complete: 1000 writes in ${elapsed}s"
+              done
+
+              # ============================================================
+              # Phase 3: Batch writes (10, 50, 100 per batch × 20 reps)
+              # ============================================================
+              echo "=== Phase 3: Batch writes ==="
+              for variant in fsync nosync; do
+                if [ "$variant" = "fsync" ]; then URL="$FSYNC"; else URL="$NOSYNC"; fi
+                echo "--- $variant variant ---"
+                for batch_size in 10 50 100; do
+                  rep=0
+                  while [ "$rep" -lt 20 ]; do
+                    # Build JSON array via shell string concatenation
+                    vals=""
+                    j=0
+                    while [ "$j" -lt "$batch_size" ]; do
+                      v=$(od -An -N2 -tu2 /dev/urandom | tr -d ' ')
+                      if [ -z "$vals" ]; then
+                        vals="$v"
+                      else
+                        vals="$vals,$v"
+                      fi
+                      j=$((j + 1))
+                    done
+                    curl -sf -X POST "$URL/batch-write" \
+                      -H "Content-Type: application/json" \
+                      -d "{\"values\": [$vals]}" >/dev/null
+                    rep=$((rep + 1))
+                  done
+                  echo "$variant batch=$batch_size: 20 reps done"
+                done
+              done
+
+              # ============================================================
+              # Phase 4: Random point reads (2000 per variant)
+              # ============================================================
+              echo "=== Phase 4: Random point reads ==="
+              for variant in fsync nosync; do
+                if [ "$variant" = "fsync" ]; then URL="$FSYNC"; else URL="$NOSYNC"; fi
+                echo "--- $variant variant ---"
+                i=0
+                while [ "$i" -lt 2000 ]; do
+                  row_id=$(($(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % 2000))
+                  curl -sf "$URL/read/$row_id" >/dev/null
+                  i=$((i + 1))
+                  if [ $((i % 500)) -eq 0 ]; then
+                    echo "$variant reads: $i / 2000"
+                  fi
+                done
+                echo "$variant random reads complete: 2000"
+              done
+
+              # ============================================================
+              # Phase 5: Sequential scan (1000 rows per variant)
+              # ============================================================
+              echo "=== Phase 5: Sequential scan ==="
+              for variant in fsync nosync; do
+                if [ "$variant" = "fsync" ]; then URL="$FSYNC"; else URL="$NOSYNC"; fi
+                echo "--- $variant variant ---"
+                curl -sf "$URL/scan?start=0&count=1000" >/dev/null
+                echo "$variant scan complete: 1000 rows"
+              done
+
+              # ============================================================
+              # Phase 6: Mixed OLTP — 70% read / 30% write (2000 ops per variant)
+              # ============================================================
+              echo "=== Phase 6: Mixed OLTP (70/30 read/write) ==="
+              for variant in fsync nosync; do
+                if [ "$variant" = "fsync" ]; then URL="$FSYNC"; else URL="$NOSYNC"; fi
+                echo "--- $variant variant ---"
+                i=0
+                while [ "$i" -lt 2000 ]; do
+                  rnd=$(($(od -An -N1 -tu1 /dev/urandom | tr -d ' ') % 10))
+                  if [ "$rnd" -lt 7 ]; then
+                    # Read (70%)
+                    row_id=$(($(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % 2000))
+                    curl -sf "$URL/read/$row_id" >/dev/null
+                  else
+                    # Write (30%)
+                    val=$((10000 + i))
+                    curl -sf -X POST "$URL/write" \
+                      -H "Content-Type: application/json" \
+                      -d "{\"value\": $val}" >/dev/null
+                  fi
+                  i=$((i + 1))
+                  if [ $((i % 500)) -eq 0 ]; then
+                    echo "$variant mixed ops: $i / 2000"
+                  fi
+                done
+                echo "$variant mixed OLTP complete: 2000 ops"
+              done
+
+              # ============================================================
+              # Phase 7: Cooldown (3 min for metrics propagation)
+              # ============================================================
+              echo "=== Phase 7: Cooldown (3 min) ==="
+              sleep 180
+
+              echo "=== Benchmark complete ==="
+              echo "--- fsync metrics ---"
+              curl -sf "$FSYNC/metrics" | grep -E "^naivedb_" | head -40
+              echo ""
+              echo "--- nosync metrics ---"
+              curl -sf "$NOSYNC/metrics" | grep -E "^naivedb_" | head -40
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi

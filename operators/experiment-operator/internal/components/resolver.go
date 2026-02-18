@@ -132,10 +132,13 @@ var componentCategory = map[string]string{
 	// apps
 	"cardinality-generator": "apps",
 	"custom-db":             "apps",
+	"db-benchmark-loadgen":  "apps",
 	"demo-app":              "apps",
 	"hello-app":             "apps",
 	"log-generator":         "apps",
 	"metrics-app":           "apps",
+	"naive-db-fsync":        "apps",
+	"naive-db-nosync":       "apps",
 	"nginx":                 "apps",
 	"otel-demo":             "apps",
 	"station-monitor":       "apps",

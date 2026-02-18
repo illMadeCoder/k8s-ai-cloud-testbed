@@ -1,0 +1,16 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: naive-db-fsync
+  labels:
+    app: naive-db-fsync
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: naive-db-fsync
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics

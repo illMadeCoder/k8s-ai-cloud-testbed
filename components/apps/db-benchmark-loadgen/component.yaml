@@ -1,0 +1,11 @@
+apiVersion: experiments.illm.io/v1alpha1
+kind: Component
+metadata:
+  name: db-benchmark-loadgen
+spec:
+  type: app
+  description: "Multi-phase benchmark load generator for fsync vs no-fsync database comparison"
+  sources:
+    - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
+      targetRevision: HEAD
+      path: components/apps/db-benchmark-loadgen/k8s
