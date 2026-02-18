@@ -3036,5 +3036,6 @@
       "app": 0.019290008303758557
     },
     "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
-  }
+  },
+  "title": "Fsync vs Memory-Only Writes on GKE PD-SSD"
 }
