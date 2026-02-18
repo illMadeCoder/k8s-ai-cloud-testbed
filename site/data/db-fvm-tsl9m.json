@@ -1,0 +1,4073 @@
+{
+  "name": "db-fvm-tsl9m",
+  "title": "Fsync vs Memory-Only Writes on GKE PD-SSD",
+  "namespace": "experiments",
+  "description": "Comparison: fsync-per-write (durable) vs no-fsync (volatile page cache) on GKE PD-SSD — measures the true cost of durability across sequential writes, burst writes, batch writes, reads, scans, and mixed OLTP workloads",
+  "createdAt": "2026-02-18T19:41:50Z",
+  "completedAt": "2026-02-18T20:24:27.169461404Z",
+  "durationSeconds": 2557.169461404,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "storage",
+    "database",
+    "baseline"
+  ],
+  "hypothesis": {
+    "claim": "Skipping fsync reduces p99 write latency by 10x+ and increases sustained write throughput by 100x+, while read latency is identical between modes",
+    "questions": [
+      "What is the true per-write cost of fsync on GKE PD-SSD?",
+      "How does write throughput scale when freed from fsync serialization?",
+      "Are read and scan operations independent of sync mode?",
+      "How does amortized batch-fsync compare to per-write fsync cost?"
+    ],
+    "focus": [
+      "fsync vs page-cache write latency distribution",
+      "throughput ceiling with and without durable writes",
+      "batch amortization of fsync cost",
+      "read path independence from sync mode"
+    ]
+  },
+  "analyzerConfig": {
+    "sections": [
+      "abstract",
+      "capabilitiesMatrix",
+      "targetAnalysis",
+      "performanceAnalysis",
+      "metricInsights",
+      "finopsAnalysis",
+      "body",
+      "feedback",
+      "architectureDiagram"
+    ]
+  },
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "db-fvm-tsl9m-app",
+      "clusterType": "gke",
+      "machineType": "e2-standard-4",
+      "nodeCount": 1,
+      "components": [
+        "ConfigMap/alloy",
+        "ConfigMap/kube-prometheus-stack-alertmanager-overview",
+        "ConfigMap/kube-prometheus-stack-apiserver",
+        "ConfigMap/kube-prometheus-stack-cluster-total",
+        "ConfigMap/kube-prometheus-stack-controller-manager",
+        "ConfigMap/kube-prometheus-stack-etcd",
+        "ConfigMap/kube-prometheus-stack-grafana",
+        "ConfigMap/kube-prometheus-stack-grafana-config-dashboards",
+        "ConfigMap/kube-prometheus-stack-grafana-datasource",
+        "ConfigMap/kube-prometheus-stack-grafana-overview",
+        "ConfigMap/kube-prometheus-stack-k8s-coredns",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-cluster",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-multicluster",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-namespace",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-node",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-pod",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-workload",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-workloads-namespace",
+        "ConfigMap/kube-prometheus-stack-kubelet",
+        "ConfigMap/kube-prometheus-stack-namespace-by-pod",
+        "ConfigMap/kube-prometheus-stack-namespace-by-workload",
+        "ConfigMap/kube-prometheus-stack-node-cluster-rsrc-use",
+        "ConfigMap/kube-prometheus-stack-node-rsrc-use",
+        "ConfigMap/kube-prometheus-stack-nodes",
+        "ConfigMap/kube-prometheus-stack-nodes-aix",
+        "ConfigMap/kube-prometheus-stack-nodes-darwin",
+        "ConfigMap/kube-prometheus-stack-persistentvolumesusage",
+        "ConfigMap/kube-prometheus-stack-pod-total",
+        "ConfigMap/kube-prometheus-stack-prometheus",
+        "ConfigMap/kube-prometheus-stack-proxy",
+        "ConfigMap/kube-prometheus-stack-scheduler",
+        "ConfigMap/kube-prometheus-stack-workload-total",
+        "Namespace/observability",
+        "Secret/alertmanager-kube-prometheus-stack-alertmanager",
+        "Secret/kube-prometheus-stack-grafana",
+        "Service/alloy",
+        "Service/kube-prometheus-stack-alertmanager",
+        "Service/kube-prometheus-stack-grafana",
+        "Service/kube-prometheus-stack-kube-state-metrics",
+        "Service/kube-prometheus-stack-operator",
+        "Service/kube-prometheus-stack-prometheus",
+        "Service/kube-prometheus-stack-prometheus-node-exporter",
+        "Service/naive-db-fsync",
+        "Service/naive-db-nosync",
+        "Service/kube-prometheus-stack-coredns",
+        "Service/kube-prometheus-stack-kube-controller-manager",
+        "Service/kube-prometheus-stack-kube-etcd",
+        "Service/kube-prometheus-stack-kube-proxy",
+        "Service/kube-prometheus-stack-kube-scheduler",
+        "Service/vm-hub",
+        "ServiceAccount/alloy",
+        "ServiceAccount/kube-prometheus-stack-admission",
+        "ServiceAccount/kube-prometheus-stack-alertmanager",
+        "ServiceAccount/kube-prometheus-stack-grafana",
+        "ServiceAccount/kube-prometheus-stack-kube-state-metrics",
+        "ServiceAccount/kube-prometheus-stack-operator",
+        "ServiceAccount/kube-prometheus-stack-prometheus",
+        "ServiceAccount/kube-prometheus-stack-prometheus-node-exporter",
+        "MutatingWebhookConfiguration/kube-prometheus-stack-admission",
+        "ValidatingWebhookConfiguration/kube-prometheus-stack-admission",
+        "CustomResourceDefinition/alertmanagerconfigs.monitoring.coreos.com",
+        "CustomResourceDefinition/alertmanagers.monitoring.coreos.com",
+        "CustomResourceDefinition/podlogs.monitoring.grafana.com",
+        "CustomResourceDefinition/podmonitors.monitoring.coreos.com",
+        "CustomResourceDefinition/probes.monitoring.coreos.com",
+        "CustomResourceDefinition/prometheusagents.monitoring.coreos.com",
+        "CustomResourceDefinition/prometheuses.monitoring.coreos.com",
+        "CustomResourceDefinition/prometheusrules.monitoring.coreos.com",
+        "CustomResourceDefinition/scrapeconfigs.monitoring.coreos.com",
+        "CustomResourceDefinition/servicemonitors.monitoring.coreos.com",
+        "CustomResourceDefinition/thanosrulers.monitoring.coreos.com",
+        "DaemonSet/alloy",
+        "DaemonSet/kube-prometheus-stack-prometheus-node-exporter",
+        "Deployment/kube-prometheus-stack-grafana",
+        "Deployment/kube-prometheus-stack-kube-state-metrics",
+        "Deployment/kube-prometheus-stack-operator",
+        "StatefulSet/naive-db-fsync",
+        "StatefulSet/naive-db-nosync",
+        "Job/db-benchmark-loadgen",
+        "Job/kube-prometheus-stack-admission-create",
+        "Alertmanager/kube-prometheus-stack-alertmanager",
+        "Prometheus/kube-prometheus-stack-prometheus",
+        "PrometheusRule/kube-prometheus-stack-alertmanager.rules",
+        "PrometheusRule/kube-prometheus-stack-config-reloaders",
+        "PrometheusRule/kube-prometheus-stack-etcd",
+        "PrometheusRule/kube-prometheus-stack-general.rules",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-cpu-usage-seconds-tot",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-cache",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-rss",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-swap",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-working-set-by",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-resource",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.pod-owner",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-availability.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-burnrate.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-histogram.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-slos",
+        "PrometheusRule/kube-prometheus-stack-kube-prometheus-general.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-prometheus-node-recording.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-scheduler.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-state-metrics",
+        "PrometheusRule/kube-prometheus-stack-kubelet.rules",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-apps",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-resources",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-storage",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-apiserver",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-controller-manager",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-kube-proxy",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-kubelet",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-scheduler",
+        "PrometheusRule/kube-prometheus-stack-node-exporter",
+        "PrometheusRule/kube-prometheus-stack-node-exporter.rules",
+        "PrometheusRule/kube-prometheus-stack-node-network",
+        "PrometheusRule/kube-prometheus-stack-node.rules",
+        "PrometheusRule/kube-prometheus-stack-prometheus",
+        "PrometheusRule/kube-prometheus-stack-prometheus-operator",
+        "ServiceMonitor/kube-prometheus-stack-alertmanager",
+        "ServiceMonitor/kube-prometheus-stack-apiserver",
+        "ServiceMonitor/kube-prometheus-stack-coredns",
+        "ServiceMonitor/kube-prometheus-stack-grafana",
+        "ServiceMonitor/kube-prometheus-stack-kube-controller-manager",
+        "ServiceMonitor/kube-prometheus-stack-kube-etcd",
+        "ServiceMonitor/kube-prometheus-stack-kube-proxy",
+        "ServiceMonitor/kube-prometheus-stack-kube-scheduler",
+        "ServiceMonitor/kube-prometheus-stack-kube-state-metrics",
+        "ServiceMonitor/kube-prometheus-stack-kubelet",
+        "ServiceMonitor/kube-prometheus-stack-operator",
+        "ServiceMonitor/kube-prometheus-stack-prometheus",
+        "ServiceMonitor/kube-prometheus-stack-prometheus-node-exporter",
+        "ServiceMonitor/naive-db-fsync",
+        "ServiceMonitor/naive-db-nosync",
+        "ClusterRole/alloy",
+        "ClusterRole/kube-prometheus-stack-admission",
+        "ClusterRole/kube-prometheus-stack-grafana-clusterrole",
+        "ClusterRole/kube-prometheus-stack-kube-state-metrics",
+        "ClusterRole/kube-prometheus-stack-operator",
+        "ClusterRole/kube-prometheus-stack-prometheus",
+        "ClusterRoleBinding/alloy",
+        "ClusterRoleBinding/kube-prometheus-stack-admission",
+        "ClusterRoleBinding/kube-prometheus-stack-grafana-clusterrolebinding",
+        "ClusterRoleBinding/kube-prometheus-stack-kube-state-metrics",
+        "ClusterRoleBinding/kube-prometheus-stack-operator",
+        "ClusterRoleBinding/kube-prometheus-stack-prometheus",
+        "Role/kube-prometheus-stack-admission",
+        "Role/kube-prometheus-stack-grafana",
+        "RoleBinding/kube-prometheus-stack-admission",
+        "RoleBinding/kube-prometheus-stack-grafana"
+      ]
+    }
+  ],
+  "workflow": {
+    "name": "db-fvm-tsl9m-validation",
+    "template": "db-fsync-vs-memory-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-18T19:53:38Z",
+    "finishedAt": "2026-02-18T20:24:14Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-18T20:24:28.054892711Z",
+    "source": "target:db-fvm-tsl9m/kube-prometheus-stack-prometheus",
+    "timeRange": {
+      "start": "2026-02-18T19:41:50Z",
+      "end": "2026-02-18T20:24:28.05481927Z",
+      "duration": "42m38.05481927s",
+      "stepSeconds": 60
+    },
+    "queries": {
+      "cluster_cpu": {
+        "query": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"db-fvm-tsl9m\", container!=\"\"}[1m]))",
+        "type": "range",
+        "unit": "cores",
+        "description": "Total workload CPU usage",
+        "data": [
+          {
+            "timestamp": "2026-02-18T19:53:50Z",
+            "value": 0.22424309194494618
+          },
+          {
+            "timestamp": "2026-02-18T19:54:50Z",
+            "value": 0.2402120139962679
+          },
+          {
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 0.26247337056590375
+          },
+          {
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 0.2637841843812409
+          },
+          {
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 0.26731245753430743
+          },
+          {
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 0.24816587372099033
+          },
+          {
+            "timestamp": "2026-02-18T19:59:50Z",
+            "value": 0.24389647791344427
+          },
+          {
+            "timestamp": "2026-02-18T20:00:50Z",
+            "value": 0.2547738176639966
+          },
+          {
+            "timestamp": "2026-02-18T20:01:50Z",
+            "value": 0.2673497439530183
+          },
+          {
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 0.2544411236045012
+          },
+          {
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 0.2618054701649564
+          },
+          {
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 0.25250007604228186
+          },
+          {
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 0.22397223211764433
+          },
+          {
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 0.24980083078313448
+          },
+          {
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 0.09850824603031962
+          },
+          {
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 0.04606342241693337
+          },
+          {
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 0.046187188140580114
+          },
+          {
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 0.041146413083776374
+          },
+          {
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 0.4030484271637136
+          },
+          {
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 0.04041607942024387
+          },
+          {
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 0.03922358057594227
+          },
+          {
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 0.04047461300547139
+          },
+          {
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 0.044867400761240864
+          },
+          {
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 0.04740696685618989
+          },
+          {
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 0.04178853938005803
+          },
+          {
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 0.04426451951458491
+          },
+          {
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 0.0407280210743817
+          },
+          {
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 0.04626557541638144
+          },
+          {
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 0.04613515650073581
+          },
+          {
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 0.044598591078103676
+          },
+          {
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 0.042308124825995705
+          }
+        ]
+      },
+      "cluster_memory": {
+        "query": "sum(container_memory_working_set_bytes{namespace=~\"db-fvm-tsl9m\", container!=\"\"})",
+        "type": "range",
+        "unit": "bytes",
+        "description": "Total workload memory usage",
+        "data": [
+          {
+            "timestamp": "2026-02-18T19:53:50Z",
+            "value": 550395904
+          },
+          {
+            "timestamp": "2026-02-18T19:54:50Z",
+            "value": 614502400
+          },
+          {
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 651894784
+          },
+          {
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 669278208
+          },
+          {
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 661123072
+          },
+          {
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 675717120
+          },
+          {
+            "timestamp": "2026-02-18T19:59:50Z",
+            "value": 695906304
+          },
+          {
+            "timestamp": "2026-02-18T20:00:50Z",
+            "value": 708263936
+          },
+          {
+            "timestamp": "2026-02-18T20:01:50Z",
+            "value": 710668288
+          },
+          {
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 734625792
+          },
+          {
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 738316288
+          },
+          {
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 740814848
+          },
+          {
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 743796736
+          },
+          {
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 760311808
+          },
+          {
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 758005760
+          },
+          {
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 765296640
+          },
+          {
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 758525952
+          },
+          {
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 762134528
+          },
+          {
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 755552256
+          },
+          {
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 768581632
+          },
+          {
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 777842688
+          },
+          {
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 793952256
+          },
+          {
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 780025856
+          },
+          {
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 775131136
+          },
+          {
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 770383872
+          },
+          {
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 774123520
+          },
+          {
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 775135232
+          },
+          {
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 783708160
+          },
+          {
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 785317888
+          },
+          {
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 788881408
+          },
+          {
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 787832832
+          }
+        ]
+      },
+      "fsync_batch_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_batch_write_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Fsync variant: P99 batch write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 0.00994047619047619
+          }
+        ]
+      },
+      "fsync_cpu": {
+        "query": "rate(container_cpu_usage_seconds_total{container=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}[1m])",
+        "type": "range",
+        "unit": "cores",
+        "description": "Fsync variant: CPU usage",
+        "data": [
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:53:50Z",
+            "value": 0.0001255463568868408
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:54:50Z",
+            "value": 0.0234886740612598
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 0.007781805522313363
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 0.00019315662951516235
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 0.01588978241144342
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 0.0016074522630834527
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:59:50Z",
+            "value": 0.004123778353561525
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:00:50Z",
+            "value": 0.011979398851739279
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:01:50Z",
+            "value": 0.006515244163785466
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 0.00018928367756813278
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 0.008821192517400376
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 0.011747875559859584
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 0.0015990204452883757
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 0.00018955965354904055
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 0.00019079320113314264
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 0.00019493737480018902
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 0.0002016939389414106
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 0.0002008895478132032
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 0.00018586149256256655
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 0.00016182676164979383
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 0.00019737389341095745
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 0.00022205280863525092
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 0.00019009769829442588
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 0.00016535239778953198
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 0.0001954548466176526
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 0.0001746707978311497
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 0.000180736212278877
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 0.00019690511078550424
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 0.00020378998297643195
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 0.0001946511015955701
+          },
+          {
+            "labels": {
+              "container": "naive-db-fsync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 0.00018166796496943432
+          }
+        ]
+      },
+      "fsync_fsync_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Fsync variant: P99 fsync-only latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 0.009908617886178863
+          }
+        ]
+      },
+      "fsync_latency_over_time": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"db-fvm-tsl9m\"}[1m])) by (le, app))",
+        "type": "range",
+        "unit": "seconds",
+        "description": "P99 fsync latency over time by variant",
+        "data": [
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:54:50Z",
+            "value": 0.009926651982378853
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 0.009911702127659575
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 0.009887956204379562
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 0.009903333333333333
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 0.009895238095238096
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 0.0098
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 0.009714285714285713
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 9.9e-7
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 9.9e-7
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 9.9e-7
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 9.9e-7
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:59:50Z",
+            "value": 9.9e-7
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 9.9e-7
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 9.9e-7
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 9.9e-7
+          }
+        ]
+      },
+      "fsync_memory": {
+        "query": "container_memory_working_set_bytes{container=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}",
+        "type": "range",
+        "unit": "bytes",
+        "description": "Fsync variant: memory usage",
+        "data": [
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:53:50Z",
+            "value": 557056
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:54:50Z",
+            "value": 675840
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 647168
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 647168
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 647168
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 684032
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:59:50Z",
+            "value": 663552
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:00:50Z",
+            "value": 659456
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:01:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 684032
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 679936
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 655360
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 917504
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 651264
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 655360
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 655360
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 655360
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-fsync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pode6799f50_93a6_48e1_b055_2bcba478f032.slice/cri-containerd-fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "fee44a5eced7747f3560e19137b067997d5a4b61c20bcb43ca8d6359e9c6d59f",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-fsync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 655360
+          }
+        ]
+      },
+      "fsync_read_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_read_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Fsync variant: P99 read latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 0.00004993344208809138
+          }
+        ]
+      },
+      "fsync_read_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"read\", app=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}[42m38s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "Fsync variant: read ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 1.2681399961704776
+          }
+        ]
+      },
+      "fsync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "Fsync variant: total rows written",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "app": "naive-db-fsync",
+              "container": "naive-db-fsync",
+              "endpoint": "http",
+              "instance": "10.1.0.19:8080",
+              "job": "naive-db-fsync",
+              "namespace": "db-fvm-tsl9m",
+              "pod": "naive-db-fsync-0",
+              "service": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 6771
+          }
+        ]
+      },
+      "fsync_write_p50": {
+        "query": "histogram_quantile(0.5, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Fsync variant: P50 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 0.0065995893223819305
+          }
+        ]
+      },
+      "fsync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Fsync variant: P99 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 0.009931991786447637
+          }
+        ]
+      },
+      "fsync_write_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-fsync\", namespace=~\"db-fvm-tsl9m\"}[42m38s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "Fsync variant: write ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 1.3088162937212053
+          }
+        ]
+      },
+      "nosync_batch_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_batch_write_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "NoSync variant: P99 batch write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 0.000496
+          }
+        ]
+      },
+      "nosync_cpu": {
+        "query": "rate(container_cpu_usage_seconds_total{container=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}[1m])",
+        "type": "range",
+        "unit": "cores",
+        "description": "NoSync variant: CPU usage",
+        "data": [
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:53:50Z",
+            "value": 0.00012153333333333332
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:54:50Z",
+            "value": 0.0001913926643480488
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 0.009246260450665877
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 0.017316421179678597
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 0.007051924739046601
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 0.003183603902218536
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:59:50Z",
+            "value": 0.0008578035530759026
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:00:50Z",
+            "value": 0.00018637888893491988
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:01:50Z",
+            "value": 0.005642987025751915
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 0.011068517885901123
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 0.0036567581781844906
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 0.00018380262693752273
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 0.006806999147414747
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 0.010412384122148882
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 0.0008644481671824946
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 0.00019840184135669667
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 0.00017140976301396342
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 0.000175576091336459
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 0.0001469502229347186
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 0.00013761070330384022
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 0.00018607988519491638
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 0.00017728266812465728
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 0.0001867548172006619
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 0.00019996808171082728
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 0.00020655988769062512
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 0.00014355733270657322
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 0.00017799819216768087
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 0.000202790813571991
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 0.00016064521521846613
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 0.00020119246977419694
+          },
+          {
+            "labels": {
+              "container": "naive-db-nosync",
+              "cpu": "total",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 0.00018820047547425965
+          }
+        ]
+      },
+      "nosync_fsync_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "NoSync variant: P99 fsync-only latency (should be ~0)",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 9.9e-7
+          }
+        ]
+      },
+      "nosync_memory": {
+        "query": "container_memory_working_set_bytes{container=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}",
+        "type": "range",
+        "unit": "bytes",
+        "description": "NoSync variant: memory usage",
+        "data": [
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:53:50Z",
+            "value": 536576
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:54:50Z",
+            "value": 593920
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 655360
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 655360
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 655360
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 634880
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T19:59:50Z",
+            "value": 643072
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:00:50Z",
+            "value": 618496
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:01:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 638976
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 655360
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 659456
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 630784
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 634880
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 626688
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 630784
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 630784
+          },
+          {
+            "labels": {
+              "__name__": "container_memory_working_set_bytes",
+              "container": "naive-db-nosync",
+              "endpoint": "https-metrics",
+              "id": "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod10996e10_eb85_4ae0_8547_ed1e8b478bc3.slice/cri-containerd-4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe.scope",
+              "image": "ghcr.io/illmadecoder/naive-db:latest",
+              "instance": "10.0.0.4:10250",
+              "job": "kubelet",
+              "metrics_path": "/metrics/cadvisor",
+              "name": "4809b156511c425a24208d77cb2bbb64ae62b9aed2f644f31d761a093716d6fe",
+              "namespace": "db-fvm-tsl9m",
+              "node": "gke-illm-db-fvm-tsl9-db-fvm-tsl9m-app-165d321f-gll5",
+              "pod": "naive-db-nosync-0",
+              "service": "kube-prometheus-stack-kubelet"
+            },
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 630784
+          }
+        ]
+      },
+      "nosync_read_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_read_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "NoSync variant: P99 read latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 0.00004837466410748565
+          }
+        ]
+      },
+      "nosync_read_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"read\", app=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}[42m38s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "NoSync variant: read ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 1.27138505528873
+          }
+        ]
+      },
+      "nosync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "NoSync variant: total rows written",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "app": "naive-db-nosync",
+              "container": "naive-db-nosync",
+              "endpoint": "http",
+              "instance": "10.1.0.20:8080",
+              "job": "naive-db-nosync",
+              "namespace": "db-fvm-tsl9m",
+              "pod": "naive-db-nosync-0",
+              "service": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 6791
+          }
+        ]
+      },
+      "nosync_write_p50": {
+        "query": "histogram_quantile(0.5, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "NoSync variant: P50 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 0.000237291280148423
+          }
+        ]
+      },
+      "nosync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}[42m38s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "NoSync variant: P99 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 0.0004963458256029685
+          }
+        ]
+      },
+      "nosync_write_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-nosync\", namespace=~\"db-fvm-tsl9m\"}[42m38s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "NoSync variant: write ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-18T20:24:28Z",
+            "value": 1.4047912997762262
+          }
+        ]
+      },
+      "read_throughput_over_time": {
+        "query": "sum(rate(naivedb_operations_total{op=\"read\", namespace=~\"db-fvm-tsl9m\"}[1m])) by (app)",
+        "type": "range",
+        "unit": "ops/s",
+        "description": "Read throughput over time by variant",
+        "data": [
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:00:50Z",
+            "value": 18.84444444444444
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:01:50Z",
+            "value": 8.244444444444444
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 10.466666666666665
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 11.71111111111111
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 2.311111111111111
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 20.51111111111111
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 6.5555555555555545
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 6.377777777777777
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 12.088888888888887
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 5.022222222222221
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 0
+          }
+        ]
+      },
+      "write_latency_over_time": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"db-fvm-tsl9m\"}[1m])) by (le, app))",
+        "type": "range",
+        "unit": "seconds",
+        "description": "P99 write latency over time by variant",
+        "data": [
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:54:50Z",
+            "value": 0.009940464839094158
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 0.009931063122923588
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 0.009922670025188918
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 0.00992280701754386
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 0.00989795918367347
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 0.009866666666666666
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 0.0004976224863334579
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 0.0004954200743494424
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 0.0004982857142857143
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 0.0004960820512820513
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 0.0004984615384615386
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 0.0004969936305732484
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 0.0006250000000000038
+          }
+        ]
+      },
+      "write_throughput_over_time": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", namespace=~\"db-fvm-tsl9m\"}[1m])) by (app)",
+        "type": "range",
+        "unit": "ops/s",
+        "description": "Write throughput over time by variant",
+        "data": [
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:54:50Z",
+            "value": 22.199999999999996
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 9.222222222222221
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 13.644444444444442
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T19:59:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:00:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:01:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 3.9111111111111105
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 4.444444444444444
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 0.8888888888888888
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync"
+            },
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:55:50Z",
+            "value": 12.131073333333333
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:56:50Z",
+            "value": 22.755555555555553
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:57:50Z",
+            "value": 6.644444444444444
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:58:50Z",
+            "value": 6.466666666666666
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T19:59:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:00:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:01:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:02:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:03:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:04:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:05:50Z",
+            "value": 3.1111111111111107
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:06:50Z",
+            "value": 4.844444444444444
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:07:50Z",
+            "value": 1.6666666666666665
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:08:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:09:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:10:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:11:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:12:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:13:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:14:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:15:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:16:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:17:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:18:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:19:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:20:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:21:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:22:50Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync"
+            },
+            "timestamp": "2026-02-18T20:23:50Z",
+            "value": 0
+          }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.019036705990452003,
+    "durationHours": 0.71032485039,
+    "perTarget": {
+      "app": 0.019036705990452003
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  },
+  "iterationStatus": {
+    "currentIteration": 0,
+    "maxIterations": 3,
+    "phase": "Passed",
+    "qualityResults": [
+      {
+        "iteration": 0,
+        "totalMetrics": 26,
+        "metricsWithData": 26,
+        "coverage": 1,
+        "passed": true
+      }
+    ]
+  }
+}
