@@ -55,25 +55,43 @@ const { matrix } = Astro.props;
     font-size: 0.9rem;
     color: var(--text);
     line-height: 1.65;
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
   }
 
   .cap-category-panels {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    padding-top: 1rem;
+    padding: 1rem;
+  }
+
+  .cap-category {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
   }
 
   .cap-category-label {
+    display: block;
     font-family: var(--font-mono);
     font-size: 0.85rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-muted);
-    padding: 0.75rem 0 0.25rem;
+    padding: 0.75rem 1rem;
     cursor: pointer;
     list-style: none;
+    user-select: none;
+    background: var(--bg-card);
+    border-bottom: 1px solid transparent;
+  }
+
+  .cap-category[open] > .cap-category-label {
+    border-bottom-color: var(--border);
   }
 
   .cap-category-label::-webkit-details-marker {
@@ -81,11 +99,16 @@ const { matrix } = Astro.props;
   }
 
   .cap-category-label::before {
-    content: '▸ ';
+    content: '▶';
+    display: inline-block;
+    font-size: 0.55rem;
+    margin-right: 0.5rem;
+    transition: transform 0.15s ease;
+    vertical-align: middle;
   }
 
   .cap-category[open] > .cap-category-label::before {
-    content: '▾ ';
+    transform: rotate(90deg);
   }
 
   .cap-panel {

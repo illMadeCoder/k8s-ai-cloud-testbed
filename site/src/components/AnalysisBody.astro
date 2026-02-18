@@ -42,7 +42,11 @@ function getCalloutColor(variant: string): string {
   <div class="body-blocks">
     {body.blocks.map((block: BodyBlock) => {
       if (block.type === 'text') {
-        return <p class="block-text">{block.content}</p>;
+        return (
+          <div class="block-text-featured">
+            <p class="block-text">{block.content}</p>
+          </div>
+        );
       }
 
       if (block.type === 'topic') {
@@ -304,6 +308,14 @@ function getCalloutColor(variant: string): string {
     line-height: 1.7;
     font-size: 0.95rem;
     margin: 0;
+  }
+
+  .block-text-featured {
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
   }
 
   .block-metric-missing {

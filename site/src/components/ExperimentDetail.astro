@@ -165,9 +165,16 @@ const machineVerdict = getMachineVerdict(experiment);
         <details class="overview-item" open>
           <summary class="overview-item-title">Questions</summary>
           <div class="overview-item-content">
-            <ol class="study-questions-list">
-              {questions.map((q) => <li>{q}</li>)}
-            </ol>
+            <div class="study-questions-list">
+              {questions.map((q, i) => (
+                <div class="study-question-card">
+                  <div class="study-question-header">
+                    <span class="study-question-number">{i + 1}</span>
+                  </div>
+                  <p class="study-question-text">{q}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </details>
       )}
@@ -394,15 +401,42 @@ const machineVerdict = getMachineVerdict(experiment);
   }
   .study-questions-list {
     margin: 0;
-    padding-left: 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
   }
-  .study-questions-list li {
+  .study-question-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+  }
+  .study-question-header {
+    flex-shrink: 0;
+  }
+  .study-question-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+    border-radius: 3px;
+  }
+  .study-question-text {
+    margin: 0;
     color: var(--text);
     font-size: 0.9rem;
     line-height: 1.5;
+    padding-top: 0.1rem;
   }
   .focus-tags {
     display: flex;
