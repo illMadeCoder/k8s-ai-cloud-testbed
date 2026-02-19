@@ -9,6 +9,7 @@ const { workerUrl, experimentName, openingMessage } = Astro.props;
 ---
 
 <div class="conv-panel" id="conv-panel" data-worker-url={workerUrl} data-experiment-name={experimentName}>
+  <div class="conv-drag" id="conv-drag"><div class="conv-drag-bar"></div></div>
   <div class="conv-header" id="conv-header">
     <span class="conv-title">Ask about this experiment</span>
     <div class="conv-header-actions">
@@ -33,7 +34,7 @@ const { workerUrl, experimentName, openingMessage } = Astro.props;
     </div>
     <div class="conv-input-area">
       <input type="text" id="conv-input" placeholder="Ask about this experiment..." autocomplete="off" />
-      <select id="conv-voice-select" class="conv-voice-select" title="AI voice">
+      <select id="conv-voice-select" class="conv-voice-select" title="AI voice" hidden>
         <option value="verse">verse</option>
         <option value="alloy">alloy</option>
         <option value="ash">ash</option>
@@ -94,6 +95,46 @@ const { workerUrl, experimentName, openingMessage } = Astro.props;
     return (voiceSelect && voiceSelect.value) || 'verse';
   }
 
+  // --- Drag resize ---
+  var dragHandle = document.getElementById('conv-drag');
+  var panelHeight = 50; // vh
+  var dragging = false;
+
+  function startDrag(e) {
+    if (panelState === 'minimized') return;
+    dragging = true;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  }
+
+  function onDrag(e) {
+    if (!dragging) return;
+    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    var vh = ((window.innerHeight - clientY) / window.innerHeight) * 100;
+    panelHeight = Math.max(10, Math.min(85, vh));
+    panel.style.height = panelHeight + 'vh';
+    if (mainEl) mainEl.style.paddingBottom = panelHeight + 'vh';
+  }
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    if (panelHeight < 20) {
+      panelHeight = 50;
+      setPanelState('minimized');
+    }
+  }
+
+  dragHandle.addEventListener('mousedown', startDrag);
+  dragHandle.addEventListener('touchstart', startDrag, { passive: false });
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('touchmove', onDrag, { passive: false });
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchend', endDrag);
+
   // State
   var panelState = 'open'; // open | minimized
   var connState = 'disconnected'; // disconnected | connecting | text | voice
@@ -109,7 +150,7 @@ const { workerUrl, experimentName, openingMessage } = Astro.props;
   // --- Padding ---
   function updatePadding() {
     if (!mainEl) return;
-    if (panelState === 'open') mainEl.style.paddingBottom = '50vh';
+    if (panelState === 'open') mainEl.style.paddingBottom = panelHeight + 'vh';
     else mainEl.style.paddingBottom = '48px';
   }
 
@@ -117,6 +158,8 @@ const { workerUrl, experimentName, openingMessage } = Astro.props;
   function setPanelState(s) {
     panelState = s;
     panel.classList.toggle('minimized', s === 'minimized');
+    if (s === 'open') panel.style.height = panelHeight + 'vh';
+    else panel.style.height = '';
     updatePadding();
     if (s === 'open') scrollMessages();
   }
@@ -168,6 +211,7 @@ const { workerUrl, experimentName, openingMessage } = Astro.props;
     else if (connState === 'voice') title.textContent = 'Listening\u2026';
     else title.textContent = 'Ask about this experiment';
     voiceBtn.classList.toggle('active', connState === 'voice');
+    voiceSelect.hidden = connState !== 'voice';
   }
 
   // --- Connection ---
@@ -511,6 +555,28 @@ const { workerUrl, experimentName, openingMessage } = Astro.props;
     border-top: 2px solid var(--accent);
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
     z-index: 100;
+  }
+
+  .conv-drag {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 12px;
+    cursor: ns-resize;
+  }
+  .conv-drag-bar {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background 0.15s;
+  }
+  .conv-drag:hover .conv-drag-bar {
+    background: var(--text-muted);
+  }
+  .conv-panel.minimized .conv-drag {
+    display: none;
   }
 
   .conv-header {

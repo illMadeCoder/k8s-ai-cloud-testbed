@@ -120,12 +120,6 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
   </button>
 </div>
 
-{analysis?.architectureDiagram && (
-  <div class="architecture-hero">
-    <ArchitectureDiagram diagram={analysis.architectureDiagram} format={analysis.architectureDiagramFormat} />
-  </div>
-)}
-
 <details class="section section-metadata">
   <summary class="section-title">Metadata</summary>
   <TargetTable targets={experiment.targets} />
@@ -175,9 +169,17 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
   )}
 </details>
 
-{(hypothesisClaim || questions.length > 0 || focusAreas.length > 0 || hasRichAnalysis || analysis?.summary) && (
+{(hypothesisClaim || analysis?.architectureDiagram || questions.length > 0 || focusAreas.length > 0 || hasRichAnalysis || analysis?.summary) && (
   <details class="section section-overview">
     <summary class="section-title">Overview</summary>
+    {analysis?.architectureDiagram && (
+      <details class="section" open>
+        <summary class="section-title">Architecture</summary>
+        <div class="architecture-hero">
+          <ArchitectureDiagram diagram={analysis.architectureDiagram} format={analysis.architectureDiagramFormat} />
+        </div>
+      </details>
+    )}
     {hypothesisClaim && (
       <details class="section" open>
         <summary class="section-title">Hypothesis</summary>
@@ -286,7 +288,7 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
   return (
     <details class="section section-series series-nav">
       <summary class="section-title">
-        {nextGroups.length > 0 ? 'Next in' : 'Part of'} <a href={`${base}series/${seriesSiblings.seriesId}/`} class="series-link" style={seriesColor ? `color: ${seriesColor}` : undefined}>{seriesSiblings.seriesName}</a>
+        {nextGroups.length > 0 ? 'Next in the' : 'Part of the'} <a href={`${base}series/${seriesSiblings.seriesId}/`} class="series-link" style={seriesColor ? `color: ${seriesColor}` : undefined}>{seriesSiblings.seriesName}</a> Series
       </summary>
       {nextGroups.length > 0 ? (
         <div class="series-cards">
