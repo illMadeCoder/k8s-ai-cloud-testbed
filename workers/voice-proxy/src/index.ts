@@ -9,17 +9,7 @@ const ALLOWED_ORIGINS = [
 	'http://localhost:3000',
 ];
 
-const MAX_PER_IP_PER_DAY = 2;
 const MAX_PER_MONTH = 40;
-
-async function hashIP(ip: string): Promise<string> {
-	const data = new TextEncoder().encode(ip);
-	const hash = await crypto.subtle.digest('SHA-256', data);
-	return Array.from(new Uint8Array(hash))
-		.slice(0, 8)
-		.map((b) => b.toString(16).padStart(2, '0'))
-		.join('');
-}
 
 function corsHeaders(origin: string): Record<string, string> {
 	return {
@@ -52,20 +42,6 @@ export default {
 				status: 403,
 				headers: { 'Content-Type': 'application/json' },
 			});
-		}
-
-		// Rate limit: per IP per day
-		const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-		const ipHash = await hashIP(ip);
-		const today = new Date().toISOString().slice(0, 10);
-		const ipKey = `ip:${ipHash}:${today}`;
-
-		const ipCount = parseInt((await env.RATE_LIMIT.get(ipKey)) || '0', 10);
-		if (ipCount >= MAX_PER_IP_PER_DAY) {
-			return new Response(
-				JSON.stringify({ error: 'Daily limit reached. Try again tomorrow.' }),
-				{ status: 429, headers: { ...headers, 'Content-Type': 'application/json' } }
-			);
 		}
 
 		// Rate limit: monthly budget
@@ -101,8 +77,7 @@ export default {
 				);
 			}
 
-			// Increment rate limits
-			await env.RATE_LIMIT.put(ipKey, String(ipCount + 1), { expirationTtl: 86400 });
+			// Increment monthly budget counter
 			await env.RATE_LIMIT.put(budgetKey, String(budgetCount + 1), { expirationTtl: 2678400 });
 
 			const data = await response.json();
