@@ -265,18 +265,20 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
 {seriesSiblings && (() => {
   const idx = seriesSiblings.groups.findIndex((g) => g.baseName === currentBaseName);
   const nextGroups = idx !== -1 ? seriesSiblings.groups.slice(idx + 1) : seriesSiblings.groups;
-  return nextGroups.length > 0 ? (
+  return (
     <details class="section section-series series-nav" open>
       <summary class="section-title">
-        Next in <a href={`${base}series/${seriesSiblings.seriesId}/`} class="series-link">{seriesSiblings.seriesName}</a>
+        {nextGroups.length > 0 ? 'Next' : 'Part of'} <a href={`${base}series/${seriesSiblings.seriesId}/`} class="series-link">{seriesSiblings.seriesName}</a>
       </summary>
-      <div class="series-cards">
-        {nextGroups.map((g) => (
-          <ExperimentGroupCard group={g} />
-        ))}
-      </div>
+      {nextGroups.length > 0 && (
+        <div class="series-cards">
+          {nextGroups.map((g) => (
+            <ExperimentGroupCard group={g} />
+          ))}
+        </div>
+      )}
     </details>
-  ) : null;
+  );
 })()}
 
 <script>
