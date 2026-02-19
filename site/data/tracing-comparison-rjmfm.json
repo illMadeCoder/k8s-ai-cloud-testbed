@@ -11,7 +11,7 @@
     "observability",
     "tracing"
   ],
-  "project": "this-lab",
+  "series": "this-lab",
   "targets": [
     {
       "name": "app",

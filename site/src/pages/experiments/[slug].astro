@@ -2,7 +2,8 @@
 import Base from '../../layouts/Base.astro';
 import Breadcrumb from '../../components/Breadcrumb.astro';
 import ExperimentDetail from '../../components/ExperimentDetail.astro';
-import { loadAllExperiments, groupExperiments, getDisplayTitle } from '../../lib/experiments';
+import { loadAllExperiments, groupExperiments, getDisplayTitle, getSeriesSiblings } from '../../lib/experiments';
+import { getSeriesMeta } from '../../lib/series';
 import type { ExperimentGroup } from '../../lib/experiments';
 
 export function getStaticPaths() {
@@ -21,6 +22,17 @@ interface Props {
 const { group } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const displayName = getDisplayTitle(group);
+
+const experiments = loadAllExperiments();
+const seriesId = group.latest.series;
+let seriesSiblings: { seriesId: string; seriesName: string; groups: ExperimentGroup[] } | undefined;
+if (seriesId) {
+  const meta = getSeriesMeta(seriesId);
+  const siblings = getSeriesSiblings(group.baseName, experiments);
+  if (meta && siblings && siblings.length > 1) {
+    seriesSiblings = { seriesId, seriesName: meta.name, groups: siblings };
+  }
+}
 ---
 
 <Base title={`${displayName} — K8s AI Lab Benchmarks`} description={group.latest.description}>
@@ -37,5 +49,6 @@ const displayName = getDisplayTitle(group);
     displayName={displayName}
     tags={group.tags}
     runHistory={{ baseName: group.baseName, runs: group.runs }}
+    seriesSiblings={seriesSiblings}
   />
 </Base>

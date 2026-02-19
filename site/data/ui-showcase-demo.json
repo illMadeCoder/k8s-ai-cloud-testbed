@@ -12,7 +12,7 @@
     "logging",
     "demo"
   ],
-  "project": "this-lab",
+  "series": "this-lab",
   "study": {
     "hypothesis": "A visual-first analysis body with typed content blocks tells a more effective story than paragraphs of prose — and Loki will use fewer resources than Elasticsearch while doing it",
     "questions": [

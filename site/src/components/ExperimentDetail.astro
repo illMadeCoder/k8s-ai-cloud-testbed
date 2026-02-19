@@ -8,10 +8,12 @@ import CapabilitiesMatrix from './CapabilitiesMatrix.astro';
 import AnalysisBody from './AnalysisBody.astro';
 import AnalysisFeedback from './AnalysisFeedback.astro';
 import ArchitectureDiagram from './ArchitectureDiagram.astro';
+import ExperimentGroupCard from './ExperimentGroupCard.astro';
 import { formatDuration, formatDate, formatCost, formatValue } from '../lib/format';
 import { buildSpec } from '../lib/vega-specs';
-import { getHypothesisClaim, getQuestions, getFocus, getMachineVerdict } from '../lib/experiments';
+import { getHypothesisClaim, getQuestions, getFocus, getMachineVerdict, getBaseName } from '../lib/experiments';
 import type { ExperimentSummary } from '../types';
+import type { ExperimentGroup } from '../lib/experiments';
 
 interface Props {
   experiment: ExperimentSummary;
@@ -22,9 +24,15 @@ interface Props {
     runs: ExperimentSummary[];
     currentRunName?: string;
   };
+  seriesSiblings?: {
+    seriesId: string;
+    seriesName: string;
+    groups: ExperimentGroup[];
+  };
 }
 
-const { experiment, displayName, tags, runHistory } = Astro.props;
+const { experiment, displayName, tags, runHistory, seriesSiblings } = Astro.props;
+const currentBaseName = getBaseName(experiment.name);
 const base = import.meta.env.BASE_URL;
 
 const allMetricEntries = experiment.metrics
@@ -252,6 +260,22 @@ const machineVerdict = getMachineVerdict(experiment);
 {/* Rich analysis: Future Enhancements */}
 {hasRichAnalysis && analysis?.feedback && (
   <AnalysisFeedback feedback={analysis.feedback} />
+)}
+
+{seriesSiblings && seriesSiblings.groups.length > 1 && (
+  <details class="section series-nav" open>
+    <summary class="section-title">
+      More in <a href={`${base}series/${seriesSiblings.seriesId}/`} class="series-link">{seriesSiblings.seriesName}</a>
+    </summary>
+    <div class="series-cards">
+      {seriesSiblings.groups.map((g) => (
+        <div class:list={['series-card-wrapper', { 'series-card-current': g.baseName === currentBaseName }]}>
+          {g.baseName === currentBaseName && <span class="series-current-label">Current</span>}
+          <ExperimentGroupCard group={g} />
+        </div>
+      ))}
+    </div>
+  </details>
 )}
 
 <script>
@@ -524,6 +548,44 @@ const machineVerdict = getMachineVerdict(experiment);
   .architecture-hero :global(.arch-diagram) {
     padding: 1.5rem 2rem;
     margin: 0;
+  }
+
+  .series-nav {
+    margin-top: 2rem;
+  }
+  .series-link {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .series-link:hover {
+    text-decoration: underline;
+  }
+  .series-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    padding: 1rem;
+  }
+  .series-card-wrapper {
+    position: relative;
+  }
+  .series-card-current {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .series-current-label {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+    z-index: 1;
   }
 
   @media (max-width: 640px) {

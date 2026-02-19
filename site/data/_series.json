@@ -1,5 +1,5 @@
 {
-  "projects": [
+  "series": [
     {
       "id": "this-lab",
       "name": "This Lab",
@@ -13,7 +13,8 @@
     {
       "id": "modern-database-survey",
       "name": "Modern Database Internals",
-      "description": "Benchmarking cloud-native databases — NewSQL, distributed KV, time-series, and object storage"
+      "description": "Benchmarking cloud-native databases — NewSQL, distributed KV, time-series, and object storage",
+      "order": ["db-fvm"]
     },
     {
       "id": "messages-and-streams",

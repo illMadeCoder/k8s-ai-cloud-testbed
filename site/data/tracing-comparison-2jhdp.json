@@ -11,7 +11,7 @@
     "observability",
     "tracing"
   ],
-  "project": "this-lab",
+  "series": "this-lab",
   "study": {
     "hypothesis": "Tempo will use fewer resources than Jaeger because it writes traces directly to object storage without an indexing layer, avoiding the CPU and memory overhead of Elasticsearch or Cassandra that Jaeger requires, while Jaeger will provide a more mature query UI because its longer ecosystem tenure has produced richer search, comparison, and dependency graph tooling",
     "questions": [

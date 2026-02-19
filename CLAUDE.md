@@ -44,7 +44,7 @@ components/{apps,core,obs,...}/  42 components with component.yaml (8 categories
 experiments/{name}/              17 experiment scenarios (+ _template)
 platform/{apps,manifests,values} Hub cluster config + ArgoCD apps
 site/                            Astro + Tailwind benchmark site (GitHub Pages, ADR-017)
-site/data/                       Experiment result JSONs + _categories.json (committed, not LFS)
+site/data/                       Experiment result JSONs + _categories.json + _series.json (committed, not LFS)
 docs/{adrs,roadmap}              17 ADRs, phase docs
 .github/workflows/               build-operator, build-components, deploy-site, auto-merge
 ```
@@ -75,12 +75,14 @@ Astro static site with Tailwind CSS, deployed to GitHub Pages via `deploy-site.y
 ### Information Architecture
 
 ```
-/                              Landing (hero + stats + domain cards + recent experiments)
+/                              Landing (hero + stats + series cards + recent experiments)
+/series/                       Series index (all research tracks)
+/series/{id}/                  Series detail (ordered experiments in a track)
 /categories/                   Domain index (all categories)
 /categories/{domain}/          Domain detail (observability, networking, storage, cicd)
 /comparisons/                  All comparison experiments index
 /about/                        Portfolio + methodology + architecture + tech stack
-/experiments/{slug}/           Experiment group (latest run + run history)
+/experiments/{slug}/           Experiment group (latest run + run history + series nav)
 /experiments/{slug}/{run}/     Individual run detail
 /tags/{tag}/                   Tag filter
 ```
@@ -91,9 +93,11 @@ Astro static site with Tailwind CSS, deployed to GitHub Pages via `deploy-site.y
 site/astro.config.mjs          Astro config (Tailwind integration, GitHub Pages base)
 site/tailwind.config.mjs       Tailwind theme (maps CSS custom properties)
 site/data/_categories.json     Domain taxonomy (observability, networking, storage, cicd)
+site/data/_series.json         Series definitions with optional experiment ordering
 site/data/{name}.json          Experiment result JSONs (auto-committed by operator/analyzer)
 site/src/types.ts              TypeScript interfaces mirroring Go structs
-site/src/lib/experiments.ts    Data loading, grouping, domain/type derivation
+site/src/lib/experiments.ts    Data loading, grouping, domain/type derivation, series siblings
+site/src/lib/series.ts         Series data loading and ordering
 site/src/lib/categories.ts     Category data loading
 site/src/lib/format.ts         Value formatting (duration, bytes, cost)
 site/src/lib/vega-specs.ts     Vega-Lite chart builders

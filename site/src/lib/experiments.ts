@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ExperimentSummary } from '../types';
+import { getSeriesOrder } from './series';
 
 const dataDir = path.resolve(process.cwd(), 'data');
 
@@ -242,20 +243,52 @@ export function groupByDomain(experiments: ExperimentSummary[]): Record<string, 
 }
 
 /**
- * Group experiments by project field.
+ * Group experiments by series field.
  */
-export function groupByProject(experiments: ExperimentSummary[]): Record<string, ExperimentGroup[]> {
+export function groupBySeries(experiments: ExperimentSummary[]): Record<string, ExperimentGroup[]> {
   const groups = groupExperiments(experiments);
   const result: Record<string, ExperimentGroup[]> = {};
 
   for (const group of groups) {
-    const project = group.latest.project;
-    if (!project) continue;
-    if (!result[project]) result[project] = [];
-    result[project].push(group);
+    const series = group.latest.series;
+    if (!series) continue;
+    if (!result[series]) result[series] = [];
+    result[series].push(group);
   }
 
   return result;
+}
+
+/**
+ * Get sibling experiment groups in the same series, ordered by the series order array.
+ * Returns undefined if the experiment is not in a series.
+ */
+export function getSeriesSiblings(
+  baseName: string,
+  experiments: ExperimentSummary[],
+): ExperimentGroup[] | undefined {
+  const groups = groupExperiments(experiments);
+  const thisGroup = groups.find((g) => g.baseName === baseName);
+  if (!thisGroup) return undefined;
+
+  const seriesId = thisGroup.latest.series;
+  if (!seriesId) return undefined;
+
+  const order = getSeriesOrder(seriesId);
+
+  const siblings = groups.filter((g) => g.latest.series === seriesId);
+
+  // Sort by series order array; unordered experiments come after ordered ones chronologically
+  siblings.sort((a, b) => {
+    const ai = order.indexOf(a.baseName);
+    const bi = order.indexOf(b.baseName);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime();
+  });
+
+  return siblings;
 }
 
 /**

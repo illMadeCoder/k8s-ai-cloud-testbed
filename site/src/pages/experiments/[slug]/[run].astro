@@ -2,8 +2,10 @@
 import Base from '../../../layouts/Base.astro';
 import Breadcrumb from '../../../components/Breadcrumb.astro';
 import ExperimentDetail from '../../../components/ExperimentDetail.astro';
-import { loadAllExperiments, getBaseName, getRunDisplayTitle, groupExperiments } from '../../../lib/experiments';
+import { loadAllExperiments, getBaseName, getRunDisplayTitle, groupExperiments, getSeriesSiblings } from '../../../lib/experiments';
+import { getSeriesMeta } from '../../../lib/series';
 import type { ExperimentSummary } from '../../../types';
+import type { ExperimentGroup } from '../../../lib/experiments';
 
 export function getStaticPaths() {
   const experiments = loadAllExperiments();
@@ -24,6 +26,17 @@ const { experiment, siblingRuns } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const baseName = getBaseName(experiment.name);
 const displayName = getRunDisplayTitle(experiment);
+
+const experiments = loadAllExperiments();
+const seriesId = experiment.series;
+let seriesSiblings: { seriesId: string; seriesName: string; groups: ExperimentGroup[] } | undefined;
+if (seriesId) {
+  const meta = getSeriesMeta(seriesId);
+  const siblings = getSeriesSiblings(baseName, experiments);
+  if (meta && siblings && siblings.length > 1) {
+    seriesSiblings = { seriesId, seriesName: meta.name, groups: siblings };
+  }
+}
 ---
 
 <Base title={`${experiment.name} — K8s AI Lab Benchmarks`} description={experiment.description}>
@@ -45,5 +58,6 @@ const displayName = getRunDisplayTitle(experiment);
       runs: siblingRuns,
       currentRunName: experiment.name,
     } : undefined}
+    seriesSiblings={seriesSiblings}
   />
 </Base>

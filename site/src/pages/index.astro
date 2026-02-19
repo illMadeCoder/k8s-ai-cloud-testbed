@@ -2,29 +2,29 @@
 import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
 import ExperimentGroupCard from '../components/ExperimentGroupCard.astro';
-import ProjectCard from '../components/ProjectCard.astro';
+import SeriesCard from '../components/SeriesCard.astro';
 import {
   loadAllExperiments,
   groupExperiments,
-  groupByProject,
+  groupBySeries,
   getStats,
 } from '../lib/experiments';
 import { loadCategories } from '../lib/categories';
-import { loadProjects } from '../lib/projects';
+import { loadSeries } from '../lib/series';
 
 const experiments = loadAllExperiments();
 const groups = groupExperiments(experiments);
 const stats = getStats(experiments);
 const categories = loadCategories();
-const projects = loadProjects();
-const projectGroups = groupByProject(experiments);
+const allSeries = loadSeries();
+const seriesGroups = groupBySeries(experiments);
 const recentGroups = groups.slice(0, 6);
 ---
 
 <Base title="K8s Cloud TestBed — Automated Kubernetes Benchmarks">
   <Hero
     experimentCount={stats.experimentCount}
-    projectCount={projects.length}
+    seriesCount={allSeries.length}
     componentCount={stats.componentCount}
     totalRuns={stats.totalRuns}
     totalCostUSD={stats.totalCostUSD}
@@ -105,14 +105,14 @@ const recentGroups = groups.slice(0, 6);
   </section>
 
   <section class="mb-12">
-    <h2 class="text-xl font-semibold mb-4">Ongoing Projects</h2>
+    <h2 class="text-xl font-semibold mb-4">Ongoing Series</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {projects.map((p) => (
-        <ProjectCard
-          id={p.id}
-          name={p.name}
-          description={p.description}
-          experimentCount={(projectGroups[p.id] ?? []).length}
+      {allSeries.map((s) => (
+        <SeriesCard
+          id={s.id}
+          name={s.name}
+          description={s.description}
+          experimentCount={(seriesGroups[s.id] ?? []).length}
         />
       ))}
     </div>

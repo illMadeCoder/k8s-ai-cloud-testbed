@@ -1,0 +1,38 @@
+---
+import Base from '../../layouts/Base.astro';
+import Breadcrumb from '../../components/Breadcrumb.astro';
+import SeriesCard from '../../components/SeriesCard.astro';
+import { loadAllExperiments, groupBySeries } from '../../lib/experiments';
+import { loadSeries } from '../../lib/series';
+
+const experiments = loadAllExperiments();
+const seriesGroups = groupBySeries(experiments);
+const allSeries = loadSeries();
+const base = import.meta.env.BASE_URL;
+---
+
+<Base title="Series — K8s Cloud TestBed">
+  <Breadcrumb
+    crumbs={[
+      { label: 'Home', href: base },
+      { label: 'Series' },
+    ]}
+    slot="breadcrumb"
+  />
+
+  <h1 class="text-2xl font-bold mb-2">Ongoing Series</h1>
+  <p class="text-text-muted mb-8 max-w-2xl">
+    Long-term research tracks grouping related experiments around a common theme.
+  </p>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {allSeries.map((s) => (
+      <SeriesCard
+        id={s.id}
+        name={s.name}
+        description={s.description}
+        experimentCount={(seriesGroups[s.id] ?? []).length}
+      />
+    ))}
+  </div>
+</Base>

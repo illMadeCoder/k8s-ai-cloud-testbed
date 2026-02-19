@@ -11,7 +11,7 @@
     "observability",
     "logging"
   ],
-  "project": "this-lab",
+  "series": "this-lab",
   "targets": [
     {
       "name": "app",
