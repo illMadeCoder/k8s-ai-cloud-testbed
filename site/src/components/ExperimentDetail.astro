@@ -88,16 +88,15 @@ const machineVerdict = getMachineVerdict(experiment);
     <MetricCard label="Est. Cost" value={formatCost(experiment.costEstimate.totalUSD)} />
   )}
   <MetricCard label="Workflow" value={experiment.workflow.phase} />
-  <button class="metric-card pdf-btn" id="pdf-download-btn" data-experiment-name={experiment.name}>
+  <button class="metric-card copy-btn" id="copy-page-btn">
     <span class="metric-label">Export</span>
-    <span class="metric-value pdf-btn-label">
+    <span class="metric-value copy-btn-label">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" y1="15" x2="12" y2="3"/>
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
       </svg>
-      PDF
+      Copy
     </span>
   </button>
 </div>
@@ -158,7 +157,7 @@ const machineVerdict = getMachineVerdict(experiment);
 </details>
 
 {(hypothesisClaim || questions.length > 0 || focusAreas.length > 0 || hasRichAnalysis || analysis?.summary) && (
-  <details class="section section-overview" open>
+  <details class="section section-overview">
     <summary class="section-title">Overview</summary>
     {hypothesisClaim && (
       <details class="section" open>
@@ -167,7 +166,7 @@ const machineVerdict = getMachineVerdict(experiment);
       </details>
     )}
     {hasRichAnalysis && analysis && (
-      <details class="section">
+      <details class="section" open>
         <summary class="section-title">Abstract</summary>
         <AnalysisAbstract
           abstract={analysis.abstract!}
@@ -177,7 +176,7 @@ const machineVerdict = getMachineVerdict(experiment);
       </details>
     )}
     {questions.length > 0 && (
-      <details class="section">
+      <details class="section" open>
         <summary class="section-title">Questions</summary>
         <div class="study-questions-list">
           {questions.map((q, i) => (
@@ -192,7 +191,7 @@ const machineVerdict = getMachineVerdict(experiment);
       </details>
     )}
     {focusAreas.length > 0 && (
-      <details class="section">
+      <details class="section" open>
         <summary class="section-title">Focus Areas</summary>
         <div class="focus-tags">
           {focusAreas.map((f) => <span class="focus-tag">{f}</span>)}
@@ -289,63 +288,43 @@ const machineVerdict = getMachineVerdict(experiment);
 </script>
 <script is:inline>
   (function() {
-    var btn = document.getElementById('pdf-download-btn');
+    var btn = document.getElementById('copy-page-btn');
     if (!btn) return;
 
-    function loadHtml2Pdf() {
-      return new Promise(function(resolve, reject) {
-        if (window.html2pdf) return resolve(window.html2pdf);
-        var s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js';
-        s.onload = function() { resolve(window.html2pdf); };
-        s.onerror = function() { reject(new Error('Failed to load html2pdf.js')); };
-        document.head.appendChild(s);
+    btn.addEventListener('click', function() {
+      var main = document.querySelector('main');
+      if (!main) return;
+
+      // Clone so we never touch the live DOM
+      var clone = main.cloneNode(true);
+
+      // Expand all collapsed sections
+      clone.querySelectorAll('details:not([open])').forEach(function(d) { d.open = true; });
+
+      // Replace rendered mermaid SVGs with raw source text
+      clone.querySelectorAll('.mermaid-wrapper').forEach(function(wrapper) {
+        var src = wrapper.getAttribute('data-mermaid-source');
+        if (src) {
+          var pre = document.createElement('pre');
+          pre.textContent = src;
+          wrapper.replaceWith(pre);
+        }
       });
-    }
 
-    btn.addEventListener('click', async function() {
-      btn.disabled = true;
-      var label = btn.querySelector('.pdf-btn-label');
-      var origHTML = label.innerHTML;
-      label.textContent = 'Generating\u2026';
+      // Remove elements with no useful text representation
+      clone.querySelectorAll('script, style, .mermaid-toolbar, #copy-page-btn, .vega-embed').forEach(function(el) {
+        el.remove();
+      });
 
-      try {
-        var html2pdf = await loadHtml2Pdf();
-        var main = document.querySelector('main');
-        if (!main) return;
+      var text = clone.innerText;
 
-        // Expand all closed <details> and track which ones we opened
-        var closedDetails = [];
-        main.querySelectorAll('details:not([open])').forEach(function(d) {
-          closedDetails.push(d);
-          d.open = true;
-        });
-
-        // Wait for reflow of newly visible content
-        await new Promise(function(r) { setTimeout(r, 500); });
-
-        // Hide the PDF button from capture
-        btn.style.display = 'none';
-
-        var name = btn.dataset.experimentName || 'experiment';
-        await html2pdf().set({
-          margin: 10,
-          filename: name + '.pdf',
-          image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-        }).from(main).save();
-
-        // Restore collapsed sections
-        closedDetails.forEach(function(d) { d.open = false; });
-        btn.style.display = '';
-      } catch (e) {
-        console.error('PDF generation failed:', e);
-      } finally {
-        label.innerHTML = origHTML;
-        btn.disabled = false;
-      }
+      navigator.clipboard.writeText(text).then(function() {
+        var label = btn.querySelector('.copy-btn-label');
+        if (!label) return;
+        var original = label.innerHTML;
+        label.textContent = 'Copied!';
+        setTimeout(function() { label.innerHTML = original; }, 1500);
+      });
     });
   })();
 </script>
@@ -611,21 +590,16 @@ const machineVerdict = getMachineVerdict(experiment);
     z-index: 1;
   }
 
-  .pdf-btn {
+  .copy-btn {
     cursor: pointer;
     border: 1px solid transparent;
     font-family: var(--font-mono);
     transition: border-color 0.15s;
   }
-  .pdf-btn:hover {
+  .copy-btn:hover {
     border-color: var(--accent);
   }
-  .pdf-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    border-color: transparent;
-  }
-  .pdf-btn-label {
+  .copy-btn-label {
     display: flex;
     align-items: center;
     gap: 0.4rem;

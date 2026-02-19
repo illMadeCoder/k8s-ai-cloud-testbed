@@ -8,7 +8,7 @@ const { diagram, caption } = Astro.props;
 const chartId = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
 ---
 
-<div class="mermaid-wrapper" data-chart-id={chartId}>
+<div class="mermaid-wrapper" data-chart-id={chartId} data-mermaid-source={diagram}>
   <div class="mermaid-toolbar">
     <button class="mermaid-btn" data-action="zoom-out" title="Zoom out">&minus;</button>
     <span class="mermaid-zoom-label">100%</span>
