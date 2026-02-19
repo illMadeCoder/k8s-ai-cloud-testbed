@@ -14,7 +14,7 @@
       "id": "modern-database-survey",
       "name": "Modern Database Internals",
       "description": "Benchmarking cloud-native databases — NewSQL, distributed KV, time-series, and object storage",
-      "order": ["db-fvm"]
+      "order": ["db-fvm", "db-dsc"]
     },
     {
       "id": "messages-and-streams",

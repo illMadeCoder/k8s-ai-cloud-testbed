@@ -7,6 +7,7 @@ spec:
   title: "Fsync vs No-Fsync Across Disk Types: HDD, Balanced SSD, SSD"
   description: "Comparison: fsync-per-write vs no-fsync across three GKE persistent disk types (pd-standard HDD, pd-balanced, pd-ssd) — measures how disk hardware interacts with durability guarantees under sustained 60-second maximum-rate write bursts, with disk-level IOPS correlation"
   tags: ["comparison", "storage", "database"]
+  series: modern-database-survey
   publish: true
 
   analyzerConfig:
