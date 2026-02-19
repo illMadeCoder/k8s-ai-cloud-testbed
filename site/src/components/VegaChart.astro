@@ -33,6 +33,7 @@ const chartId = `vega-${Math.random().toString(36).slice(2, 10)}`;
         if (narrow) {
           legendOpts.orient = 'bottom';
           legendOpts.columns = 2;
+          legendOpts.labelLimit = 120;
         }
         patchedSpec.encoding.color.legend = Object.assign(
           patchedSpec.encoding.color.legend || {},
