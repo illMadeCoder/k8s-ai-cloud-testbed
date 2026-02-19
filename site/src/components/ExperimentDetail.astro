@@ -287,38 +287,50 @@ const machineVerdict = getMachineVerdict(experiment);
   (window as any).mermaidLib = mermaid;
   window.dispatchEvent(new CustomEvent('mermaid:ready'));
 </script>
-<script>
-  const btn = document.getElementById('pdf-download-btn') as HTMLButtonElement | null;
-  if (btn) {
-    btn.addEventListener('click', async () => {
+<script is:inline>
+  (function() {
+    var btn = document.getElementById('pdf-download-btn');
+    if (!btn) return;
+
+    function loadHtml2Pdf() {
+      return new Promise(function(resolve, reject) {
+        if (window.html2pdf) return resolve(window.html2pdf);
+        var s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js';
+        s.onload = function() { resolve(window.html2pdf); };
+        s.onerror = function() { reject(new Error('Failed to load html2pdf.js')); };
+        document.head.appendChild(s);
+      });
+    }
+
+    btn.addEventListener('click', async function() {
       btn.disabled = true;
-      const label = btn.querySelector('.pdf-btn-label')!;
-      const origHTML = label.innerHTML;
-      label.textContent = 'Generating…';
+      var label = btn.querySelector('.pdf-btn-label');
+      var origHTML = label.innerHTML;
+      label.textContent = 'Generating\u2026';
 
       try {
-        const html2pdf = (await import('html2pdf.js')).default;
-        const main = document.querySelector('main');
+        var html2pdf = await loadHtml2Pdf();
+        var main = document.querySelector('main');
         if (!main) return;
 
         // Expand all closed <details> and track which ones we opened
-        const closedDetails: HTMLDetailsElement[] = [];
-        main.querySelectorAll('details:not([open])').forEach((el) => {
-          const d = el as HTMLDetailsElement;
+        var closedDetails = [];
+        main.querySelectorAll('details:not([open])').forEach(function(d) {
           closedDetails.push(d);
           d.open = true;
         });
 
         // Wait for reflow of newly visible content
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise(function(r) { setTimeout(r, 500); });
 
         // Hide the PDF button from capture
         btn.style.display = 'none';
 
-        const name = btn.dataset.experimentName || 'experiment';
+        var name = btn.dataset.experimentName || 'experiment';
         await html2pdf().set({
           margin: 10,
-          filename: `${name}.pdf`,
+          filename: name + '.pdf',
           image: { type: 'jpeg', quality: 0.95 },
           html2canvas: { scale: 2, useCORS: true, logging: false },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -326,7 +338,7 @@ const machineVerdict = getMachineVerdict(experiment);
         }).from(main).save();
 
         // Restore collapsed sections
-        closedDetails.forEach((d) => { d.open = false; });
+        closedDetails.forEach(function(d) { d.open = false; });
         btn.style.display = '';
       } catch (e) {
         console.error('PDF generation failed:', e);
@@ -335,7 +347,7 @@ const machineVerdict = getMachineVerdict(experiment);
         btn.disabled = false;
       }
     });
-  }
+  })();
 </script>
 
 <style>
