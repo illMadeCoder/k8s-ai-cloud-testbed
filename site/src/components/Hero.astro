@@ -2,12 +2,11 @@
 interface Props {
   experimentCount: number;
   seriesCount?: number;
-  componentCount: number;
   totalRuns: number;
   totalCostUSD: number;
 }
 
-const { experimentCount, componentCount, totalRuns, totalCostUSD } = Astro.props;
+const { experimentCount, totalRuns, totalCostUSD } = Astro.props;
 const costDisplay = `$${totalCostUSD.toFixed(2)}`;
 ---
 
@@ -29,10 +28,6 @@ const costDisplay = `$${totalCostUSD.toFixed(2)}`;
         <div class="flex flex-col">
           <span class="text-2xl font-bold font-mono text-accent">{totalRuns}</span>
           <span class="text-xs text-text-muted uppercase tracking-wider font-semibold">Total Runs</span>
-        </div>
-        <div class="flex flex-col">
-          <span class="text-2xl font-bold font-mono text-accent">{componentCount}</span>
-          <span class="text-xs text-text-muted uppercase tracking-wider font-semibold">Components</span>
         </div>
         <div class="flex flex-col">
           <span class="text-2xl font-bold font-mono text-accent">{costDisplay}</span>
