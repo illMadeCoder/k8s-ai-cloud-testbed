@@ -2,7 +2,8 @@
 import Base from '../../../layouts/Base.astro';
 import Breadcrumb from '../../../components/Breadcrumb.astro';
 import ExperimentDetail from '../../../components/ExperimentDetail.astro';
-import { loadAllExperiments, getBaseName, getRunDisplayTitle, groupExperiments, getSeriesSiblings } from '../../../lib/experiments';
+import VoiceChat from '../../../components/VoiceChat.astro';
+import { loadAllExperiments, getBaseName, getRunDisplayTitle, groupExperiments, getSeriesSiblings, getHypothesisClaim } from '../../../lib/experiments';
 import { getSeriesMeta } from '../../../lib/series';
 import type { ExperimentSummary } from '../../../types';
 import type { ExperimentGroup } from '../../../lib/experiments';
@@ -37,6 +38,26 @@ if (seriesId) {
     seriesSiblings = { seriesId, seriesName: meta.name, groups: siblings };
   }
 }
+
+const hypothesis = getHypothesisClaim(experiment);
+const verdict = experiment.analysis?.hypothesisVerdict;
+const abstract = experiment.analysis?.abstract;
+
+let openingMessage: string;
+if (abstract) {
+  const firstSentence = abstract.split(/(?<=[.!?])\s/)[0];
+  if (hypothesis && verdict) {
+    openingMessage = `This experiment tested whether ${hypothesis.toLowerCase().replace(/\.$/, '')}. The result: ${verdict}. ${firstSentence} What would you like to know more about?`;
+  } else if (hypothesis) {
+    openingMessage = `This experiment explored whether ${hypothesis.toLowerCase().replace(/\.$/, '')}. ${firstSentence} What would you like to know more about?`;
+  } else {
+    openingMessage = `${firstSentence} What would you like to know more about?`;
+  }
+} else if (hypothesis) {
+  openingMessage = `This experiment tested whether ${hypothesis.toLowerCase().replace(/\.$/, '')}. What would you like to know about the methodology or results?`;
+} else {
+  openingMessage = `Welcome! This is the "${displayName}" experiment. What would you like to know about it?`;
+}
 ---
 
 <Base title={`${experiment.name} — K8s AI Lab Benchmarks`} description={experiment.description}>
@@ -59,5 +80,10 @@ if (seriesId) {
       currentRunName: experiment.name,
     } : undefined}
     seriesSiblings={seriesSiblings}
+  />
+  <VoiceChat
+    workerUrl="https://voice-proxy.illmadecoder.workers.dev"
+    experimentName={displayName}
+    openingMessage={openingMessage}
   />
 </Base>

@@ -9,7 +9,6 @@ import AnalysisBody from './AnalysisBody.astro';
 import AnalysisFeedback from './AnalysisFeedback.astro';
 import ArchitectureDiagram from './ArchitectureDiagram.astro';
 import ExperimentGroupCard from './ExperimentGroupCard.astro';
-import VoiceChat from './VoiceChat.astro';
 import { formatDuration, formatDate, formatCost, formatValue } from '../lib/format';
 import { buildSpec } from '../lib/vega-specs';
 import { getHypothesisClaim, getQuestions, getFocus, getMachineVerdict, getBaseName } from '../lib/experiments';
@@ -119,7 +118,6 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
       .md
     </span>
   </button>
-  <VoiceChat workerUrl="https://voice-proxy.illmadecoder.workers.dev" />
 </div>
 
 {analysis?.architectureDiagram && (
