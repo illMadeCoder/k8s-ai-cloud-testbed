@@ -266,7 +266,7 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
   const idx = seriesSiblings.groups.findIndex((g) => g.baseName === currentBaseName);
   const nextGroups = idx !== -1 ? seriesSiblings.groups.slice(idx + 1) : seriesSiblings.groups;
   return (
-    <details class="section section-series series-nav" open>
+    <details class="section section-series series-nav">
       <summary class="section-title">
         {nextGroups.length > 0 ? 'Next' : 'Part of'} <a href={`${base}series/${seriesSiblings.seriesId}/`} class="series-link">{seriesSiblings.seriesName}</a>
       </summary>
