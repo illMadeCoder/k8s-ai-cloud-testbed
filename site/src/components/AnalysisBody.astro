@@ -15,6 +15,13 @@ const { body, metrics } = Astro.props;
 // Skip rendering if body has no blocks (old format)
 const hasBlocks = body?.blocks && Array.isArray(body.blocks) && body.blocks.length > 0;
 
+// Find first and last top-level text block indices for Analysis/Conclusion headers
+const textIndices = hasBlocks
+  ? body.blocks.reduce<number[]>((acc, b, i) => { if (b.type === 'text') acc.push(i); return acc; }, [])
+  : [];
+const firstTextIdx = textIndices.length > 0 ? textIndices[0] : -1;
+const lastTextIdx = textIndices.length > 1 ? textIndices[textIndices.length - 1] : -1;
+
 function getPriorityColor(priority: string): string {
   switch (priority) {
     case 'p0': return '#ef4444';
@@ -40,10 +47,14 @@ function getCalloutColor(variant: string): string {
 <details class="section section-analysis">
   <summary class="section-title">Analysis</summary>
   <div class="body-blocks">
-    {body.blocks.map((block: BodyBlock) => {
+    {body.blocks.map((block: BodyBlock, blockIdx: number) => {
       if (block.type === 'text') {
+        const header = blockIdx === firstTextIdx ? 'Analysis'
+          : blockIdx === lastTextIdx ? 'Conclusion'
+          : undefined;
         return (
           <div class="block-text-featured">
+            {header && <h3 class="block-text-header">{header}</h3>}
             <p class="block-text">{block.content}</p>
           </div>
         );
@@ -315,7 +326,16 @@ function getCalloutColor(variant: string): string {
     border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
     border-left: 3px solid var(--accent);
     border-radius: var(--radius);
-    padding: 0.75rem 1rem;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .block-text-header {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    margin: 0 0 0.5rem;
   }
 
   .block-metric-missing {

@@ -17,7 +17,7 @@ const hasDesign = feedback.experimentDesign && feedback.experimentDesign.length 
 
     {hasRecommendations && (
       <div class="feedback-group">
-        <h4 class="feedback-group-title">Analysis</h4>
+        <h4 class="feedback-group-title">Next Steps</h4>
         <ul class="recommendations">
           {feedback.recommendations!.map((rec) => <li>{rec}</li>)}
         </ul>
@@ -26,7 +26,7 @@ const hasDesign = feedback.experimentDesign && feedback.experimentDesign.length 
 
     {hasDesign && (
       <div class="feedback-group">
-        <h4 class="feedback-group-title">Conclusion</h4>
+        <h4 class="feedback-group-title">Design Improvements</h4>
         <ul class="design-suggestions">
           {feedback.experimentDesign!.map((item) => <li>{item}</li>)}
         </ul>
