@@ -230,7 +230,7 @@ details.section > summary.section-title {
 details.section.section-metadata { --section-color: #6b7280; }
 details.section.section-overview { --section-color: #3b82f6; }
 details.section.section-capabilities { --section-color: #22c55e; }
-details.section.section-analysis { --section-color: var(--accent); }
+details.section.section-analysis { --section-color: #06b6d4; }
 details.section.section-metrics { --section-color: #f97316; }
 details.section.section-enhancements { --section-color: #f59e0b; }
 details.section.section-series { --section-color: #a855f7; }

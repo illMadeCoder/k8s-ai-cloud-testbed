@@ -20,9 +20,9 @@ const { abstract, model, generatedAt } = Astro.props;
 
 <style>
   .analysis-abstract {
-    background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
-    border-left: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--section-color, var(--accent)) 8%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--section-color, var(--accent)) 30%, var(--border));
+    border-left: 3px solid var(--section-color, var(--accent));
     border-radius: var(--radius);
     padding: 1.25rem 1.5rem;
     margin: 1.5rem 0;
@@ -40,7 +40,7 @@ const { abstract, model, generatedAt } = Astro.props;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--accent);
+    color: var(--section-color, var(--accent));
     margin: 0;
   }
 
