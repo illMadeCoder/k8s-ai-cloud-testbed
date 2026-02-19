@@ -233,7 +233,7 @@ details.section.section-capabilities { --section-color: #8b5cf6; }
 details.section.section-analysis { --section-color: #06b6d4; }
 details.section.section-metrics { --section-color: #10b981; }
 details.section.section-enhancements { --section-color: #f59e0b; }
-details.section.section-series { --section-color: #a855f7; }
+details.section.section-series { --section-color: #ec4899; }
 
 details.section > summary.section-title::-webkit-details-marker {
   display: none;
