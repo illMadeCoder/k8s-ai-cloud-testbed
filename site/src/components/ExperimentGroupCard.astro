@@ -34,6 +34,9 @@ const verdictClass = verdict === 'validated' ? 'badge-complete'
     <span class="card-date">{formatDate(latest.createdAt)}</span>
   </div>
   <h3 class="card-title">{getDisplayTitle(group)}</h3>
+  {seriesName && (
+    <div class="card-series">Part of {seriesName}</div>
+  )}
   <p class="card-desc">{latest.description}</p>
   {group.tags.length > 0 && (
     <div class="card-tags">
@@ -41,9 +44,6 @@ const verdictClass = verdict === 'validated' ? 'badge-complete'
         <span class="tag">{tag}</span>
       ))}
     </div>
-  )}
-  {seriesName && (
-    <div class="card-series">Part of {seriesName}</div>
   )}
   <div class="card-meta">
     <span>Duration: {formatDuration(latest.durationSeconds)}</span>
@@ -104,9 +104,7 @@ const verdictClass = verdict === 'validated' ? 'badge-complete'
   .card-series {
     font-size: 0.75rem;
     color: var(--text-muted);
-    margin-bottom: 0.75rem;
-    padding-left: 0.5rem;
-    border-left: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    margin-bottom: 0.5rem;
   }
   .card-meta {
     display: flex;
