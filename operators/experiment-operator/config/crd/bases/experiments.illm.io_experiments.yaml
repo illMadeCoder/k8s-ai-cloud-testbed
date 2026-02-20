@@ -88,6 +88,7 @@ spec:
                       - capabilitiesMatrix
                       - feedback
                       - architectureDiagram
+                      - glossary
                       type: string
                     minItems: 1
                     type: array
@@ -339,6 +340,11 @@ spec:
                 required:
                 - claim
                 type: object
+              series:
+                description: Series identifier linking this experiment to a research
+                  track (e.g., cloud-database-internals). Used for ordering on
+                  the benchmark site.
+                type: string
               tags:
                 description: Tags for categorization on the benchmark site.
                 items:
