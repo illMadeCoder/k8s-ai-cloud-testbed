@@ -20,6 +20,7 @@ spec:
       - body
       - feedback
       - architectureDiagram
+      - vocabulary
 
   hypothesis:
     claim: "Skipping fsync reduces p99 write latency by 10x+ and increases sustained write throughput by 100x+, while read latency is identical between modes"

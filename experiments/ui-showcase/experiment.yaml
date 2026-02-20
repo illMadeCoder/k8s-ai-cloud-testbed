@@ -20,6 +20,7 @@ spec:
       - body
       - feedback
       - architectureDiagram
+      - vocabulary
 
   hypothesis:
     claim: "A visual-first analysis body with typed content blocks (charts, comparison cards, callouts, tables, capability rows) tells a more effective story than paragraphs of prose — and Loki will still use fewer resources than Elasticsearch while doing it"

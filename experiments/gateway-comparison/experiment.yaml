@@ -21,6 +21,7 @@ spec:
       - capabilitiesMatrix
       - feedback
       - architectureDiagram
+      - vocabulary
 
   hypothesis:
     claim: "Under load, Envoy Gateway's two-process architecture (separate control plane + Envoy data-plane proxy) will consume more total resources than NGINX Ingress's single-process model, but deliver lower tail latency because Envoy's event-driven C++ proxy handles concurrent connections more efficiently than NGINX's worker-process model"

@@ -21,6 +21,7 @@ spec:
       - capabilitiesMatrix
       - feedback
       - architectureDiagram
+      - vocabulary
 
   hypothesis:
     claim: "Loki will consume 40-60% fewer CPU cores and 50-70% less memory than Elasticsearch at steady-state because it indexes only label metadata rather than full log content, but Elasticsearch's inverted index will enable richer ad-hoc full-text queries that LogQL's label-based filtering cannot match — prior runs consistently showed Loki's resource advantage but were too short to capture ES index stabilization"

@@ -21,6 +21,7 @@ spec:
       - capabilitiesMatrix
       - feedback
       - architectureDiagram
+      - vocabulary
 
   hypothesis:
     claim: "VictoriaMetrics will be the most resource-efficient for single-node deployments because its merge-tree storage engine and single-binary architecture avoid the per-component overhead of distributed systems, while Mimir's monolithic mode will require higher base resources due to its object-storage dependency (MinIO) and embedded microservices architecture"

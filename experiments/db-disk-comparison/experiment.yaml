@@ -21,6 +21,7 @@ spec:
       - body
       - feedback
       - architectureDiagram
+      - vocabulary
 
   hypothesis:
     claim: "Fsync latency is dominated by disk hardware — pd-ssd fsync should be 5-10x faster than pd-standard HDD, while no-fsync writes are uniformly fast regardless of disk type since they only hit the page cache"
