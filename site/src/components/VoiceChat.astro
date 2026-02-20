@@ -85,6 +85,35 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
 
   var labPreamble = 'About this site: The K8s Cloud TestBed is an automated benchmarking lab for cloud-native technologies. A custom Kubernetes operator (Kubebuilder) provisions real GKE clusters via Crossplane, deploys competing technology stacks via ArgoCD, runs standardized workloads via Argo Workflows, collects metrics, and publishes results here. Every experiment runs on freshly provisioned infrastructure for clean baselines.\n\nThe hub cluster runs on Talos Linux and hosts the operator, ArgoCD, VictoriaMetrics, SeaweedFS, and supporting infrastructure. Target clusters are provisioned on-demand in GCP and torn down after each experiment. After completion, an AI analyzer generates summaries, per-metric insights, and recommendations.\n\nThe site is organized into: Series (long-term research tracks like "Cloud Database Internals" or "Ecosystem Comparisons"), Categories (observability, networking, storage, cicd), and individual experiment pages with detailed results, charts, and AI analysis.\n\nTech stack: Talos Linux, GKE, Crossplane, ArgoCD, Argo Workflows, Prometheus, VictoriaMetrics, Grafana, Loki, Tempo, Kyverno, OpenBao, SeaweedFS, Astro, Tailwind CSS.';
 
+  var GITHUB_API = 'https://api.github.com/repos/illMadeCoder/k8s-ai-cloud-testbed/contents/';
+
+  var repoTools = [
+    {
+      type: 'function',
+      name: 'get_file',
+      description: 'Read the contents of a file from the project GitHub repository. Returns the file text. Use this to answer questions about how the code works.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'File path relative to repo root, e.g. "operators/experiment-operator/internal/controller/experiment_controller.go"' }
+        },
+        required: ['path']
+      }
+    },
+    {
+      type: 'function',
+      name: 'list_directory',
+      description: 'List files and subdirectories in a directory of the project GitHub repository. Use this to explore the codebase structure before reading specific files.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Directory path relative to repo root. Use empty string "" for the repository root.' }
+        },
+        required: ['path']
+      }
+    }
+  ];
+
   // Restore saved voice preference
   var savedVoice = localStorage.getItem('conv-voice');
   if (savedVoice && voiceSelect) {
@@ -242,6 +271,42 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
     connectingMode = null;
   }
 
+  async function githubGetFile(filePath) {
+    try {
+      var res = await fetch(GITHUB_API + filePath);
+      if (!res.ok) return 'Error: Could not fetch file (HTTP ' + res.status + ')';
+      var data = await res.json();
+      if (data.type !== 'file') return 'Error: Path is a directory, not a file. Use list_directory instead.';
+      var content = atob(data.content.replace(/\n/g, ''));
+      if (content.length > 12000) {
+        content = content.substring(0, 12000) + '\n\n[Truncated — file is ' + data.size + ' bytes total]';
+      }
+      return content;
+    } catch (e) {
+      return 'Error: ' + e.message;
+    }
+  }
+
+  async function githubListDir(dirPath) {
+    try {
+      var res = await fetch(GITHUB_API + (dirPath || ''));
+      if (!res.ok) return 'Error: Could not list directory (HTTP ' + res.status + ')';
+      var data = await res.json();
+      if (!Array.isArray(data)) return 'Error: Path is a file, not a directory. Use get_file instead.';
+      return data.map(function(item) {
+        return (item.type === 'dir' ? 'dir:  ' : 'file: ') + item.name;
+      }).join('\n');
+    } catch (e) {
+      return 'Error: ' + e.message;
+    }
+  }
+
+  async function handleToolCall(name, args) {
+    if (name === 'get_file') return await githubGetFile(args.path || '');
+    if (name === 'list_directory') return await githubListDir(args.path || '');
+    return 'Error: Unknown tool ' + name;
+  }
+
   async function connect(mode) {
     if (connState !== 'disconnected') return;
     connState = 'connecting';
@@ -309,7 +374,7 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
         var turnDetection = mode === 'voice' ? { type: 'server_vad' } : null;
 
         var brevity = ' Keep answers brief — a few sentences is ideal. Only go deeper if the user asks for detail or the question genuinely requires it.';
-        var instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The visitor is viewing "' + pageTopic + '". Be conversational, technically accurate, and enthusiastic. Help them understand the content on this page — results, methodology, and implications. Only reference experiments and data mentioned in the provided context — never invent experiments.' + brevity + (mode === 'voice' ? ' Keep responses extra concise for voice.' : '') + '\n\nContext:\n\n' + context;
+        var instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The visitor is viewing "' + pageTopic + '". Be conversational, technically accurate, and enthusiastic. Help them understand the content on this page — results, methodology, and implications. Only reference experiments and data mentioned in the provided context — never invent experiments. You have access to tools that can browse the project GitHub repository — use them to look up code, configs, or directory structure when the user asks about implementation details.' + brevity + (mode === 'voice' ? ' Keep responses extra concise for voice.' : '') + '\n\nContext:\n\n' + context;
 
         dc.send(JSON.stringify({
           type: 'session.update',
@@ -317,6 +382,7 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
             modalities: modalities,
             voice: getVoice(),
             instructions: instructions,
+            tools: repoTools,
             input_audio_transcription: { model: 'whisper-1' },
             turn_detection: turnDetection
           }
@@ -441,6 +507,26 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
 
         case 'conversation.item.input_audio_transcription.completed':
           if (msg.transcript) addMessage('user', msg.transcript);
+          break;
+
+        case 'response.function_call_arguments.done':
+          var callId = msg.call_id;
+          var fnName = msg.name;
+          var fnArgs;
+          try { fnArgs = JSON.parse(msg.arguments); } catch(e) { fnArgs = {}; }
+          appendAiDelta('[Looking up ' + fnName.replace('_', ' ') + ': ' + (fnArgs.path || '/') + '...]');
+          handleToolCall(fnName, fnArgs).then(function(result) {
+            finalizeAiBubble();
+            dc.send(JSON.stringify({
+              type: 'conversation.item.create',
+              item: {
+                type: 'function_call_output',
+                call_id: callId,
+                output: result
+              }
+            }));
+            dc.send(JSON.stringify({ type: 'response.create' }));
+          });
           break;
 
         case 'error':
