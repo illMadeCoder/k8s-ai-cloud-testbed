@@ -7,6 +7,8 @@ interface Props {
 }
 
 const { pageTopic, openingMessage, pageContext, placeholder = 'Ask about the testbed…' } = Astro.props;
+const capabilities = 'I can also browse the project source code on GitHub if you want to know how something is implemented.';
+const fullOpeningMessage = openingMessage + ' ' + capabilities;
 const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
 ---
 
@@ -16,7 +18,7 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
     <div class="conv-messages" id="conv-messages">
       <div class="conv-msg conv-msg-ai">
         <div class="conv-msg-role">AI</div>
-        <div class="conv-msg-text">{openingMessage}</div>
+        <div class="conv-msg-text">{fullOpeningMessage}</div>
       </div>
     </div>
   </div>
