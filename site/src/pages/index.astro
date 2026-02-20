@@ -48,7 +48,6 @@ const recentGroups = groups.slice(0, 6);
       </div>
       <div class="conn-fan-out">
         <div class="conn-v-center"></div>
-        <div class="conn-arrow"></div>
         <div class="conn-label">experiment</div>
         <div class="conn-h"></div>
         <div class="conn-fan-out-stems">
@@ -93,11 +92,7 @@ const recentGroups = groups.slice(0, 6);
           <div class="conn-cell"><div class="conn-v-short"></div></div>
         </div>
         <div class="conn-h"></div>
-        <div class="conn-v-center"></div>
-        <div class="conn-arrow"></div>
         <div class="conn-label">metrics</div>
-      </div>
-      <div class="conn-single">
         <div class="conn-v-center"></div>
         <div class="conn-arrow"></div>
       </div>
@@ -113,7 +108,6 @@ const recentGroups = groups.slice(0, 6);
       </div>
       <div class="conn-single">
         <div class="conn-v-center"></div>
-        <div class="conn-arrow"></div>
         <div class="conn-label">CI/CD publish</div>
         <div class="conn-v-center"></div>
         <div class="conn-arrow"></div>
@@ -294,7 +288,7 @@ const recentGroups = groups.slice(0, 6);
   .conn-fan-out-stems { display: flex; gap: 0.5rem; }
 
   /* --- merge: 3 clouds -> 1 --- */
-  .conn-merge { width: 55%; }
+  .conn-merge { width: 90%; }
   .conn-merge-stems { display: flex; gap: 0.5rem; }
 
   /* --- single line --- */
@@ -342,7 +336,6 @@ const recentGroups = groups.slice(0, 6);
     .arch-hub { width: 100%; }
     .arch-row { width: 100%; }
     .arch-ai { width: 70%; }
-    .conn-fan-out { width: 100%; }
-    .conn-merge { width: 70%; }
+    .conn-fan-out, .conn-merge { width: 100%; }
   }
 </style>

@@ -642,7 +642,9 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
   voiceBtn.addEventListener('click', toggleVoice);
   minimizeBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    setPanelState(panelState === 'minimized' ? 'open' : 'minimized');
+    var next = panelState === 'minimized' ? 'open' : 'minimized';
+    if (next === 'minimized') input.blur();
+    setPanelState(next);
   });
   input.addEventListener('focus', function() {
     if (panelState === 'minimized') setPanelState('open');
