@@ -81,8 +81,9 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
   var pageTopic = panel.getAttribute('data-page-topic') || '';
   var pageContext = panel.getAttribute('data-page-context') || '';
   var mainEl = document.querySelector('main');
-  var hasContext = !!document.getElementById('page-markdown') || !!pageContext;
   var defaultPlaceholder = panel.getAttribute('data-placeholder') || 'Ask about the testbed\u2026';
+
+  var labPreamble = 'About this site: The K8s Cloud TestBed is an automated benchmarking lab for cloud-native technologies. A custom Kubernetes operator (Kubebuilder) provisions real GKE clusters via Crossplane, deploys competing technology stacks via ArgoCD, runs standardized workloads via Argo Workflows, collects metrics, and publishes results here. Every experiment runs on freshly provisioned infrastructure for clean baselines.\n\nThe hub cluster runs on Talos Linux and hosts the operator, ArgoCD, VictoriaMetrics, SeaweedFS, and supporting infrastructure. Target clusters are provisioned on-demand in GCP and torn down after each experiment. After completion, an AI analyzer generates summaries, per-metric insights, and recommendations.\n\nThe site is organized into: Series (long-term research tracks like "Cloud Database Internals" or "Ecosystem Comparisons"), Categories (observability, networking, storage, cicd), and individual experiment pages with detailed results, charts, and AI analysis.\n\nTech stack: Talos Linux, GKE, Crossplane, ArgoCD, Argo Workflows, Prometheus, VictoriaMetrics, Grafana, Loki, Tempo, Kyverno, OpenBao, SeaweedFS, Astro, Tailwind CSS.';
 
   // Restore saved voice preference
   var savedVoice = localStorage.getItem('conv-voice');
@@ -298,18 +299,17 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
 
       dc.onopen = function() {
         var mdEl = document.getElementById('page-markdown');
-        var context = mdEl ? mdEl.textContent : pageContext;
-        var hasCtx = !!context;
+        var context = labPreamble;
+        if (mdEl && mdEl.textContent) {
+          context += '\n\nPage content:\n\n' + mdEl.textContent;
+        } else if (pageContext) {
+          context += '\n\nPage content:\n\n' + pageContext;
+        }
         var modalities = mode === 'voice' ? ['audio', 'text'] : ['text'];
         var turnDetection = mode === 'voice' ? { type: 'server_vad' } : null;
 
         var brevity = ' Keep answers brief — a few sentences is ideal. Only go deeper if the user asks for detail or the question genuinely requires it.';
-        var instructions;
-        if (hasCtx) {
-          instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The visitor is viewing "' + pageTopic + '". Be conversational, technically accurate, and enthusiastic. Help them understand the content on this page — results, methodology, and implications.' + brevity + (mode === 'voice' ? ' Keep responses extra concise for voice.' : '') + '\n\nPage content:\n\n' + context;
-        } else {
-          instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The current page is "' + pageTopic + '". Help visitors explore benchmark experiments, discover research series, understand the methodology, and navigate to specific results. Be conversational, technically accurate, and enthusiastic.' + brevity + (mode === 'voice' ? ' Keep responses extra concise for voice.' : '');
-        }
+        var instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The visitor is viewing "' + pageTopic + '". Be conversational, technically accurate, and enthusiastic. Help them understand the content on this page — results, methodology, and implications. Only reference experiments and data mentioned in the provided context — never invent experiments.' + brevity + (mode === 'voice' ? ' Keep responses extra concise for voice.' : '') + '\n\nContext:\n\n' + context;
 
         dc.send(JSON.stringify({
           type: 'session.update',

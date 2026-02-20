@@ -354,24 +354,3 @@ export function getMachineVerdict(exp: ExperimentSummary): string | undefined {
   return exp.hypothesis?.machineVerdict;
 }
 
-/**
- * Build a concise context string summarizing all experiments on the site.
- * Used to ground the AI assistant so it only references real experiments.
- */
-export function buildSiteContext(experiments: ExperimentSummary[]): string {
-  const groups = groupExperiments(experiments);
-  if (groups.length === 0) return 'No experiments have been published yet.';
-
-  const lines: string[] = [`This site has ${groups.length} experiments (${experiments.length} total runs):\n`];
-  for (const g of groups) {
-    const title = getDisplayTitle(g);
-    const desc = g.latest.description ?? '';
-    const domain = deriveDomain(g.tags);
-    const series = g.latest.series ?? '';
-    let line = `- ${title} [${domain}]`;
-    if (series) line += ` (series: ${series})`;
-    if (desc) line += `: ${desc}`;
-    lines.push(line);
-  }
-  return lines.join('\n');
-}

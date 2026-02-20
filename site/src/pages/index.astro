@@ -8,7 +8,6 @@ import {
   groupExperiments,
   groupBySeries,
   getStats,
-  buildSiteContext,
 } from '../lib/experiments';
 import { loadCategories } from '../lib/categories';
 import { loadSeries } from '../lib/series';
@@ -20,10 +19,9 @@ const categories = loadCategories();
 const allSeries = loadSeries();
 const seriesGroups = groupBySeries(experiments);
 const recentGroups = groups.slice(0, 6);
-const siteContext = buildSiteContext(experiments);
 ---
 
-<Base title="K8s Cloud TestBed — Automated Kubernetes Benchmarks" pageContext={siteContext}>
+<Base title="K8s Cloud TestBed — Automated Kubernetes Benchmarks">
   <Hero
     experimentCount={stats.experimentCount}
     seriesCount={allSeries.length}
