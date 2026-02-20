@@ -48,7 +48,7 @@ const recentGroups = groups.slice(0, 6);
       </div>
       <div class="conn-fan-out">
         <div class="conn-v-center"></div>
-        <div class="conn-label">experiment</div>
+        <div class="conn-label">idempotent ephemeral experiment</div>
         <div class="conn-h"></div>
         <div class="conn-fan-out-stems">
           <div class="conn-cell"><div class="conn-v-short"></div><div class="conn-arrow"></div></div>
@@ -92,7 +92,7 @@ const recentGroups = groups.slice(0, 6);
           <div class="conn-cell"><div class="conn-v-short"></div></div>
         </div>
         <div class="conn-h"></div>
-        <div class="conn-label">metrics</div>
+        <div class="conn-label">metrics, logs, traces</div>
         <div class="conn-v-center"></div>
         <div class="conn-arrow"></div>
       </div>
@@ -113,7 +113,6 @@ const recentGroups = groups.slice(0, 6);
         <div class="conn-arrow"></div>
       </div>
       <div class="arch-node arch-here">
-        <span class="arch-here-ping"></span>
         <div class="arch-icon-row">
           <svg class="arch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
@@ -245,11 +244,11 @@ const recentGroups = groups.slice(0, 6);
   .arch-ai .arch-icon { color: #a855f7; }
 
   /* --- shared connector primitives --- */
-  .conn-v { width: 2px; height: 14px; background: var(--line); }
-  .conn-v-short { width: 2px; height: 6px; background: var(--line); }
+  .conn-v { width: 2px; height: 8px; background: var(--line); }
+  .conn-v-short { width: 2px; height: 8px; background: var(--line); }
   .conn-v-center {
     width: 2px;
-    height: 10px;
+    height: 8px;
     margin: 0 auto;
     background: linear-gradient(to bottom, var(--line) 0%,
       color-mix(in srgb, var(--accent) 80%, transparent) 50%, var(--line) 100%);
@@ -272,7 +271,7 @@ const recentGroups = groups.slice(0, 6);
     color: var(--accent);
     letter-spacing: 0.06em;
     text-align: center;
-    margin-top: 0.2rem;
+    margin: 0.2rem 0;
     background: color-mix(in srgb, var(--accent) 10%, transparent);
     padding: 0.1rem 0.5rem;
     border-radius: 999px;
@@ -299,9 +298,9 @@ const recentGroups = groups.slice(0, 6);
     position: relative;
     border-color: var(--accent);
     background: transparent;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent);
     padding: 0.5rem 1.25rem;
     animation-delay: 0.4s;
-    animation: nodeIn 0.5s ease-out 0.4s both, hereGlow 3s ease-in-out 0.9s infinite;
   }
   .arch-here .arch-name { color: var(--accent); font-size: 0.8rem; }
   .arch-here .arch-icon { color: var(--accent); }
@@ -311,24 +310,12 @@ const recentGroups = groups.slice(0, 6);
     width: 6px; height: 6px;
     background: var(--accent);
     border-radius: 50%;
-    box-shadow: 0 0 6px var(--accent);
-    animation: ping 2s ease-in-out infinite;
-  }
-  @keyframes ping {
-    0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--accent); }
-    50% { opacity: 0.4; box-shadow: 0 0 10px var(--accent); }
-  }
-  @keyframes hereGlow {
-    0%, 100% { box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent); }
-    50%      { box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 35%, transparent); }
   }
 
   /* --- reduced motion --- */
   @media (prefers-reduced-motion: reduce) {
     .arch-node { animation: none; opacity: 1; }
     .conn-v-center { animation: none; }
-    .arch-here { animation: none; opacity: 1; box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent); }
-    .arch-here-ping { animation: none; opacity: 1; }
   }
 
   /* --- mobile adjustments --- */
