@@ -174,6 +174,7 @@ type AnalysisResult struct {
 	Body                *AnalysisBody       `json:"body,omitempty"`
 	Feedback            *AnalysisFeedback   `json:"feedback,omitempty"`
 	ArchitectureDiagram string              `json:"architectureDiagram,omitempty"`
+	Vocabulary          []VocabularyEntry   `json:"vocabulary,omitempty"`
 }
 
 // CapabilitiesMatrix is a feature comparison table for comparison experiments.
@@ -209,6 +210,12 @@ type BodyBlock map[string]interface{}
 type AnalysisFeedback struct {
 	Recommendations  []string `json:"recommendations,omitempty"`
 	ExperimentDesign []string `json:"experimentDesign,omitempty"`
+}
+
+// VocabularyEntry is a glossary term with a short definition for the experiment's domain.
+type VocabularyEntry struct {
+	Term       string `json:"term"`
+	Definition string `json:"definition"`
 }
 
 // GCP on-demand hourly rates (USD) for common machine types.

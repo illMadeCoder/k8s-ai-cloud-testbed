@@ -220,6 +220,19 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
         </div>
       </details>
     )}
+    {analysis?.vocabulary && analysis.vocabulary.length > 0 && (
+      <details class="section" open>
+        <summary class="section-title">Vocabulary</summary>
+        <dl class="vocabulary-list">
+          {analysis.vocabulary.map((entry) => (
+            <div class="vocabulary-entry">
+              <dt class="vocabulary-term">{entry.term}</dt>
+              <dd class="vocabulary-def">{entry.definition}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
+    )}
     {!hasRichAnalysis && analysis?.summary && (
       <details class="section">
         <summary class="section-title">Summary</summary>
@@ -525,6 +538,36 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
     font-weight: 600;
     padding: 0.2rem 0.6rem;
     border-radius: 2px;
+  }
+  .vocabulary-list {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  .vocabulary-entry {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .vocabulary-term {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .vocabulary-def {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.5;
   }
   .code-snippets-list {
     display: flex;

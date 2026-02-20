@@ -132,6 +132,7 @@ export interface AnalysisResult {
   feedback?: AnalysisFeedback;
   architectureDiagram?: string;
   architectureDiagramFormat?: 'ascii' | 'mermaid';
+  vocabulary?: VocabularyEntry[];
 }
 
 export interface CapabilitiesMatrix {
@@ -180,4 +181,9 @@ export interface AnalysisBody {
 export interface AnalysisFeedback {
   recommendations?: string[];
   experimentDesign?: string[];
+}
+
+export interface VocabularyEntry {
+  term: string;
+  definition: string;
 }

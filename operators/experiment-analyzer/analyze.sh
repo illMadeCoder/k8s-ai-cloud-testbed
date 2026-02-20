@@ -385,7 +385,7 @@ echo "==> Analysis plan: $(jq -c '{technologies, isComparison, focusAreas}' "${P
 # Pass 2: Core Analysis (abstract, targetAnalysis, performanceAnalysis, metricInsights)
 # ============================================================================
 PASS2_FILE="${WORK_DIR}/pass_2.json"
-if any_section_requested "abstract" "targetAnalysis" "performanceAnalysis" "metricInsights" "architectureDiagram"; then
+if any_section_requested "abstract" "targetAnalysis" "performanceAnalysis" "metricInsights" "architectureDiagram" "vocabulary"; then
 
 PASS2_PROMPT=$(cat <<'EOF'
 You are writing research-paper quality analysis of Kubernetes experiment benchmark results.
@@ -427,8 +427,18 @@ Output ONLY a JSON object with these sections:
     "<exact_code_snippet_key>": "<1-2 sentence analysis of this code snippet's implementation and its relationship to observed metrics. Explain what the code does and why it matters for the results.>"
   },
 
-  "architectureDiagram": "<ASCII architecture diagram string with \\n for newlines>"
+  "architectureDiagram": "<ASCII architecture diagram string with \\n for newlines>",
+
+  "vocabulary": [
+    {"term": "<domain term>", "definition": "<1-sentence definition>"}
+  ]
 }
+
+Rules for vocabulary:
+- 5-10 entries covering the most important domain-specific terms used in the analysis
+- Include technologies, protocols, metrics concepts, and infrastructure terms
+- Definitions should be concise (1 sentence) and accessible to someone new to the domain
+- Order from most fundamental to most specialized
 
 Rules:
 - "hypothesisVerdict" MUST be exactly one of the three allowed values (validated, invalidated, insufficient) — it is displayed as a status badge in the experiment header
@@ -843,7 +853,7 @@ jq 'if .capabilitiesMatrix == null then del(.capabilitiesMatrix) else . end' \
   "${FINAL_FILE}" > "${FINAL_FILE}.tmp" && mv "${FINAL_FILE}.tmp" "${FINAL_FILE}"
 
 # Strip any sections that weren't explicitly requested
-ALL_SECTIONS="abstract targetAnalysis performanceAnalysis metricInsights finopsAnalysis secopsAnalysis body capabilitiesMatrix feedback architectureDiagram"
+ALL_SECTIONS="abstract targetAnalysis performanceAnalysis metricInsights finopsAnalysis secopsAnalysis body capabilitiesMatrix feedback architectureDiagram vocabulary"
 for section in ${ALL_SECTIONS}; do
   if ! section_requested "${section}"; then
     jq "del(.${section})" "${FINAL_FILE}" > "${FINAL_FILE}.tmp" && mv "${FINAL_FILE}.tmp" "${FINAL_FILE}"
