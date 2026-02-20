@@ -270,6 +270,19 @@ build_prompt_file() {
   done
 }
 
+# --- Extract available code snippet keys from summary.json ---
+CODE_SNIPPET_KEYS=""
+if jq -e '.codeSnippets' "${SUMMARY_FILE}" > /dev/null 2>&1; then
+  CODE_SNIPPET_KEYS=$(jq -r '.codeSnippets | keys | join(", ")' "${SUMMARY_FILE}")
+  echo "==> Code snippets found: ${CODE_SNIPPET_KEYS}"
+fi
+
+# Build conditional code placement hint for Pass 5
+CODE_PLACEMENT_HINT=""
+if [ -n "${CODE_SNIPPET_KEYS}" ]; then
+  CODE_PLACEMENT_HINT="CODE PLACEMENT: You MUST include a \"code\" block for each of these snippet keys: ${CODE_SNIPPET_KEYS}. Place each one in the topic where its code is most relevant to the discussion. The \"insight\" field should explain how the code connects to the metrics in that topic — not generic description."
+fi
+
 # Extract hypothesis context if present (claim, questions, focus from experiment spec)
 # Try new 'hypothesis' field first, fall back to legacy 'study' field
 STUDY_CONTEXT=""
@@ -410,6 +423,10 @@ Output ONLY a JSON object with these sections:
     "<exact_metric_key>": "<1-2 sentence insight referencing actual values from the data. Each insight appears below its Vega-Lite chart.>"
   },
 
+  "codeInsights": {
+    "<exact_code_snippet_key>": "<1-2 sentence analysis of this code snippet's implementation and its relationship to observed metrics. Explain what the code does and why it matters for the results.>"
+  },
+
   "architectureDiagram": "<ASCII architecture diagram string with \\n for newlines>"
 }
 
@@ -423,6 +440,7 @@ Rules:
 - "performanceAnalysis.findings" should have 3-6 numbered findings with actual data
 - If study questions exist, findings should directly answer as many as possible
 - "metricInsights" must have one entry per metric key in metrics.queries, using exact key names
+- "codeInsights" must have one entry per code snippet key in codeSnippets, using exact key names. If no codeSnippets exist, omit codeInsights entirely
 - Reference specific numbers from the data (CPU cores, memory bytes, durations)
 - Be technical and concise — this is for infrastructure engineers
 - "architectureDiagram": Mermaid flowchart for an 800px-wide container.
@@ -702,6 +720,10 @@ Each block has a "type" field. Available types:
                Only include if the body needs a DIFFERENT view (e.g. data flow detail).
                Do NOT duplicate the top-level architectureDiagram.
                Fields: type, diagram, format, caption (optional)
+  code       — Reference a code snippet by key. "key" must match a codeSnippets key.
+               Optional "insight" provides contextual explanation shown below the code.
+               UI renders the actual source code with syntax highlighting and line numbers.
+               Fields: type, key, insight (optional)
   callout    — Emphasis box. "variant" (info|warning|success|finding) + "title" + "content".
                Fields: type, variant, title, content
   recommendation — Action item. "priority" (p0-p3) + "title" + "description" + "effort" (low|medium|high).
@@ -714,6 +736,9 @@ Each block has a "type" field. Available types:
 STRUCTURE: Create 3-5 topic blocks, each covering one theme of the experiment
 (e.g., "Resource Efficiency", "Query Capabilities", "Production Readiness").
 Add brief intro text before the first topic, and a closing verdict after the last.
+Within topics, interleave metric blocks with code blocks where the code directly
+explains the observed behavior. If code snippets are available, distribute them
+across the most relevant topics rather than clustering them all in one place.
 
 PHILOSOPHY:
 - VISUAL-FIRST: Prefer showing a chart or comparison block over describing numbers in prose.
@@ -726,9 +751,19 @@ PHILOSOPHY:
   sit side-by-side. A metric + text also works well in a row. Never put more than 3
   items in a row. Full-width blocks (tables, architecture, large metrics) stay outside rows.
 - INTERLEAVE: Alternate between visual blocks and brief text. Never stack >2 text blocks.
+- CODE AS EVIDENCE: When code snippets are available, use them as evidence alongside the metrics
+  they influence. Place a "code" block adjacent to the metric or discussion it explains — e.g.,
+  show the fsync implementation next to fsync latency metrics. Every available code snippet
+  should appear at least once in the body. The "insight" field on code blocks should provide
+  context specific to that topic — not just repeat the snippet's description.
 
 AVAILABLE METRIC KEYS:
 ${METRIC_KEYS}
+
+AVAILABLE CODE SNIPPET KEYS:
+${CODE_SNIPPET_KEYS}
+
+${CODE_PLACEMENT_HINT}
 
 PRIOR ANALYSIS (use as source material — DO NOT repeat verbatim):
 EOF
