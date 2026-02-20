@@ -6,31 +6,44 @@ import SeriesCard from '../components/SeriesCard.astro';
 import {
   loadAllExperiments,
   groupExperiments,
-  groupBySeries,
-  getStats,
 } from '../lib/experiments';
-import { loadCategories } from '../lib/categories';
-import { loadSeries } from '../lib/series';
 
 const experiments = loadAllExperiments();
 const groups = groupExperiments(experiments);
-const stats = getStats(experiments);
-const categories = loadCategories();
-const allSeries = loadSeries();
-const seriesGroups = groupBySeries(experiments);
 const recentGroups = groups.slice(0, 6);
 ---
 
 <Base title="K8s Cloud TestBed — Automated Kubernetes Benchmarks">
-  <Hero
-    experimentCount={stats.experimentCount}
-    seriesCount={allSeries.length}
-    totalRuns={stats.totalRuns}
-    totalCostUSD={stats.totalCostUSD}
-  >
+  <Hero>
+    <Fragment slot="intro">
+      <h1 class="text-3xl md:text-4xl font-bold font-mono mb-4">
+        Cloud Testbed
+      </h1>
+      <p class="text-lg text-text-muted max-w-2xl leading-relaxed mb-4">
+        A custom Kubernetes operator provisions production cloud clusters, deploys competing
+        technology stacks, runs standardized workloads, and publishes AI-analyzed
+        results — all automated, all reproducible.
+      </p>
+      <div class="hero-tech-badges">
+        <span class="hero-tech-badge">Talos</span>
+        <span class="hero-tech-badge">GKE</span>
+        <span class="hero-tech-badge">EKS</span>
+        <span class="hero-tech-badge">AKS</span>
+        <span class="hero-tech-badge">Crossplane</span>
+        <span class="hero-tech-badge">ArgoCD</span>
+        <span class="hero-tech-badge">Argo Workflows</span>
+        <span class="hero-tech-badge">VictoriaMetrics</span>
+      </div>
+    </Fragment>
     <div class="arch">
       <div class="arch-node arch-hub">
-        <div class="arch-name">On-Prem Talos Hub</div>
+        <div class="arch-icon-row">
+          <svg class="arch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+            <circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/>
+          </svg>
+          <div class="arch-name">On-Prem Talos Hub</div>
+        </div>
         <div class="arch-detail">Experiment CRs · ArgoCD · Crossplane</div>
       </div>
       <div class="conn-fan-out">
@@ -46,15 +59,30 @@ const recentGroups = groups.slice(0, 6);
       </div>
       <div class="arch-row">
         <div class="arch-node">
-          <div class="arch-name">GKE</div>
+          <div class="arch-icon-row">
+            <svg class="arch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+            </svg>
+            <div class="arch-name">GKE</div>
+          </div>
           <div class="arch-detail">Google Cloud</div>
         </div>
         <div class="arch-node">
-          <div class="arch-name">EKS</div>
+          <div class="arch-icon-row">
+            <svg class="arch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+            </svg>
+            <div class="arch-name">EKS</div>
+          </div>
           <div class="arch-detail">AWS</div>
         </div>
         <div class="arch-node">
-          <div class="arch-name">AKS</div>
+          <div class="arch-icon-row">
+            <svg class="arch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+            </svg>
+            <div class="arch-name">AKS</div>
+          </div>
           <div class="arch-detail">Azure</div>
         </div>
       </div>
@@ -69,17 +97,35 @@ const recentGroups = groups.slice(0, 6);
         <div class="conn-arrow"></div>
         <div class="conn-label">metrics</div>
       </div>
+      <div class="conn-single">
+        <div class="conn-v-center"></div>
+        <div class="conn-arrow"></div>
+      </div>
       <div class="arch-node arch-ai">
-        <div class="arch-name">AI Analysis</div>
+        <div class="arch-icon-row">
+          <svg class="arch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2l2.09 6.26L20 10l-5.91 1.74L12 18l-2.09-6.26L4 10l5.91-1.74L12 2z"/>
+            <path d="M18 14l1.18 3.54L23 19l-3.82 1.46L18 24l-1.18-3.54L13 19l3.82-1.46L18 14z" opacity="0.6"/>
+          </svg>
+          <div class="arch-name">AI Analysis</div>
+        </div>
         <div class="arch-detail">Argo Workflows · Agentic</div>
       </div>
       <div class="conn-single">
         <div class="conn-v-center"></div>
         <div class="conn-arrow"></div>
+        <div class="conn-label">CI/CD publish</div>
+        <div class="conn-v-center"></div>
+        <div class="conn-arrow"></div>
       </div>
       <div class="arch-node arch-here">
         <span class="arch-here-ping"></span>
-        <div class="arch-name">You are here</div>
+        <div class="arch-icon-row">
+          <svg class="arch-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          <div class="arch-name">You are here</div>
+        </div>
       </div>
     </div>
   </Hero>
@@ -106,6 +152,24 @@ const recentGroups = groups.slice(0, 6);
 </Base>
 
 <style>
+  /* --- tech badges --- */
+  .hero-tech-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .hero-tech-badge {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    padding: 0.15rem 0.5rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  /* --- architecture diagram --- */
   .arch {
     display: flex;
     flex-direction: column;
@@ -117,6 +181,12 @@ const recentGroups = groups.slice(0, 6);
     --line: color-mix(in srgb, var(--accent) 50%, transparent);
   }
 
+  /* --- node entrance animation --- */
+  @keyframes nodeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
   /* --- nodes --- */
   .arch-node {
     border: 1px solid var(--line);
@@ -125,19 +195,74 @@ const recentGroups = groups.slice(0, 6);
     text-align: center;
     font-family: var(--font-mono);
     background: transparent;
+    animation: nodeIn 0.5s ease-out both;
   }
-  .arch-hub { width: 80%; }
+
+  /* --- node icons --- */
+  .arch-icon-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+  .arch-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+  }
+
+  /* --- hub node (blue accent) --- */
+  .arch-hub {
+    width: 80%;
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    border-left: 3px solid var(--accent);
+    animation-delay: 0s;
+  }
+  .arch-hub .arch-icon { color: var(--accent); }
+
   .arch-name { font-size: 0.9rem; font-weight: 700; color: var(--text); line-height: 1.3; }
   .arch-detail { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; line-height: 1.3; }
+
+  /* --- cloud row (green accent) --- */
   .arch-row { display: flex; gap: 0.5rem; width: 90%; justify-content: center; }
-  .arch-row .arch-node { flex: 1; min-width: 0; padding: 0.5rem 0.4rem; }
-  .arch-ai { width: 55%; }
+  .arch-row .arch-node {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.4rem;
+    background: color-mix(in srgb, var(--success) 6%, var(--bg-surface));
+    border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+    border-top: 2px solid var(--success);
+  }
+  .arch-row .arch-node:nth-child(1) { animation-delay: 0.1s; }
+  .arch-row .arch-node:nth-child(2) { animation-delay: 0.15s; }
+  .arch-row .arch-node:nth-child(3) { animation-delay: 0.2s; }
+  .arch-row .arch-icon { color: var(--success); }
+
+  /* --- AI analysis node (purple accent) --- */
+  .arch-ai {
+    width: 55%;
+    background: color-mix(in srgb, #a855f7 8%, var(--bg-surface));
+    border-color: color-mix(in srgb, #a855f7 30%, var(--border));
+    border-left: 3px solid #a855f7;
+    animation-delay: 0.3s;
+  }
+  .arch-ai .arch-icon { color: #a855f7; }
 
   /* --- shared connector primitives --- */
-  .conn-v { width: 1px; height: 14px; background: var(--line); }
-  .conn-v-short { width: 1px; height: 6px; background: var(--line); }
-  .conn-v-center { width: 1px; height: 10px; background: var(--line); margin: 0 auto; }
-  .conn-h { width: 100%; height: 1px; background: var(--line); }
+  .conn-v { width: 2px; height: 14px; background: var(--line); }
+  .conn-v-short { width: 2px; height: 6px; background: var(--line); }
+  .conn-v-center {
+    width: 2px;
+    height: 10px;
+    margin: 0 auto;
+    background: linear-gradient(to bottom, var(--line) 0%,
+      color-mix(in srgb, var(--accent) 80%, transparent) 50%, var(--line) 100%);
+    background-size: 100% 200%;
+    animation: dataFlow 2s ease-in-out infinite;
+  }
+  .conn-h { width: 100%; height: 2px; background: var(--line); }
   .conn-arrow {
     width: 0; height: 0;
     border-left: 5px solid transparent;
@@ -150,18 +275,26 @@ const recentGroups = groups.slice(0, 6);
     font-family: var(--font-mono);
     font-size: 0.7rem;
     font-weight: 600;
-    color: var(--text);
+    color: var(--accent);
     letter-spacing: 0.06em;
     text-align: center;
     margin-top: 0.2rem;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
   }
 
-  /* --- fan-out: hub → 3 clouds --- */
+  @keyframes dataFlow {
+    0%   { background-position: 0% 0%; }
+    100% { background-position: 0% 200%; }
+  }
+
+  /* --- fan-out: hub -> 3 clouds --- */
   .conn-fan-out { width: 90%; }
   .conn-fan-out-stems { display: flex; gap: 0.5rem; }
 
-  /* --- merge: 3 clouds → 1 --- */
-  .conn-merge { width: 90%; }
+  /* --- merge: 3 clouds -> 1 --- */
+  .conn-merge { width: 55%; }
   .conn-merge-stems { display: flex; gap: 0.5rem; }
 
   /* --- single line --- */
@@ -171,10 +304,13 @@ const recentGroups = groups.slice(0, 6);
   .arch-here {
     position: relative;
     border-color: var(--accent);
-    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent);
+    background: transparent;
     padding: 0.5rem 1.25rem;
+    animation-delay: 0.4s;
+    animation: nodeIn 0.5s ease-out 0.4s both, hereGlow 3s ease-in-out 0.9s infinite;
   }
   .arch-here .arch-name { color: var(--accent); font-size: 0.8rem; }
+  .arch-here .arch-icon { color: var(--accent); }
   .arch-here-ping {
     position: absolute;
     top: -3px; right: -3px;
@@ -187,5 +323,26 @@ const recentGroups = groups.slice(0, 6);
   @keyframes ping {
     0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--accent); }
     50% { opacity: 0.4; box-shadow: 0 0 10px var(--accent); }
+  }
+  @keyframes hereGlow {
+    0%, 100% { box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent); }
+    50%      { box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 35%, transparent); }
+  }
+
+  /* --- reduced motion --- */
+  @media (prefers-reduced-motion: reduce) {
+    .arch-node { animation: none; opacity: 1; }
+    .conn-v-center { animation: none; }
+    .arch-here { animation: none; opacity: 1; box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent); }
+    .arch-here-ping { animation: none; opacity: 1; }
+  }
+
+  /* --- mobile adjustments --- */
+  @media (max-width: 1024px) {
+    .arch-hub { width: 100%; }
+    .arch-row { width: 100%; }
+    .arch-ai { width: 70%; }
+    .conn-fan-out { width: 100%; }
+    .conn-merge { width: 70%; }
   }
 </style>

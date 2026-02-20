@@ -1,45 +1,10 @@
 ---
-interface Props {
-  experimentCount: number;
-  seriesCount?: number;
-  totalRuns: number;
-  totalCostUSD: number;
-}
-
-const { experimentCount, seriesCount, totalRuns, totalCostUSD } = Astro.props;
-const costDisplay = `$${totalCostUSD.toFixed(2)}`;
 ---
 
 <section class="py-12 md:py-16">
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
     <div>
-      <h1 class="text-3xl md:text-4xl font-bold font-mono mb-4">
-        Cloud Testbed
-      </h1>
-      <p class="text-lg text-text-muted max-w-2xl mb-8 leading-relaxed">
-        Real-world benchmarks of cloud-native technologies — automated experiments
-        comparing performance, cost, and operational complexity.
-      </p>
-      <div class="flex flex-wrap gap-8">
-        <div class="flex flex-col items-center">
-          <span class="text-2xl font-bold font-mono text-accent">{experimentCount}</span>
-          <span class="text-xs text-text-muted uppercase tracking-wider font-semibold">Experiments</span>
-        </div>
-        {seriesCount != null && (
-        <div class="flex flex-col items-center">
-          <span class="text-2xl font-bold font-mono text-accent">{seriesCount}</span>
-          <span class="text-xs text-text-muted uppercase tracking-wider font-semibold">Series</span>
-        </div>
-        )}
-        <div class="flex flex-col items-center">
-          <span class="text-2xl font-bold font-mono text-accent">{totalRuns}</span>
-          <span class="text-xs text-text-muted uppercase tracking-wider font-semibold">Runs</span>
-        </div>
-        <div class="flex flex-col items-center">
-          <span class="text-2xl font-bold font-mono text-accent">{costDisplay}</span>
-          <span class="text-xs text-text-muted uppercase tracking-wider font-semibold">OpEx</span>
-        </div>
-      </div>
+      <slot name="intro" />
     </div>
     <slot />
   </div>
