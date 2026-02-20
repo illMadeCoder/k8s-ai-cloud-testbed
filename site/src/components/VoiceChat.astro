@@ -94,7 +94,7 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
 
   // --- Drag resize ---
   var dragHandle = document.getElementById('conv-drag');
-  var panelHeight = 25; // vh
+  var panelHeight = 30; // vh
   var dragging = false;
   var dragMoved = false;
 
@@ -301,11 +301,12 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
         var modalities = mode === 'voice' ? ['audio', 'text'] : ['text'];
         var turnDetection = mode === 'voice' ? { type: 'server_vad' } : null;
 
+        var brevity = ' Keep answers brief — a few sentences is ideal. Only go deeper if the user asks for detail or the question genuinely requires it.';
         var instructions;
         if (hasCtx) {
-          instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The visitor is viewing "' + pageTopic + '". Be conversational, technically accurate, and enthusiastic. Help them understand the content on this page — results, methodology, and implications.' + (mode === 'voice' ? ' Keep responses concise for voice.' : '') + '\n\nPage content:\n\n' + context;
+          instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The visitor is viewing "' + pageTopic + '". Be conversational, technically accurate, and enthusiastic. Help them understand the content on this page — results, methodology, and implications.' + brevity + (mode === 'voice' ? ' Keep responses extra concise for voice.' : '') + '\n\nPage content:\n\n' + context;
         } else {
-          instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The current page is "' + pageTopic + '". Help visitors explore benchmark experiments, discover research series, understand the methodology, and navigate to specific results. Be conversational, technically accurate, and enthusiastic.' + (mode === 'voice' ? ' Keep responses concise for voice.' : '');
+          instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The current page is "' + pageTopic + '". Help visitors explore benchmark experiments, discover research series, understand the methodology, and navigate to specific results. Be conversational, technically accurate, and enthusiastic.' + brevity + (mode === 'voice' ? ' Keep responses extra concise for voice.' : '');
         }
 
         dc.send(JSON.stringify({
@@ -576,7 +577,7 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
     bottom: 0;
     left: 0;
     right: 0;
-    height: 25vh;
+    height: 30vh;
     display: flex;
     flex-direction: column;
     background: var(--bg-card);
