@@ -41,3 +41,14 @@ parameters:
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 reclaimPolicy: Delete
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: bench-hyperdisk-extreme
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: hyperdisk-extreme
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete

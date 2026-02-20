@@ -4,8 +4,8 @@ metadata:
   generateName: db-st-
   namespace: experiments
 spec:
-  title: "GKE Storage Tier Showdown: 4 Disk Types from HDD to Hyperdisk Balanced"
-  description: "Comparison: fsync-per-write vs no-fsync across four GKE persistent disk types (pd-standard, pd-balanced, pd-ssd, hyperdisk-balanced) on n2-standard-8 — measures how disk tier interacts with durability guarantees under sustained 60-second maximum-rate write bursts"
+  title: "GKE Storage Tier Showdown: All 5 Disk Types from HDD to Hyperdisk Extreme"
+  description: "Comparison: fsync-per-write vs no-fsync across all five GKE persistent disk types (pd-standard, pd-balanced, pd-ssd, hyperdisk-balanced, hyperdisk-extreme) on n2-standard-80 — measures how disk tier interacts with durability guarantees under sustained 60-second maximum-rate write bursts"
   tags: ["comparison", "storage", "database", "baseline"]
   series: cloud-database-internals
   publish: true
@@ -24,21 +24,21 @@ spec:
       - glossary
 
   hypothesis:
-    claim: "Hyperdisk Balanced delivers lower fsync latency than pd-ssd due to its newer storage backend. No-fsync writes remain uniformly fast across all disk types since they only hit the page cache."
+    claim: "Hyperdisk Extreme delivers 5-20x lower fsync latency than pd-standard and 2-5x lower than pd-ssd. Hyperdisk Balanced slots between pd-ssd and Hyperdisk Extreme. No-fsync writes remain uniformly fast across all disk types since they only hit the page cache."
     questions:
-      - "How does fsync write latency vary across four GKE disk types including Hyperdisk Balanced?"
+      - "How does fsync write latency vary across all five GKE disk types?"
       - "Is no-fsync latency truly independent of underlying disk type?"
       - "What is the sustained write throughput ceiling for each disk type under fsync?"
       - "Do node-level disk IOPS correlate with application-level fsync latency?"
       - "How does the fsync cost multiplier change across disk tiers?"
-      - "Where does Hyperdisk Balanced slot in relative to traditional pd-standard/balanced/ssd?"
+      - "Where do the Hyperdisk tiers slot in relative to traditional pd-standard/balanced/ssd?"
     focus:
-      - "fsync latency distribution across 4 disk types"
-      - "Hyperdisk Balanced vs traditional PD latency comparison"
+      - "fsync latency distribution across all 5 disk types"
+      - "Hyperdisk vs traditional PD latency comparison"
       - "sustained throughput ceiling per disk type"
       - "disk IOPS correlation with application latency"
       - "page-cache independence from disk type"
-      - "cost-performance tradeoff across 4 disk tiers"
+      - "cost-performance tradeoff across 5 disk tiers"
 
   codeSnippets:
     fsync-store:
@@ -48,7 +48,7 @@ spec:
       path: components/apps/naive-db/src/src/store.rs
       startLine: 72
       endLine: 87
-      usedBy: ["naive-db-fsync-hdd", "naive-db-fsync-balanced", "naive-db-fsync-ssd", "naive-db-fsync-hyperdisk-balanced"]
+      usedBy: ["naive-db-fsync-hdd", "naive-db-fsync-balanced", "naive-db-fsync-ssd", "naive-db-fsync-hyperdisk-balanced", "naive-db-fsync-hyperdisk-extreme"]
     nosync-store:
       name: "SyncMode Configuration"
       description: "Controls whether writes call fsync — set via NAIVE_DB_SYNC_MODE environment variable. In NoSync mode, writes land in the page cache only, trading durability for throughput."
@@ -56,13 +56,13 @@ spec:
       path: components/apps/naive-db/src/src/store.rs
       startLine: 9
       endLine: 22
-      usedBy: ["naive-db-nosync-hdd", "naive-db-nosync-balanced", "naive-db-nosync-ssd", "naive-db-nosync-hyperdisk-balanced"]
+      usedBy: ["naive-db-nosync-hdd", "naive-db-nosync-balanced", "naive-db-nosync-ssd", "naive-db-nosync-hyperdisk-balanced", "naive-db-nosync-hyperdisk-extreme"]
 
   targets:
     - name: app
       cluster:
         type: gke
-        machineType: n2-standard-8
+        machineType: n2-standard-80
         preemptible: true
       components:
         - app: naive-db-storage-bench
@@ -222,12 +222,49 @@ spec:
       description: "Hyperdisk Balanced nosync: sustained write ops/sec"
       group: hdb
 
+    # --- Hyperdisk Extreme variant: fsync ---
+    - name: hde_fsync_write_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-fsync-hyperdisk-extreme\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "Hyperdisk Extreme fsync: P99 write latency"
+      group: hde
+
+    - name: hde_fsync_throughput
+      query: "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-fsync-hyperdisk-extreme\", namespace=~\"$EXPERIMENT\"}[$DURATION]))"
+      type: instant
+      unit: ops/s
+      description: "Hyperdisk Extreme fsync: sustained write ops/sec"
+      group: hde
+
+    - name: hde_fsync_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{app=\"naive-db-fsync-hyperdisk-extreme\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "Hyperdisk Extreme fsync: P99 fsync-only latency"
+      group: hde
+
+    # --- Hyperdisk Extreme variant: nosync ---
+    - name: hde_nosync_write_p99
+      query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-nosync-hyperdisk-extreme\", namespace=~\"$EXPERIMENT\"}[$DURATION])) by (le))"
+      type: instant
+      unit: seconds
+      description: "Hyperdisk Extreme nosync: P99 write latency"
+      group: hde
+
+    - name: hde_nosync_throughput
+      query: "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-nosync-hyperdisk-extreme\", namespace=~\"$EXPERIMENT\"}[$DURATION]))"
+      type: instant
+      unit: ops/s
+      description: "Hyperdisk Extreme nosync: sustained write ops/sec"
+      group: hde
+
     # --- Time-series (range) across all variants ---
     - name: write_latency_over_time
       query: "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"$EXPERIMENT\"}[1m])) by (le, app))"
       type: range
       unit: seconds
-      description: "P99 write latency over time by variant (8 series)"
+      description: "P99 write latency over time by variant (10 series)"
       group: timeseries
 
     - name: fsync_latency_over_time
@@ -241,7 +278,7 @@ spec:
       query: "sum(rate(naivedb_operations_total{op=\"write\", namespace=~\"$EXPERIMENT\"}[1m])) by (app)"
       type: range
       unit: ops/s
-      description: "Write throughput over time by variant (8 series)"
+      description: "Write throughput over time by variant (10 series)"
       group: timeseries
 
     - name: read_throughput_over_time
@@ -321,6 +358,20 @@ spec:
       type: instant
       unit: rows
       description: "Hyperdisk Balanced nosync: total rows written"
+      group: totals
+
+    - name: hde_fsync_total_rows
+      query: "naivedb_rows_total{app=\"naive-db-fsync-hyperdisk-extreme\", namespace=~\"$EXPERIMENT\"}"
+      type: instant
+      unit: rows
+      description: "Hyperdisk Extreme fsync: total rows written"
+      group: totals
+
+    - name: hde_nosync_total_rows
+      query: "naivedb_rows_total{app=\"naive-db-nosync-hyperdisk-extreme\", namespace=~\"$EXPERIMENT\"}"
+      type: instant
+      unit: rows
+      description: "Hyperdisk Extreme nosync: total rows written"
       group: totals
 
     # --- Cluster resources ---

@@ -4,7 +4,7 @@ metadata:
   name: db-storage-bench-loadgen
 spec:
   type: app
-  description: "Sustained-throughput load generator for storage-tier comparison benchmark (8 naive-db variants)"
+  description: "Sustained-throughput load generator for storage-tier comparison benchmark (10 naive-db variants)"
   sources:
     - repoURL: https://github.com/illMadeCoder/k8s-ai-cloud-testbed.git
       targetRevision: HEAD
