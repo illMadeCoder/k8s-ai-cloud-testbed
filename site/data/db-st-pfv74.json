@@ -1,0 +1,2009 @@
+{
+  "name": "db-st-pfv74",
+  "title": "GKE Storage Tier Showdown: 4 Disk Types from HDD to Hyperdisk Balanced",
+  "namespace": "experiments",
+  "description": "Comparison: fsync-per-write vs no-fsync across four GKE persistent disk types (pd-standard, pd-balanced, pd-ssd, hyperdisk-balanced) on c3-standard-8 — measures how disk tier interacts with durability guarantees under sustained 60-second maximum-rate write bursts",
+  "createdAt": "2026-02-21T15:35:18Z",
+  "completedAt": "2026-02-21T17:10:01.075162454Z",
+  "durationSeconds": 5683.075162454,
+  "phase": "Complete",
+  "tags": [
+    "comparison",
+    "storage",
+    "database",
+    "baseline"
+  ],
+  "hypothesis": {
+    "claim": "Hyperdisk Balanced delivers lower fsync latency than pd-ssd, which in turn beats pd-balanced and pd-standard. No-fsync writes remain uniformly fast across all disk types since they only hit the page cache.",
+    "questions": [
+      "How does fsync write latency vary across four GKE disk types?",
+      "Is no-fsync latency truly independent of underlying disk type?",
+      "What is the sustained write throughput ceiling for each disk type under fsync?",
+      "Do node-level disk IOPS correlate with application-level fsync latency?",
+      "How does the fsync cost multiplier change across disk tiers?",
+      "Where does Hyperdisk Balanced slot in relative to traditional pd-standard/balanced/ssd?"
+    ],
+    "focus": [
+      "fsync latency distribution across 4 disk types",
+      "Hyperdisk Balanced vs traditional PD latency comparison",
+      "sustained throughput ceiling per disk type",
+      "disk IOPS correlation with application latency",
+      "page-cache independence from disk type",
+      "cost-performance tradeoff across 4 disk tiers"
+    ]
+  },
+  "analyzerConfig": {
+    "sections": [
+      "abstract",
+      "capabilitiesMatrix",
+      "targetAnalysis",
+      "performanceAnalysis",
+      "metricInsights",
+      "finopsAnalysis",
+      "body",
+      "feedback",
+      "architectureDiagram",
+      "glossary"
+    ]
+  },
+  "targets": [
+    {
+      "name": "app",
+      "clusterName": "db-st-pfv74-app",
+      "clusterType": "gke",
+      "machineType": "c3-standard-8",
+      "nodeCount": 1,
+      "components": [
+        "ConfigMap/alloy",
+        "ConfigMap/kube-prometheus-stack-alertmanager-overview",
+        "ConfigMap/kube-prometheus-stack-apiserver",
+        "ConfigMap/kube-prometheus-stack-cluster-total",
+        "ConfigMap/kube-prometheus-stack-controller-manager",
+        "ConfigMap/kube-prometheus-stack-etcd",
+        "ConfigMap/kube-prometheus-stack-grafana",
+        "ConfigMap/kube-prometheus-stack-grafana-config-dashboards",
+        "ConfigMap/kube-prometheus-stack-grafana-datasource",
+        "ConfigMap/kube-prometheus-stack-grafana-overview",
+        "ConfigMap/kube-prometheus-stack-k8s-coredns",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-cluster",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-multicluster",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-namespace",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-node",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-pod",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-workload",
+        "ConfigMap/kube-prometheus-stack-k8s-resources-workloads-namespace",
+        "ConfigMap/kube-prometheus-stack-kubelet",
+        "ConfigMap/kube-prometheus-stack-namespace-by-pod",
+        "ConfigMap/kube-prometheus-stack-namespace-by-workload",
+        "ConfigMap/kube-prometheus-stack-node-cluster-rsrc-use",
+        "ConfigMap/kube-prometheus-stack-node-rsrc-use",
+        "ConfigMap/kube-prometheus-stack-nodes",
+        "ConfigMap/kube-prometheus-stack-nodes-aix",
+        "ConfigMap/kube-prometheus-stack-nodes-darwin",
+        "ConfigMap/kube-prometheus-stack-persistentvolumesusage",
+        "ConfigMap/kube-prometheus-stack-pod-total",
+        "ConfigMap/kube-prometheus-stack-prometheus",
+        "ConfigMap/kube-prometheus-stack-proxy",
+        "ConfigMap/kube-prometheus-stack-scheduler",
+        "ConfigMap/kube-prometheus-stack-workload-total",
+        "Namespace/observability",
+        "Secret/alertmanager-kube-prometheus-stack-alertmanager",
+        "Secret/kube-prometheus-stack-grafana",
+        "Service/alloy",
+        "Service/kube-prometheus-stack-alertmanager",
+        "Service/kube-prometheus-stack-grafana",
+        "Service/kube-prometheus-stack-kube-state-metrics",
+        "Service/kube-prometheus-stack-operator",
+        "Service/kube-prometheus-stack-prometheus",
+        "Service/kube-prometheus-stack-prometheus-node-exporter",
+        "Service/naive-db-fsync-balanced",
+        "Service/naive-db-fsync-hdd",
+        "Service/naive-db-fsync-hyperdisk-balanced",
+        "Service/naive-db-fsync-ssd",
+        "Service/naive-db-nosync-balanced",
+        "Service/naive-db-nosync-hdd",
+        "Service/naive-db-nosync-hyperdisk-balanced",
+        "Service/naive-db-nosync-ssd",
+        "Service/kube-prometheus-stack-coredns",
+        "Service/kube-prometheus-stack-kube-controller-manager",
+        "Service/kube-prometheus-stack-kube-etcd",
+        "Service/kube-prometheus-stack-kube-proxy",
+        "Service/kube-prometheus-stack-kube-scheduler",
+        "Service/vm-hub",
+        "ServiceAccount/alloy",
+        "ServiceAccount/kube-prometheus-stack-admission",
+        "ServiceAccount/kube-prometheus-stack-alertmanager",
+        "ServiceAccount/kube-prometheus-stack-grafana",
+        "ServiceAccount/kube-prometheus-stack-kube-state-metrics",
+        "ServiceAccount/kube-prometheus-stack-operator",
+        "ServiceAccount/kube-prometheus-stack-prometheus",
+        "ServiceAccount/kube-prometheus-stack-prometheus-node-exporter",
+        "MutatingWebhookConfiguration/kube-prometheus-stack-admission",
+        "ValidatingWebhookConfiguration/kube-prometheus-stack-admission",
+        "CustomResourceDefinition/alertmanagerconfigs.monitoring.coreos.com",
+        "CustomResourceDefinition/alertmanagers.monitoring.coreos.com",
+        "CustomResourceDefinition/podlogs.monitoring.grafana.com",
+        "CustomResourceDefinition/podmonitors.monitoring.coreos.com",
+        "CustomResourceDefinition/probes.monitoring.coreos.com",
+        "CustomResourceDefinition/prometheusagents.monitoring.coreos.com",
+        "CustomResourceDefinition/prometheuses.monitoring.coreos.com",
+        "CustomResourceDefinition/prometheusrules.monitoring.coreos.com",
+        "CustomResourceDefinition/scrapeconfigs.monitoring.coreos.com",
+        "CustomResourceDefinition/servicemonitors.monitoring.coreos.com",
+        "CustomResourceDefinition/thanosrulers.monitoring.coreos.com",
+        "DaemonSet/alloy",
+        "DaemonSet/kube-prometheus-stack-prometheus-node-exporter",
+        "Deployment/kube-prometheus-stack-grafana",
+        "Deployment/kube-prometheus-stack-kube-state-metrics",
+        "Deployment/kube-prometheus-stack-operator",
+        "StatefulSet/naive-db-fsync-balanced",
+        "StatefulSet/naive-db-fsync-hdd",
+        "StatefulSet/naive-db-fsync-hyperdisk-balanced",
+        "StatefulSet/naive-db-fsync-ssd",
+        "StatefulSet/naive-db-nosync-balanced",
+        "StatefulSet/naive-db-nosync-hdd",
+        "StatefulSet/naive-db-nosync-hyperdisk-balanced",
+        "StatefulSet/naive-db-nosync-ssd",
+        "Job/db-storage-bench-loadgen",
+        "Job/kube-prometheus-stack-admission-create",
+        "Alertmanager/kube-prometheus-stack-alertmanager",
+        "Prometheus/kube-prometheus-stack-prometheus",
+        "PrometheusRule/kube-prometheus-stack-alertmanager.rules",
+        "PrometheusRule/kube-prometheus-stack-config-reloaders",
+        "PrometheusRule/kube-prometheus-stack-etcd",
+        "PrometheusRule/kube-prometheus-stack-general.rules",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-cpu-usage-seconds-tot",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-cache",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-rss",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-swap",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-memory-working-set-by",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.container-resource",
+        "PrometheusRule/kube-prometheus-stack-k8s.rules.pod-owner",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-availability.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-burnrate.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-histogram.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-apiserver-slos",
+        "PrometheusRule/kube-prometheus-stack-kube-prometheus-general.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-prometheus-node-recording.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-scheduler.rules",
+        "PrometheusRule/kube-prometheus-stack-kube-state-metrics",
+        "PrometheusRule/kube-prometheus-stack-kubelet.rules",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-apps",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-resources",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-storage",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-apiserver",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-controller-manager",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-kube-proxy",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-kubelet",
+        "PrometheusRule/kube-prometheus-stack-kubernetes-system-scheduler",
+        "PrometheusRule/kube-prometheus-stack-node-exporter",
+        "PrometheusRule/kube-prometheus-stack-node-exporter.rules",
+        "PrometheusRule/kube-prometheus-stack-node-network",
+        "PrometheusRule/kube-prometheus-stack-node.rules",
+        "PrometheusRule/kube-prometheus-stack-prometheus",
+        "PrometheusRule/kube-prometheus-stack-prometheus-operator",
+        "ServiceMonitor/kube-prometheus-stack-alertmanager",
+        "ServiceMonitor/kube-prometheus-stack-apiserver",
+        "ServiceMonitor/kube-prometheus-stack-coredns",
+        "ServiceMonitor/kube-prometheus-stack-grafana",
+        "ServiceMonitor/kube-prometheus-stack-kube-controller-manager",
+        "ServiceMonitor/kube-prometheus-stack-kube-etcd",
+        "ServiceMonitor/kube-prometheus-stack-kube-proxy",
+        "ServiceMonitor/kube-prometheus-stack-kube-scheduler",
+        "ServiceMonitor/kube-prometheus-stack-kube-state-metrics",
+        "ServiceMonitor/kube-prometheus-stack-kubelet",
+        "ServiceMonitor/kube-prometheus-stack-operator",
+        "ServiceMonitor/kube-prometheus-stack-prometheus",
+        "ServiceMonitor/kube-prometheus-stack-prometheus-node-exporter",
+        "ServiceMonitor/naive-db-fsync-balanced",
+        "ServiceMonitor/naive-db-fsync-hdd",
+        "ServiceMonitor/naive-db-fsync-hyperdisk-balanced",
+        "ServiceMonitor/naive-db-fsync-ssd",
+        "ServiceMonitor/naive-db-nosync-balanced",
+        "ServiceMonitor/naive-db-nosync-hdd",
+        "ServiceMonitor/naive-db-nosync-hyperdisk-balanced",
+        "ServiceMonitor/naive-db-nosync-ssd",
+        "ClusterRole/alloy",
+        "ClusterRole/kube-prometheus-stack-admission",
+        "ClusterRole/kube-prometheus-stack-grafana-clusterrole",
+        "ClusterRole/kube-prometheus-stack-kube-state-metrics",
+        "ClusterRole/kube-prometheus-stack-operator",
+        "ClusterRole/kube-prometheus-stack-prometheus",
+        "ClusterRoleBinding/alloy",
+        "ClusterRoleBinding/kube-prometheus-stack-admission",
+        "ClusterRoleBinding/kube-prometheus-stack-grafana-clusterrolebinding",
+        "ClusterRoleBinding/kube-prometheus-stack-kube-state-metrics",
+        "ClusterRoleBinding/kube-prometheus-stack-operator",
+        "ClusterRoleBinding/kube-prometheus-stack-prometheus",
+        "Role/kube-prometheus-stack-admission",
+        "Role/kube-prometheus-stack-grafana",
+        "RoleBinding/kube-prometheus-stack-admission",
+        "RoleBinding/kube-prometheus-stack-grafana",
+        "StorageClass/bench-balanced",
+        "StorageClass/bench-hdd",
+        "StorageClass/bench-hyperdisk-balanced",
+        "StorageClass/bench-ssd"
+      ]
+    }
+  ],
+  "workflow": {
+    "name": "db-st-pfv74-validation",
+    "template": "db-storage-tiers-validation",
+    "phase": "Succeeded",
+    "startedAt": "2026-02-21T16:09:24Z",
+    "finishedAt": "2026-02-21T17:09:52Z"
+  },
+  "metrics": {
+    "collectedAt": "2026-02-21T17:10:02.036844255Z",
+    "source": "target:db-st-pfv74/kube-prometheus-stack-prometheus",
+    "timeRange": {
+      "start": "2026-02-21T15:35:18Z",
+      "end": "2026-02-21T17:10:02.036799424Z",
+      "duration": "1h34m44.036799424s",
+      "stepSeconds": 300
+    },
+    "queries": {
+      "balanced_fsync_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{app=\"naive-db-fsync-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Balanced fsync: P99 fsync-only latency",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.004972724935732649
+          }
+        ]
+      },
+      "balanced_fsync_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-fsync-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "Balanced fsync: sustained write ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.5571261805517964
+          }
+        ]
+      },
+      "balanced_fsync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-fsync-balanced\", namespace=~\"db-st-pfv74\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "Balanced fsync: total rows written",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "app": "naive-db-fsync-balanced",
+              "container": "naive-db",
+              "endpoint": "http",
+              "instance": "10.1.0.24:8080",
+              "job": "naive-db-fsync-balanced",
+              "namespace": "db-st-pfv74",
+              "pod": "naive-db-fsync-balanced-0",
+              "service": "naive-db-fsync-balanced"
+            },
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 3616
+          }
+        ]
+      },
+      "balanced_fsync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-fsync-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Balanced fsync: P99 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.004988103225806452
+          }
+        ]
+      },
+      "balanced_nosync_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-nosync-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "Balanced nosync: sustained write ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.5780426944053484
+          }
+        ]
+      },
+      "balanced_nosync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-nosync-balanced\", namespace=~\"db-st-pfv74\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "Balanced nosync: total rows written",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "app": "naive-db-nosync-balanced",
+              "container": "naive-db",
+              "endpoint": "http",
+              "instance": "10.1.0.23:8080",
+              "job": "naive-db-nosync-balanced",
+              "namespace": "db-st-pfv74",
+              "pod": "naive-db-nosync-balanced-0",
+              "service": "naive-db-nosync-balanced"
+            },
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 3604
+          }
+        ]
+      },
+      "balanced_nosync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-nosync-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Balanced nosync: P99 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.0025779591836734795
+          }
+        ]
+      },
+      "cluster_cpu": {
+        "query": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"db-st-pfv74\", container!=\"\"}[1m]))",
+        "type": "range",
+        "unit": "cores",
+        "description": "Total workload CPU usage",
+        "data": [
+          {
+            "timestamp": "2026-02-21T16:25:18Z",
+            "value": 0.06445082142235843
+          },
+          {
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 0.06363046340759847
+          },
+          {
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 0.0679603715637714
+          },
+          {
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 0.06242075497702657
+          },
+          {
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0.26177776657810325
+          },
+          {
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0.49691275309772
+          },
+          {
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0.5716544504421537
+          },
+          {
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0.056072824600477626
+          },
+          {
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0.048961008923400766
+          }
+        ]
+      },
+      "cluster_memory": {
+        "query": "sum(container_memory_working_set_bytes{namespace=~\"db-st-pfv74\", container!=\"\"})",
+        "type": "range",
+        "unit": "bytes",
+        "description": "Total workload memory usage",
+        "data": [
+          {
+            "timestamp": "2026-02-21T16:25:18Z",
+            "value": 673460224
+          },
+          {
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 724746240
+          },
+          {
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 733581312
+          },
+          {
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 731156480
+          },
+          {
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 722571264
+          },
+          {
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 754122752
+          },
+          {
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 750489600
+          },
+          {
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 739381248
+          },
+          {
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 818626560
+          }
+        ]
+      },
+      "disk_io_utilization": {
+        "query": "rate(node_disk_io_time_seconds_total{namespace=~\"db-st-pfv74\", device=~\"sd.*\"}[1m])",
+        "type": "range",
+        "unit": "%",
+        "description": "Disk I/O utilization (time spent doing I/O per second)",
+        "data": [
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sda",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:25:18Z",
+            "value": 0.007799999999999822
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sda",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 0.0014666666666665643
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sda",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 0.0029333333333331287
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sda",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 0.0026000000000000983
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sda",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0.033483258370814444
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sda",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0.007333333333333295
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sda",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0.0034969692932792906
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sda",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0.005966666666666735
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sda",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0.00403333333333317
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdb",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:25:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdb",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdb",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdb",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdb",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdb",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdb",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0.00043295810297741994
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdb",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdb",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdc",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:25:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdc",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdc",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdc",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdc",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0.06627442112277196
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdc",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdc",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0.00006660893891956609
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdc",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdc",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdd",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdd",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdd",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdd",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdd",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0.036066666666666664
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdd",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdd",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdd",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sde",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sde",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sde",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sde",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sde",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sde",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sde",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sde",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdf",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdf",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdf",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdf",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdf",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0.0003999999999999994
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdf",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdf",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdf",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdg",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdg",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdg",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdg",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdg",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdg",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdg",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "container": "node-exporter",
+              "device": "sdg",
+              "endpoint": "http-metrics",
+              "instance": "10.0.0.3:9100",
+              "job": "node-exporter",
+              "namespace": "db-st-pfv74",
+              "pod": "kube-prometheus-stack-prometheus-node-exporter-vpbbf",
+              "service": "kube-prometheus-stack-prometheus-node-exporter"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          }
+        ]
+      },
+      "disk_write_iops": {
+        "query": "sum(rate(node_disk_writes_completed_total{namespace=~\"db-st-pfv74\", device=~\"sd.*\"}[1m]))",
+        "type": "range",
+        "unit": "ops/s",
+        "description": "Node-level disk write IOPS (all data disks)",
+        "data": [
+          {
+            "timestamp": "2026-02-21T16:25:18Z",
+            "value": 3.6666666666666665
+          },
+          {
+            "timestamp": "2026-02-21T16:30:18Z",
+            "value": 1.4666666666666666
+          },
+          {
+            "timestamp": "2026-02-21T16:35:18Z",
+            "value": 1.8333333333333333
+          },
+          {
+            "timestamp": "2026-02-21T16:40:18Z",
+            "value": 2.933333333333333
+          },
+          {
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 51.925948692320496
+          },
+          {
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 46.7
+          },
+          {
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 3.163924598681143
+          },
+          {
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 3.5
+          },
+          {
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 4.1
+          }
+        ]
+      },
+      "fsync_latency_over_time": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{namespace=~\"db-st-pfv74\"}[1m])) by (le, app))",
+        "type": "range",
+        "unit": "seconds",
+        "description": "P99 fsync-only latency over time by variant",
+        "data": [
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0.009912153536780544
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0.008850000000000004
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0.007994444444444446
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 9.9e-7
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 9.9e-7
+          }
+        ]
+      },
+      "hdb_fsync_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{app=\"naive-db-fsync-hyperdisk-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Hyperdisk Balanced fsync: P99 fsync-only latency"
+      },
+      "hdb_fsync_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-fsync-hyperdisk-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "Hyperdisk Balanced fsync: sustained write ops/sec"
+      },
+      "hdb_fsync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-fsync-hyperdisk-balanced\", namespace=~\"db-st-pfv74\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "Hyperdisk Balanced fsync: total rows written"
+      },
+      "hdb_fsync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-fsync-hyperdisk-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Hyperdisk Balanced fsync: P99 write latency"
+      },
+      "hdb_nosync_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-nosync-hyperdisk-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "Hyperdisk Balanced nosync: sustained write ops/sec"
+      },
+      "hdb_nosync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-nosync-hyperdisk-balanced\", namespace=~\"db-st-pfv74\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "Hyperdisk Balanced nosync: total rows written"
+      },
+      "hdb_nosync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-nosync-hyperdisk-balanced\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "Hyperdisk Balanced nosync: P99 write latency"
+      },
+      "hdd_fsync_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{app=\"naive-db-fsync-hdd\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "HDD fsync: P99 fsync-only latency",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.009767425569176882
+          }
+        ]
+      },
+      "hdd_fsync_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-fsync-hdd\", namespace=~\"db-st-pfv74\"}[1h34m44s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "HDD fsync: sustained write ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.5595958902181563
+          }
+        ]
+      },
+      "hdd_fsync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-fsync-hdd\", namespace=~\"db-st-pfv74\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "HDD fsync: total rows written",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "app": "naive-db-fsync-hdd",
+              "container": "naive-db",
+              "endpoint": "http",
+              "instance": "10.1.0.19:8080",
+              "job": "naive-db-fsync-hdd",
+              "namespace": "db-st-pfv74",
+              "pod": "naive-db-fsync-hdd-0",
+              "service": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 3221
+          }
+        ]
+      },
+      "hdd_fsync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-fsync-hdd\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "HDD fsync: P99 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.009849707602339181
+          }
+        ]
+      },
+      "hdd_nosync_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-nosync-hdd\", namespace=~\"db-st-pfv74\"}[1h34m44s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "HDD nosync: sustained write ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.5125385634035828
+          }
+        ]
+      },
+      "hdd_nosync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-nosync-hdd\", namespace=~\"db-st-pfv74\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "HDD nosync: total rows written",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "app": "naive-db-nosync-hdd",
+              "container": "naive-db",
+              "endpoint": "http",
+              "instance": "10.1.0.18:8080",
+              "job": "naive-db-nosync-hdd",
+              "namespace": "db-st-pfv74",
+              "pod": "naive-db-nosync-hdd-0",
+              "service": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 3617
+          }
+        ]
+      },
+      "hdd_nosync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-nosync-hdd\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "HDD nosync: P99 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.0027174468085106214
+          }
+        ]
+      },
+      "read_throughput_over_time": {
+        "query": "sum(rate(naivedb_operations_total{op=\"read\", namespace=~\"db-st-pfv74\"}[1m])) by (app)",
+        "type": "range",
+        "unit": "ops/s",
+        "description": "Read throughput over time by variant",
+        "data": [
+          {
+            "labels": {
+              "app": "naive-db-fsync-balanced"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-balanced"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-balanced"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 4.51071015909697
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-balanced"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-balanced"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-balanced"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 12.533333333333331
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          }
+        ]
+      },
+      "ssd_fsync_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_fsync_duration_seconds_bucket{app=\"naive-db-fsync-ssd\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "SSD fsync: P99 fsync-only latency",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.006858108108108105
+          }
+        ]
+      },
+      "ssd_fsync_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-fsync-ssd\", namespace=~\"db-st-pfv74\"}[1h34m44s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "SSD fsync: sustained write ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.5058798635781692
+          }
+        ]
+      },
+      "ssd_fsync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-fsync-ssd\", namespace=~\"db-st-pfv74\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "SSD fsync: total rows written",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "app": "naive-db-fsync-ssd",
+              "container": "naive-db",
+              "endpoint": "http",
+              "instance": "10.1.0.21:8080",
+              "job": "naive-db-fsync-ssd",
+              "namespace": "db-st-pfv74",
+              "pod": "naive-db-fsync-ssd-0",
+              "service": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 3171
+          }
+        ]
+      },
+      "ssd_fsync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-fsync-ssd\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "SSD fsync: P99 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.007924107142857144
+          }
+        ]
+      },
+      "ssd_nosync_throughput": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", app=\"naive-db-nosync-ssd\", namespace=~\"db-st-pfv74\"}[1h34m44s]))",
+        "type": "instant",
+        "unit": "ops/s",
+        "description": "SSD nosync: sustained write ops/sec",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.3806212845388927
+          }
+        ]
+      },
+      "ssd_nosync_total_rows": {
+        "query": "naivedb_rows_total{app=\"naive-db-nosync-ssd\", namespace=~\"db-st-pfv74\"}",
+        "type": "instant",
+        "unit": "rows",
+        "description": "SSD nosync: total rows written",
+        "data": [
+          {
+            "labels": {
+              "__name__": "naivedb_rows_total",
+              "app": "naive-db-nosync-ssd",
+              "container": "naive-db",
+              "endpoint": "http",
+              "instance": "10.1.0.22:8080",
+              "job": "naive-db-nosync-ssd",
+              "namespace": "db-st-pfv74",
+              "pod": "naive-db-nosync-ssd-0",
+              "service": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 2318
+          }
+        ]
+      },
+      "ssd_nosync_write_p99": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{app=\"naive-db-nosync-ssd\", namespace=~\"db-st-pfv74\"}[1h34m44s])) by (le))",
+        "type": "instant",
+        "unit": "seconds",
+        "description": "SSD nosync: P99 write latency",
+        "data": [
+          {
+            "timestamp": "2026-02-21T17:10:02Z",
+            "value": 0.002357419354838674
+          }
+        ]
+      },
+      "write_latency_over_time": {
+        "query": "histogram_quantile(0.99, sum(rate(naivedb_write_duration_seconds_bucket{namespace=~\"db-st-pfv74\"}[1m])) by (le, app))",
+        "type": "range",
+        "unit": "seconds",
+        "description": "P99 write latency over time by variant (8 series)",
+        "data": [
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 0.009965836028126764
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0.009233333333333336
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0.008495833333333338
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0.002720000000000026
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0.003402794995858934
+          }
+        ]
+      },
+      "write_throughput_over_time": {
+        "query": "sum(rate(naivedb_operations_total{op=\"write\", namespace=~\"db-st-pfv74\"}[1m])) by (app)",
+        "type": "range",
+        "unit": "ops/s",
+        "description": "Write throughput over time by variant (8 series)",
+        "data": [
+          {
+            "labels": {
+              "app": "naive-db-fsync-balanced"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-balanced"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-balanced"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-balanced"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T16:45:18Z",
+            "value": 16.188288888888888
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 2.0442627322015823
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-hdd"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 20.489799546646516
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-fsync-ssd"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-balanced"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-balanced"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-balanced"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-balanced"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 5.066666666666666
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-hdd"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T16:50:18Z",
+            "value": 11.746425702811246
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T16:55:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T17:00:18Z",
+            "value": 0
+          },
+          {
+            "labels": {
+              "app": "naive-db-nosync-ssd"
+            },
+            "timestamp": "2026-02-21T17:05:18Z",
+            "value": 0
+          }
+        ]
+      }
+    }
+  },
+  "costEstimate": {
+    "totalUSD": 0.03157263979141112,
+    "durationHours": 1.5786319895705554,
+    "perTarget": {
+      "app": 0.03157263979141112
+    },
+    "note": "Rough estimate based on on-demand GCE pricing; actual cost may differ."
+  },
+  "iterationStatus": {
+    "currentIteration": 0,
+    "maxIterations": 3,
+    "phase": "Passed",
+    "qualityResults": [
+      {
+        "iteration": 0,
+        "totalMetrics": 36,
+        "metricsWithData": 29,
+        "coverage": 0.8055555555555556,
+        "missingMetrics": [
+          "hdb_fsync_p99",
+          "hdb_nosync_total_rows",
+          "hdb_fsync_write_p99",
+          "hdb_nosync_write_p99",
+          "hdb_fsync_throughput",
+          "hdb_fsync_total_rows",
+          "hdb_nosync_throughput"
+        ],
+        "passed": true
+      }
+    ]
+  }
+}
