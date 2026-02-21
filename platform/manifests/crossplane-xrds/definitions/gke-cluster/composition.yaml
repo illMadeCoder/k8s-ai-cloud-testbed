@@ -124,8 +124,8 @@ spec:
                   deletionProtection: false  # Allow easy cleanup
                   loggingService: none       # Use own observability stack
                   monitoringService: none
-                  # No release channel — static version, no auto-upgrades
-                  # that would put the cluster in RECONCILING state
+                  releaseChannel:
+                    channel: REGULAR
                 writeConnectionSecretToRef:
                   namespace: crossplane-system
             patches:
@@ -180,8 +180,8 @@ spec:
                       enableIntegrityMonitoring: true
                       enableSecureBoot: true
                   management:
-                    autoRepair: false
-                    autoUpgrade: false
+                    autoRepair: true
+                    autoUpgrade: true
                   upgradeSettings:
                     maxSurge: 1
                     maxUnavailable: 0
