@@ -1,14 +1,44 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Breadcrumb from '../../components/Breadcrumb.astro';
-import SeriesCard from '../../components/SeriesCard.astro';
-import { loadAllExperiments, groupBySeries } from '../../lib/experiments';
+import { loadAllExperiments, groupBySeries, groupExperiments, getAllTags, getDisplayTitle } from '../../lib/experiments';
 import { loadSeries } from '../../lib/series';
+import type { ExperimentGroup } from '../../lib/experiments';
+import type { Series } from '../../lib/series';
 
 const experiments = loadAllExperiments();
 const seriesGroups = groupBySeries(experiments);
 const allSeries = loadSeries();
+const allGroups = groupExperiments(experiments);
 const base = import.meta.env.BASE_URL;
+
+// Build card data for each series, including Luhmann-style addresses
+interface CardData {
+  baseName: string;
+  title: string;
+  address: string;
+  runCount: number;
+  tags: string[];
+  href: string;
+  seriesId: string;
+}
+
+const seriesCards: Record<string, CardData[]> = {};
+allSeries.forEach((s, si) => {
+  const groups = seriesGroups[s.id] ?? [];
+  seriesCards[s.id] = groups.map((g, gi) => ({
+    baseName: g.baseName,
+    title: getDisplayTitle(g),
+    address: `${si + 1}/${String.fromCharCode(97 + gi)}`,
+    runCount: g.runs.length,
+    tags: g.tags,
+    href: `${base}experiments/${g.baseName}/`,
+    seriesId: s.id,
+  }));
+});
+
+// Flatten all cards for cross-reference lookup
+const allCards = Object.values(seriesCards).flat();
 ---
 
 <Base title="Series — K8s Cloud TestBed">
@@ -20,19 +50,532 @@ const base = import.meta.env.BASE_URL;
     slot="breadcrumb"
   />
 
-  <h1 class="text-2xl font-bold mb-2">Ongoing Series</h1>
-  <p class="text-text-muted mb-8 max-w-2xl">
-    Long-term research tracks grouping related experiments around a common theme.
-  </p>
+  <div class="slip-box-header">
+    <h1>The Slip Box</h1>
+    <p class="slip-box-subtitle">Research series filed as Luhmann's Zettelkasten — open a drawer to browse index cards.</p>
+  </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {allSeries.map((s) => (
-      <SeriesCard
-        id={s.id}
-        name={s.name}
-        description={s.description}
-        experimentCount={(seriesGroups[s.id] ?? []).length}
-      />
-    ))}
+  <div class="cabinet" id="cabinet">
+    <svg class="cross-ref-svg" id="cross-ref-svg" aria-hidden="true"></svg>
+
+    {allSeries.map((s, si) => {
+      const cards = seriesCards[s.id] ?? [];
+      const color = s.color ?? '#a78bfa';
+      const drawerId = `drawer-${s.id}`;
+      return (
+        <div class="drawer-unit" data-drawer-id={drawerId}>
+          <button
+            class="drawer-bar"
+            data-drawer-toggle={drawerId}
+            aria-expanded="false"
+            aria-controls={`${drawerId}-tray`}
+            style={`--drawer-color: ${color}`}
+          >
+            <span class="drawer-handle" style={`background: ${color}`}></span>
+            <span class="drawer-label">
+              <span class="drawer-name">{s.name}</span>
+              <span class="drawer-count">{cards.length} {cards.length === 1 ? 'card' : 'cards'}</span>
+            </span>
+            <span class="drawer-chevron" aria-hidden="true">&#9662;</span>
+          </button>
+
+          <div class="drawer-tray" id={`${drawerId}-tray`} aria-hidden="true">
+            {cards.length === 0 ? (
+              <div class="empty-tray">
+                <span class="empty-label">Coming soon</span>
+                <span class="empty-sub">No experiments filed yet</span>
+              </div>
+            ) : (
+              <div class="card-stack">
+                {cards.map((card, ci) => (
+                  <a
+                    href={card.href}
+                    class="index-card"
+                    style={`--card-rotate: ${(ci % 3 === 0 ? -0.8 : ci % 3 === 1 ? 0.5 : -0.3)}deg; --card-offset: ${ci * 4}px; --drawer-color: ${color}`}
+                    data-card-id={`${s.id}:${card.baseName}`}
+                    data-card-tags={card.tags.join(',')}
+                    data-tooltip-title={card.title}
+                    data-tooltip-body={`Address: ${card.address} | ${card.runCount} run${card.runCount !== 1 ? 's' : ''}`}
+                    data-tooltip-meta={card.tags.join(', ')}
+                    data-tooltip-color={color}
+                  >
+                    <div class="card-address" style={`color: ${color}`}>{card.address}</div>
+                    <div class="card-title">{card.title}</div>
+                    <div class="card-tally" title={`${card.runCount} run${card.runCount !== 1 ? 's' : ''}`}>
+                      {Array.from({ length: Math.min(card.runCount, 20) }).map((_, ti) => (
+                        <span class:list={['tally-mark', { 'tally-fifth': (ti + 1) % 5 === 0 }]}>|</span>
+                      ))}
+                      {card.runCount > 20 && <span class="tally-overflow">+{card.runCount - 20}</span>}
+                    </div>
+                    <div class="card-tags">
+                      {card.tags.slice(0, 4).map(tag => (
+                        <span class="card-tag">{tag}</span>
+                      ))}
+                      {card.tags.length > 4 && <span class="card-tag card-tag-more">+{card.tags.length - 4}</span>}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    })}
   </div>
 </Base>
+
+<style>
+  /* === Header === */
+  .slip-box-header {
+    margin-bottom: 2rem;
+  }
+  .slip-box-header h1 {
+    font-family: var(--font-mono);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 0.5rem 0;
+  }
+  .slip-box-subtitle {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin: 0;
+    max-width: 36rem;
+  }
+
+  /* === Cabinet === */
+  .cabinet {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: linear-gradient(180deg, hsl(30 20% 18%) 0%, hsl(30 15% 14%) 100%);
+    border: 2px solid hsl(30 15% 25%);
+    border-radius: 8px;
+    padding: 6px;
+    box-shadow:
+      0 4px 24px rgba(0,0,0,0.4),
+      inset 0 1px 0 hsl(30 15% 28%);
+  }
+  :global(.dark) .cabinet {
+    background: linear-gradient(180deg, hsl(30 10% 14%) 0%, hsl(30 8% 10%) 100%);
+    border-color: hsl(30 8% 20%);
+    box-shadow:
+      0 4px 24px rgba(0,0,0,0.6),
+      inset 0 1px 0 hsl(30 8% 18%);
+  }
+
+  /* === Cross-reference SVG overlay === */
+  .cross-ref-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  /* === Drawer Unit === */
+  .drawer-unit {
+    perspective: 800px;
+  }
+  .drawer-unit + .drawer-unit {
+    border-top: 1px solid hsl(30 12% 22%);
+  }
+
+  /* === Drawer Bar (the clickable front face) === */
+  .drawer-bar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, hsl(30 15% 25%) 0%, hsl(30 12% 20%) 100%);
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    color: var(--text);
+    transition: background 0.2s;
+    position: relative;
+    text-align: left;
+  }
+  .drawer-bar:hover {
+    background: linear-gradient(180deg, hsl(30 15% 28%) 0%, hsl(30 12% 23%) 100%);
+  }
+  :global(.dark) .drawer-bar {
+    background: linear-gradient(180deg, hsl(30 8% 18%) 0%, hsl(30 6% 14%) 100%);
+  }
+  :global(.dark) .drawer-bar:hover {
+    background: linear-gradient(180deg, hsl(30 8% 22%) 0%, hsl(30 6% 17%) 100%);
+  }
+
+  .drawer-handle {
+    width: 48px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    box-shadow:
+      0 2px 4px rgba(0,0,0,0.3),
+      inset 0 1px 0 rgba(255,255,255,0.2);
+    transition: box-shadow 0.2s;
+  }
+  .drawer-bar:hover .drawer-handle {
+    box-shadow:
+      0 2px 8px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  .drawer-label {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .drawer-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .drawer-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+  }
+
+  .drawer-chevron {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+  }
+  .drawer-unit.open .drawer-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* === Drawer Tray (slides open with 3D perspective) === */
+  .drawer-tray {
+    max-height: 0;
+    overflow: hidden;
+    transform-origin: top center;
+    transform: perspective(800px) rotateX(-4deg);
+    opacity: 0;
+    transition:
+      max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.35s ease;
+    background: linear-gradient(180deg, hsl(30 10% 16%) 0%, hsl(30 8% 13%) 100%);
+    padding: 0 16px;
+  }
+  :global(.dark) .drawer-tray {
+    background: linear-gradient(180deg, hsl(30 6% 11%) 0%, hsl(30 4% 8%) 100%);
+  }
+  .drawer-unit.open .drawer-tray {
+    max-height: 800px;
+    transform: perspective(800px) rotateX(0deg);
+    opacity: 1;
+    padding: 16px;
+  }
+
+  /* === Empty tray === */
+  .empty-tray {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 24px 0;
+  }
+  .empty-label {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .empty-sub {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  /* === Card Stack === */
+  .card-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding-bottom: 8px;
+  }
+
+  /* === Index Card === */
+  .index-card {
+    display: block;
+    position: relative;
+    background:
+      linear-gradient(180deg, hsl(45 30% 92%) 0%, hsl(45 25% 88%) 100%);
+    border: 1px solid hsl(40 20% 78%);
+    border-radius: 4px;
+    padding: 14px 16px 12px;
+    margin-top: -6px;
+    transform: rotate(var(--card-rotate, 0deg));
+    transition:
+      transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 0.25s ease,
+      margin-top 0.25s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    text-decoration: none;
+    color: hsl(30 10% 20%);
+    font-family: var(--font-mono);
+    cursor: pointer;
+    /* Subtle paper texture via repeating gradient */
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 27px,
+        hsl(40 15% 82% / 0.5) 27px,
+        hsl(40 15% 82% / 0.5) 28px
+      );
+  }
+  .index-card:first-child {
+    margin-top: 0;
+  }
+  .index-card:hover {
+    transform: rotate(0deg) translateY(-3px) scale(1.02);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    z-index: 10;
+    margin-top: 2px;
+  }
+  .index-card:hover + .index-card {
+    margin-top: 2px;
+  }
+
+  /* Dark mode cards — slightly aged paper look */
+  :global(.dark) .index-card {
+    background:
+      linear-gradient(180deg, hsl(40 15% 82%) 0%, hsl(40 12% 76%) 100%);
+    border-color: hsl(40 12% 68%);
+    color: hsl(30 10% 15%);
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 27px,
+        hsl(40 10% 70% / 0.4) 27px,
+        hsl(40 10% 70% / 0.4) 28px
+      );
+  }
+
+  /* Card address (Luhmann-style alphanumeric) */
+  .card-address {
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  /* Card title */
+  .card-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 8px;
+    color: hsl(30 10% 15%);
+  }
+  :global(.dark) .card-title {
+    color: hsl(30 10% 12%);
+  }
+
+  /* Tally marks for run count */
+  .card-tally {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 8px;
+    font-size: 0.8rem;
+    color: hsl(30 8% 40%);
+    line-height: 1;
+  }
+  .tally-mark {
+    display: inline-block;
+    width: 4px;
+    font-weight: 400;
+  }
+  .tally-fifth {
+    transform: rotate(-30deg);
+    margin-left: -3px;
+    margin-right: 6px;
+    color: hsl(30 8% 50%);
+  }
+  .tally-overflow {
+    font-size: 0.65rem;
+    margin-left: 4px;
+    color: hsl(30 8% 50%);
+  }
+
+  /* Tags */
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .card-tag {
+    font-size: 0.6rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: hsl(40 15% 75% / 0.5);
+    color: hsl(30 10% 35%);
+    white-space: nowrap;
+  }
+  .card-tag-more {
+    font-style: italic;
+    opacity: 0.7;
+  }
+
+  /* Card highlight when cross-referenced */
+  .index-card.cross-ref-highlight {
+    box-shadow: 0 0 0 2px var(--drawer-color), 0 4px 12px rgba(0,0,0,0.25);
+    z-index: 11;
+  }
+
+  /* === Mobile === */
+  @media (max-width: 640px) {
+    .cabinet {
+      border-radius: 6px;
+      padding: 4px;
+    }
+    .drawer-tray {
+      transform: none;
+    }
+    .drawer-unit.open .drawer-tray {
+      transform: none;
+    }
+    .index-card {
+      transform: none;
+    }
+    .index-card:hover {
+      transform: translateY(-2px);
+    }
+    .drawer-handle {
+      width: 36px;
+      height: 8px;
+    }
+    .drawer-bar {
+      padding: 10px 12px;
+    }
+  }
+</style>
+
+<script>
+  import { initTooltip } from '../../lib/graph-tooltip';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const cabinet = document.getElementById('cabinet');
+    if (!cabinet) return;
+
+    // Initialize tooltips on index cards
+    const { cleanup: tooltipCleanup } = initTooltip(cabinet, '.index-card');
+
+    // Drawer toggle logic
+    const toggleButtons = cabinet.querySelectorAll<HTMLButtonElement>('[data-drawer-toggle]');
+    toggleButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const drawerId = btn.getAttribute('data-drawer-toggle');
+        if (!drawerId) return;
+
+        const unit = btn.closest('.drawer-unit');
+        if (!unit) return;
+
+        const isOpen = unit.classList.contains('open');
+        unit.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(!isOpen));
+        const tray = document.getElementById(`${drawerId}-tray`);
+        if (tray) tray.setAttribute('aria-hidden', String(isOpen));
+      });
+    });
+
+    // Cross-reference SVG lines on card hover
+    const svg = document.getElementById('cross-ref-svg') as unknown as SVGSVGElement;
+    if (!svg) return;
+
+    const allCardEls = cabinet.querySelectorAll<HTMLElement>('.index-card');
+
+    // Build tag-to-card index
+    const tagToCards = new Map<string, HTMLElement[]>();
+    allCardEls.forEach(cardEl => {
+      const tags = (cardEl.getAttribute('data-card-tags') ?? '').split(',').filter(Boolean);
+      tags.forEach(tag => {
+        if (!tagToCards.has(tag)) tagToCards.set(tag, []);
+        tagToCards.get(tag)!.push(cardEl);
+      });
+    });
+
+    let activeLines: SVGLineElement[] = [];
+
+    function clearLines() {
+      activeLines.forEach(line => line.remove());
+      activeLines = [];
+      allCardEls.forEach(c => c.classList.remove('cross-ref-highlight'));
+    }
+
+    function drawCrossRefs(cardEl: HTMLElement) {
+      clearLines();
+
+      const cardId = cardEl.getAttribute('data-card-id') ?? '';
+      const tags = (cardEl.getAttribute('data-card-tags') ?? '').split(',').filter(Boolean);
+      const seriesId = cardId.split(':')[0];
+
+      // Find cards in OTHER drawers that share tags
+      const relatedCards = new Set<HTMLElement>();
+      tags.forEach(tag => {
+        const cards = tagToCards.get(tag) ?? [];
+        cards.forEach(c => {
+          const cId = c.getAttribute('data-card-id') ?? '';
+          const cSeries = cId.split(':')[0];
+          if (c !== cardEl && cSeries !== seriesId) {
+            relatedCards.add(c);
+          }
+        });
+      });
+
+      if (relatedCards.size === 0) return;
+
+      const cabinetRect = cabinet!.getBoundingClientRect();
+
+      relatedCards.forEach(related => {
+        // Only draw lines to visible (open drawer) cards
+        const relUnit = related.closest('.drawer-unit');
+        if (!relUnit || !relUnit.classList.contains('open')) return;
+
+        related.classList.add('cross-ref-highlight');
+
+        const srcRect = cardEl.getBoundingClientRect();
+        const dstRect = related.getBoundingClientRect();
+
+        const x1 = srcRect.right - cabinetRect.left;
+        const y1 = srcRect.top + srcRect.height / 2 - cabinetRect.top;
+        const x2 = dstRect.right - cabinetRect.left;
+        const y2 = dstRect.top + dstRect.height / 2 - cabinetRect.top;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', String(x1));
+        line.setAttribute('y1', String(y1));
+        line.setAttribute('x2', String(x2));
+        line.setAttribute('y2', String(y2));
+        line.setAttribute('stroke', cardEl.style.getPropertyValue('--drawer-color') || '#a78bfa');
+        line.setAttribute('stroke-width', '1.5');
+        line.setAttribute('stroke-dasharray', '4 3');
+        line.setAttribute('stroke-opacity', '0.6');
+        svg.appendChild(line);
+        activeLines.push(line);
+      });
+    }
+
+    allCardEls.forEach(cardEl => {
+      cardEl.addEventListener('mouseenter', () => drawCrossRefs(cardEl));
+      cardEl.addEventListener('mouseleave', () => clearLines());
+    });
+  });
+</script>
