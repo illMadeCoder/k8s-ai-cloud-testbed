@@ -1,14 +1,210 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Breadcrumb from '../../components/Breadcrumb.astro';
-import SeriesCard from '../../components/SeriesCard.astro';
-import { loadAllExperiments, groupBySeries } from '../../lib/experiments';
+import { loadAllExperiments, groupBySeries, groupExperiments, getAllTags, getDisplayTitle } from '../../lib/experiments';
 import { loadSeries } from '../../lib/series';
+import type { ExperimentGroup } from '../../lib/experiments';
+import type { Series } from '../../lib/series';
 
 const experiments = loadAllExperiments();
 const seriesGroups = groupBySeries(experiments);
 const allSeries = loadSeries();
+const allGroups = groupExperiments(experiments);
+const tags = getAllTags(experiments);
 const base = import.meta.env.BASE_URL;
+
+// --- Catalog tree data (from zettel-index) ---
+interface SeriesEntry {
+  series: Series;
+  experiments: ExperimentGroup[];
+}
+
+const seriesEntries: SeriesEntry[] = allSeries.map(s => ({
+  series: s,
+  experiments: seriesGroups[s.id] ?? [],
+}));
+
+const seriesExpNames = new Set<string>();
+for (const groups of Object.values(seriesGroups)) {
+  for (const g of groups) {
+    seriesExpNames.add(g.baseName);
+  }
+}
+const unsorted = allGroups.filter(g => !seriesExpNames.has(g.baseName));
+
+// --- Rhizome layout data (from zettel-rhizome) ---
+const CANVAS_W = 1200;
+const CANVAS_H = 900;
+
+const quadrantCenters = [
+  { x: 280, y: 220 },
+  { x: 880, y: 250 },
+  { x: 320, y: 680 },
+  { x: 850, y: 650 },
+];
+
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+interface OrganismData {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  cx: number;
+  cy: number;
+  experiments: {
+    baseName: string;
+    title: string;
+    runCount: number;
+    tags: string[];
+    cx: number;
+    cy: number;
+    size: number;
+    href: string;
+  }[];
+  isEmpty: boolean;
+}
+
+interface TendrilData {
+  seriesId: string;
+  color: string;
+  path: string;
+}
+
+interface JunctionData {
+  cx: number;
+  cy: number;
+  color: string;
+  tag: string;
+  fromSeries: string[];
+  size: number;
+}
+
+const organisms: OrganismData[] = [];
+const tendrils: TendrilData[] = [];
+const junctions: JunctionData[] = [];
+
+allSeries.forEach((s, i) => {
+  const center = quadrantCenters[i % quadrantCenters.length];
+  const exps = seriesGroups[s.id] ?? [];
+  const color = s.color || '#60a5fa';
+  const isEmpty = exps.length === 0;
+
+  const rng = seededRandom(s.id.length * 1000 + i * 7919);
+  const sporeExps = exps.map((group, j) => {
+    const angle = ((2 * Math.PI) / Math.max(exps.length, 1)) * j + rng() * 0.4 - 0.2;
+    const dist = 120 + rng() * 80 + j * 25;
+    const cx = center.x + Math.cos(angle) * dist;
+    const cy = center.y + Math.sin(angle) * dist;
+    const runCount = group.runs.length;
+    const size = Math.max(20, Math.min(30, 16 + runCount * 0.6));
+
+    return {
+      baseName: group.baseName,
+      title: getDisplayTitle(group),
+      runCount,
+      tags: group.tags,
+      cx: Math.round(cx),
+      cy: Math.round(cy),
+      size: Math.round(size),
+      href: `${base}experiments/${group.baseName}/`,
+    };
+  });
+
+  organisms.push({
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    color,
+    cx: center.x,
+    cy: center.y,
+    experiments: sporeExps,
+    isEmpty,
+  });
+
+  for (const spore of sporeExps) {
+    const dx = spore.cx - center.x;
+    const dy = spore.cy - center.y;
+    const perpX = -dy * 0.25 * (rng() - 0.5);
+    const perpY = dx * 0.25 * (rng() - 0.5);
+    const cp1x = Math.round(center.x + dx * 0.3 + perpX);
+    const cp1y = Math.round(center.y + dy * 0.3 + perpY);
+    const cp2x = Math.round(center.x + dx * 0.7 - perpX * 0.5);
+    const cp2y = Math.round(center.y + dy * 0.7 - perpY * 0.5);
+
+    tendrils.push({
+      seriesId: s.id,
+      color,
+      path: `M ${center.x} ${center.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${spore.cx} ${spore.cy}`,
+    });
+  }
+});
+
+// Shared-tag junctions
+const tagToSeries: Record<string, { seriesIds: string[]; positions: { cx: number; cy: number }[] }> = {};
+for (const org of organisms) {
+  for (const exp of org.experiments) {
+    for (const tag of exp.tags) {
+      if (!tagToSeries[tag]) tagToSeries[tag] = { seriesIds: [], positions: [] };
+      if (!tagToSeries[tag].seriesIds.includes(org.id)) {
+        tagToSeries[tag].seriesIds.push(org.id);
+        tagToSeries[tag].positions.push({ cx: exp.cx, cy: exp.cy });
+      }
+    }
+  }
+}
+
+for (const [tag, data] of Object.entries(tagToSeries)) {
+  if (data.seriesIds.length < 2) continue;
+  const avgCx = Math.round(data.positions.reduce((s, p) => s + p.cx, 0) / data.positions.length);
+  const avgCy = Math.round(data.positions.reduce((s, p) => s + p.cy, 0) / data.positions.length);
+  const involvedOrgs = organisms.filter(o => data.seriesIds.includes(o.id));
+  const blendColor = involvedOrgs.length > 0 ? involvedOrgs[0].color : '#60a5fa';
+
+  junctions.push({
+    cx: avgCx,
+    cy: avgCy,
+    color: blendColor,
+    tag,
+    fromSeries: data.seriesIds,
+    size: 10 + data.seriesIds.length * 2,
+  });
+}
+
+// Junction tendrils
+const junctionTendrils: TendrilData[] = [];
+for (const junction of junctions) {
+  for (const seriesId of junction.fromSeries) {
+    const org = organisms.find(o => o.id === seriesId);
+    if (!org || org.experiments.length === 0) continue;
+    let closest = org.experiments[0];
+    let minDist = Infinity;
+    for (const exp of org.experiments) {
+      const d = Math.hypot(exp.cx - junction.cx, exp.cy - junction.cy);
+      if (d < minDist) { minDist = d; closest = exp; }
+    }
+    if (!closest) continue;
+    const rng2 = seededRandom(junction.cx * 31 + junction.cy * 17 + seriesId.length);
+    const dx = junction.cx - closest.cx;
+    const dy = junction.cy - closest.cy;
+    const perpX = -dy * 0.2 * (rng2() - 0.5);
+    const perpY = dx * 0.2 * (rng2() - 0.5);
+    junctionTendrils.push({
+      seriesId,
+      color: org.color,
+      path: `M ${closest.cx} ${closest.cy} Q ${Math.round(closest.cx + dx * 0.5 + perpX)} ${Math.round(closest.cy + dy * 0.5 + perpY)}, ${junction.cx} ${junction.cy}`,
+    });
+  }
+}
+
+// Serialize for client-side sync
+const layoutData = JSON.stringify({ organisms, junctions });
 ---
 
 <Base title="Series — K8s Cloud TestBed">
@@ -20,19 +216,1060 @@ const base = import.meta.env.BASE_URL;
     slot="breadcrumb"
   />
 
-  <h1 class="text-2xl font-bold mb-2">Ongoing Series</h1>
-  <p class="text-text-muted mb-8 max-w-2xl">
-    Long-term research tracks grouping related experiments around a common theme.
-  </p>
-
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {allSeries.map((s) => (
-      <SeriesCard
-        id={s.id}
-        name={s.name}
-        description={s.description}
-        experimentCount={(seriesGroups[s.id] ?? []).length}
-      />
-    ))}
+  <!-- Mobile: tab-based layout -->
+  <div class="hybrid-mobile" id="hybrid-mobile">
+    <div class="mobile-tabs" id="mobile-tabs">
+      <button class="mobile-tab active" data-target="catalog">Catalog</button>
+      <button class="mobile-tab" data-target="rhizome">Rhizome</button>
+    </div>
+    <div class="mobile-pane mobile-catalog" id="mobile-catalog">
+      <div class="catalog-scroll">
+        {seriesEntries.map(({ series, experiments: exps }) => (
+          <div class="tree-series" data-series-id={series.id}>
+            <div class="tree-header" style={`border-color: ${series.color || 'var(--border)'}`}>
+              <span class="tree-branch" style={`color: ${series.color || 'var(--text-muted)'}`}>&#9484;&#9472;</span>
+              <span class="tree-series-name" style={`color: ${series.color || 'var(--text)'}`}>{series.name}</span>
+              <span class="tree-series-line" style={`border-color: ${series.color || 'var(--border)'}`}></span>
+            </div>
+            {exps.length === 0 ? (
+              <div class="tree-row tree-empty">
+                <span class="tree-branch" style={`color: ${series.color || 'var(--text-muted)'}`}>&#9492;&#9472;&#9472;</span>
+                <span class="tree-exp-name muted">(coming soon)</span>
+              </div>
+            ) : (
+              exps.map((group, i) => {
+                const isLast = i === exps.length - 1;
+                const branch = isLast ? '\u2514\u2500\u2500' : '\u251C\u2500\u2500';
+                const title = getDisplayTitle(group);
+                const runCount = group.runs.length;
+                return (
+                  <a
+                    href={`${base}experiments/${group.baseName}/`}
+                    class="tree-row"
+                    data-base-name={group.baseName}
+                  >
+                    <span class="tree-branch" style={`color: ${series.color || 'var(--text-muted)'}`}>{branch}</span>
+                    <span class="tree-exp-name">{title}</span>
+                    <span class="tree-dots"></span>
+                    <span class="tree-runs">{runCount} {runCount === 1 ? 'run' : 'runs'}</span>
+                  </a>
+                );
+              })
+            )}
+            <div class="tree-spacer"></div>
+          </div>
+        ))}
+        {unsorted.length > 0 && (
+          <div class="tree-series" data-series-id="_unsorted">
+            <div class="tree-header" style="border-color: var(--text-muted)">
+              <span class="tree-branch" style="color: var(--text-muted)">&#9484;&#9472;</span>
+              <span class="tree-series-name" style="color: var(--text-muted)">Unsorted</span>
+              <span class="tree-series-line" style="border-color: var(--text-muted)"></span>
+            </div>
+            {unsorted.map((group, i) => {
+              const isLast = i === unsorted.length - 1;
+              const branch = isLast ? '\u2514\u2500\u2500' : '\u251C\u2500\u2500';
+              const title = getDisplayTitle(group);
+              const runCount = group.runs.length;
+              return (
+                <a
+                  href={`${base}experiments/${group.baseName}/`}
+                  class="tree-row"
+                  data-base-name={group.baseName}
+                >
+                  <span class="tree-branch" style="color: var(--text-muted)">{branch}</span>
+                  <span class="tree-exp-name">{title}</span>
+                  <span class="tree-dots"></span>
+                  <span class="tree-runs">{runCount} {runCount === 1 ? 'run' : 'runs'}</span>
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+    <div class="mobile-pane mobile-rhizome" id="mobile-rhizome" style="display:none">
+      <p class="mobile-rhizome-hint">Rhizome view is best experienced on desktop.</p>
+    </div>
   </div>
+
+  <!-- Desktop: split-pane hybrid -->
+  <div class="hybrid-container" id="hybrid-container">
+    <!-- LEFT: Catalog pane -->
+    <div class="catalog-pane" id="catalog-pane">
+      <div class="crt-overlay" aria-hidden="true"></div>
+      <div class="catalog-scroll" id="catalog-scroll">
+        {seriesEntries.map(({ series, experiments: exps }) => (
+          <div class="tree-series" data-series-id={series.id}>
+            <div class="tree-header" style={`border-color: ${series.color || 'var(--border)'}`}>
+              <span class="tree-branch" style={`color: ${series.color || 'var(--text-muted)'}`}>&#9484;&#9472;</span>
+              <span class="tree-series-name" style={`color: ${series.color || 'var(--text)'}`}>{series.name}</span>
+              <span class="tree-series-line" style={`border-color: ${series.color || 'var(--border)'}`}></span>
+            </div>
+            {exps.length === 0 ? (
+              <div class="tree-row tree-empty">
+                <span class="tree-branch" style={`color: ${series.color || 'var(--text-muted)'}`}>&#9492;&#9472;&#9472;</span>
+                <span class="tree-exp-name muted">(coming soon)</span>
+              </div>
+            ) : (
+              exps.map((group, i) => {
+                const isLast = i === exps.length - 1;
+                const branch = isLast ? '\u2514\u2500\u2500' : '\u251C\u2500\u2500';
+                const title = getDisplayTitle(group);
+                const runCount = group.runs.length;
+                return (
+                  <a
+                    href={`${base}experiments/${group.baseName}/`}
+                    class="tree-row"
+                    data-base-name={group.baseName}
+                  >
+                    <span class="tree-branch" style={`color: ${series.color || 'var(--text-muted)'}`}>{branch}</span>
+                    <span class="tree-exp-name">{title}</span>
+                    <span class="tree-dots"></span>
+                    <span class="tree-runs">{runCount} {runCount === 1 ? 'run' : 'runs'}</span>
+                  </a>
+                );
+              })
+            )}
+            <div class="tree-spacer"></div>
+          </div>
+        ))}
+
+        {unsorted.length > 0 && (
+          <div class="tree-series" data-series-id="_unsorted">
+            <div class="tree-header" style="border-color: var(--text-muted)">
+              <span class="tree-branch" style="color: var(--text-muted)">&#9484;&#9472;</span>
+              <span class="tree-series-name" style="color: var(--text-muted)">Unsorted</span>
+              <span class="tree-series-line" style="border-color: var(--text-muted)"></span>
+            </div>
+            {unsorted.map((group, i) => {
+              const isLast = i === unsorted.length - 1;
+              const branch = isLast ? '\u2514\u2500\u2500' : '\u251C\u2500\u2500';
+              const title = getDisplayTitle(group);
+              const runCount = group.runs.length;
+              return (
+                <a
+                  href={`${base}experiments/${group.baseName}/`}
+                  class="tree-row"
+                  data-base-name={group.baseName}
+                >
+                  <span class="tree-branch" style="color: var(--text-muted)">{branch}</span>
+                  <span class="tree-exp-name">{title}</span>
+                  <span class="tree-dots"></span>
+                  <span class="tree-runs">{runCount} {runCount === 1 ? 'run' : 'runs'}</span>
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+
+    <!-- DIVIDER -->
+    <div class="hybrid-divider"></div>
+
+    <!-- RIGHT: Rhizome pane -->
+    <div class="rhizome-pane" id="rhizome-pane">
+      <div id="rhizome-viewport" class="rhizome-viewport">
+        <div id="rhizome-world" class="rhizome-world" style={`width:${CANVAS_W}px;height:${CANVAS_H}px`}>
+          <svg
+            class="rhizome-svg"
+            viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+            width={CANVAS_W}
+            height={CANVAS_H}
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              {organisms.map(org => (
+                <filter id={`glow-${org.id}`} x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="6" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              ))}
+              <filter id="glow-junction" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- Tendrils -->
+            {tendrils.map((t, i) => (
+              <path
+                class="tendril"
+                d={t.path}
+                stroke={t.color}
+                stroke-width="1.5"
+                fill="none"
+                opacity="0.4"
+                data-series={t.seriesId}
+                style={`--tendril-delay: ${i * 0.08}s`}
+              />
+            ))}
+
+            <!-- Junction tendrils -->
+            {junctionTendrils.map((t, i) => (
+              <path
+                class="tendril junction-tendril"
+                d={t.path}
+                stroke={t.color}
+                stroke-width="1"
+                fill="none"
+                opacity="0.25"
+                stroke-dasharray="4 4"
+                data-series={t.seriesId}
+                style={`--tendril-delay: ${(tendrils.length + i) * 0.08}s`}
+              />
+            ))}
+
+            <!-- Junction diamonds -->
+            {junctions.map((j) => (
+              <g
+                class="junction-group"
+                data-tag={j.tag}
+                data-series-ids={j.fromSeries.join(',')}
+              >
+                <rect
+                  x={j.cx - j.size / 2}
+                  y={j.cy - j.size / 2}
+                  width={j.size}
+                  height={j.size}
+                  rx="2"
+                  fill={j.color}
+                  opacity="0.35"
+                  transform={`rotate(45, ${j.cx}, ${j.cy})`}
+                  filter="url(#glow-junction)"
+                />
+                <text
+                  x={j.cx}
+                  y={j.cy + j.size / 2 + 14}
+                  text-anchor="middle"
+                  fill={j.color}
+                  font-size="9"
+                  opacity="0.5"
+                  font-family="var(--font-mono)"
+                >
+                  {j.tag}
+                </text>
+              </g>
+            ))}
+          </svg>
+
+          <!-- Organisms -->
+          {organisms.map((org) => (
+            <a
+              href={`${base}series/${org.id}/`}
+              class:list={['organism', { 'organism--empty': org.isEmpty }]}
+              style={`left:${org.cx}px;top:${org.cy}px;--org-color:${org.color}`}
+              data-series={org.id}
+            >
+              <div class="organism-blob" />
+              <span class="organism-label">{org.name}</span>
+              {org.isEmpty && <span class="organism-soon">Coming soon</span>}
+            </a>
+          ))}
+
+          <!-- Spore nodes -->
+          {organisms.flatMap(org =>
+            org.experiments.map(exp => (
+              <a
+                href={exp.href}
+                class="spore-node"
+                style={`left:${exp.cx}px;top:${exp.cy}px;width:${exp.size}px;height:${exp.size}px;--spore-color:${org.color}`}
+                data-series={org.id}
+                data-base-name={exp.baseName}
+                data-tooltip-title={exp.title}
+                data-tooltip-body={`${exp.runCount} run${exp.runCount !== 1 ? 's' : ''}`}
+                data-tooltip-meta={exp.tags.join(', ')}
+                data-tooltip-color={org.color}
+              >
+                <span class="spore-inner" />
+              </a>
+            ))
+          )}
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="rhizome-legend">
+        {organisms.map(org => (
+          <span class="legend-item" style={`--legend-color: ${org.color}`}>
+            <span class="legend-dot" />
+            <span class="legend-label">{org.name}</span>
+            <span class="legend-count">
+              {org.experiments.length > 0 ? `${org.experiments.length}` : '0'}
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="hybrid-status" id="hybrid-status">
+      <span class="status-section">
+        <span class="status-label">CATALOG</span>
+      </span>
+      <span class="status-sep">|</span>
+      <span class="status-section">
+        <span class="status-value">{allGroups.length}</span>
+        <span class="status-label">experiments</span>
+      </span>
+      <span class="status-sep">|</span>
+      <span class="status-section">
+        <span class="status-value">{allSeries.length}</span>
+        <span class="status-label">series</span>
+      </span>
+      <span class="status-fill"></span>
+      <span class="status-section status-nav">
+        <span class="status-key">&uarr;&darr;</span> navigate
+        <span class="status-key">Enter</span> open
+        <span class="status-key">Esc</span> clear
+      </span>
+    </div>
+  </div>
+
+  <script id="rhizome-layout-data" type="application/json" set:html={layoutData} />
 </Base>
+
+<style>
+  /* ========== MOBILE: tab-based ========== */
+  .hybrid-mobile {
+    display: block;
+  }
+  .hybrid-container {
+    display: none;
+  }
+
+  .mobile-tabs {
+    display: flex;
+    border: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+
+  .mobile-tab {
+    flex: 1;
+    padding: 0.5rem;
+    background: var(--bg-surface);
+    border: none;
+    border-right: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .mobile-tab:last-child {
+    border-right: none;
+  }
+
+  .mobile-tab.active {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+  }
+
+  .mobile-pane {
+    border: 1px solid var(--border);
+    border-top: none;
+    min-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .mobile-rhizome-hint {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+  }
+
+  /* ========== DESKTOP: split-pane ========== */
+  @media (min-width: 768px) {
+    .hybrid-mobile {
+      display: none;
+    }
+    .hybrid-container {
+      /* Break out of max-w-6xl parent */
+      margin-left: calc(-50vw + 50%);
+      width: 100vw;
+      height: calc(100vh - 120px);
+      display: grid;
+      grid-template-columns: clamp(260px, 30%, 380px) 3px 1fr;
+      grid-template-rows: 1fr auto;
+      grid-template-areas:
+        "catalog divider rhizome"
+        "status  status  status";
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+  }
+
+  /* ========== CATALOG PANE ========== */
+  .catalog-pane {
+    grid-area: catalog;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-right: none;
+  }
+
+  .crt-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px
+    );
+  }
+
+  .catalog-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.35rem 0;
+  }
+
+  .catalog-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .catalog-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .catalog-scroll::-webkit-scrollbar-thumb {
+    background: var(--border);
+  }
+
+  /* ========== TREE STYLES (shared catalog + mobile) ========== */
+  .tree-series {
+    margin-bottom: 0;
+  }
+
+  .tree-header {
+    display: flex;
+    align-items: center;
+    padding: 0.35rem 0.5rem 0.1rem;
+    gap: 0.35rem;
+    user-select: none;
+  }
+
+  .tree-series-name {
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .tree-series-line {
+    flex: 1;
+    border-bottom: 1px dashed;
+    opacity: 0.3;
+    min-width: 1rem;
+  }
+
+  .tree-branch {
+    flex-shrink: 0;
+    white-space: pre;
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+
+  .tree-row {
+    display: flex;
+    align-items: baseline;
+    padding: 0.12rem 0.5rem 0.12rem 0.75rem;
+    gap: 0.25rem;
+    color: var(--text);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.15s;
+    min-height: 1.4em;
+    border-left: 2px solid transparent;
+  }
+
+  a.tree-row:hover {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  /* Keyboard-selected row */
+  .tree-row.active {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    border-left-color: var(--accent);
+  }
+
+  /* Synced from rhizome hover */
+  .tree-row.synced {
+    background: color-mix(in srgb, #3b82f6 14%, transparent);
+    border-left-color: #3b82f6;
+  }
+
+  .tree-exp-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .tree-exp-name.muted {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .tree-dots {
+    flex: 1;
+    min-width: 0.5rem;
+    border-bottom: 1px dotted var(--border);
+    margin-bottom: 0.2em;
+    opacity: 0.5;
+  }
+
+  .tree-runs {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  .tree-empty {
+    cursor: default;
+  }
+
+  .tree-empty:hover {
+    background: none;
+  }
+
+  .tree-spacer {
+    height: 0.35rem;
+  }
+
+  /* ========== DIVIDER ========== */
+  .hybrid-divider {
+    grid-area: divider;
+    background: var(--border);
+    cursor: col-resize;
+  }
+
+  /* ========== RHIZOME PANE ========== */
+  .rhizome-pane {
+    grid-area: rhizome;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-left: none;
+  }
+
+  .rhizome-viewport {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 40% 40%, #1a1e3a 0%, #0d1117 60%, #080b12 100%);
+  }
+
+  .rhizome-world {
+    position: relative;
+    transform-origin: 0 0;
+  }
+
+  .rhizome-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+
+  /* --- Tendrils --- */
+  .tendril {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: tendril-grow 2s ease-out forwards;
+    animation-delay: var(--tendril-delay, 0s);
+  }
+
+  @keyframes tendril-grow {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* --- Organisms --- */
+  .organism {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
+    z-index: 3;
+    cursor: pointer;
+  }
+
+  .organism-blob {
+    width: 80px;
+    height: 80px;
+    background: var(--org-color);
+    opacity: 0.85;
+    border-radius: 50%;
+    clip-path: polygon(
+      50% 2%, 72% 8%, 92% 25%, 98% 50%,
+      93% 75%, 73% 93%, 50% 98%, 28% 92%,
+      8% 74%, 2% 50%, 7% 26%, 27% 8%
+    );
+    box-shadow: 0 0 30px color-mix(in srgb, var(--org-color) 60%, transparent),
+                0 0 60px color-mix(in srgb, var(--org-color) 30%, transparent);
+    animation: organism-pulse 3s ease-in-out infinite;
+    transition: transform 0.3s, opacity 0.3s;
+  }
+
+  .organism--empty .organism-blob {
+    width: 50px;
+    height: 50px;
+    opacity: 0.35;
+    animation-duration: 5s;
+  }
+
+  .organism:hover .organism-blob {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+
+  @keyframes organism-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 1;
+    }
+  }
+
+  .organism-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--org-color);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--org-color) 50%, transparent);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .organism-soon {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* --- Spore nodes --- */
+  .spore-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    z-index: 2;
+    cursor: pointer;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, filter 0.2s, opacity 0.3s;
+  }
+
+  .spore-node:hover {
+    transform: translate(-50%, -50%) scale(1.3);
+    z-index: 4;
+  }
+
+  .spore-inner {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--spore-color) 90%, white), var(--spore-color));
+    opacity: 0.7;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--spore-color) 50%, transparent);
+    transition: opacity 0.2s, box-shadow 0.2s;
+  }
+
+  .spore-node:hover .spore-inner {
+    opacity: 1;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--spore-color) 70%, transparent);
+  }
+
+  /* Focused spore (synced from catalog) */
+  .spore-node.focused {
+    transform: translate(-50%, -50%) scale(1.4);
+    z-index: 5;
+  }
+
+  .spore-node.focused .spore-inner {
+    opacity: 1;
+    box-shadow: 0 0 24px color-mix(in srgb, var(--spore-color) 80%, transparent),
+                0 0 48px color-mix(in srgb, var(--spore-color) 40%, transparent);
+  }
+
+  /* Dimmed spores (non-focused during sync) */
+  .spore-node.dimmed {
+    opacity: 0.2;
+  }
+
+  .spore-node.dimmed .spore-inner {
+    opacity: 0.3;
+  }
+
+  /* Dim organisms and tendrils during focus */
+  .rhizome-world.has-focus .organism:not(.focused) .organism-blob {
+    opacity: 0.15;
+  }
+  .rhizome-world.has-focus .organism:not(.focused) .organism-label {
+    opacity: 0.3;
+  }
+  .rhizome-world.has-focus .tendril:not(.focused) {
+    opacity: 0.05;
+  }
+  .rhizome-world.has-focus .junction-group:not(.focused) {
+    opacity: 0.1;
+  }
+
+  /* --- Junction diamonds --- */
+  .junction-group {
+    transition: opacity 0.3s;
+  }
+
+  /* --- Legend --- */
+  .rhizome-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+    border-top: 1px solid var(--border);
+    justify-content: center;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+  }
+
+  .legend-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--legend-color);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--legend-color) 50%, transparent);
+  }
+
+  .legend-count {
+    opacity: 0.5;
+  }
+
+  /* ========== STATUS BAR ========== */
+  .hybrid-status {
+    grid-area: status;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    user-select: none;
+  }
+
+  .status-section {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .status-label {
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    font-size: 0.6rem;
+  }
+
+  .status-value {
+    color: var(--text);
+  }
+
+  .status-sep {
+    color: var(--border);
+  }
+
+  .status-fill {
+    flex: 1;
+  }
+
+  .status-nav {
+    gap: 0.5rem;
+  }
+
+  .status-key {
+    display: inline-block;
+    padding: 0 0.25rem;
+    border: 1px solid var(--border);
+    font-size: 0.6rem;
+    line-height: 1.4;
+    color: var(--text);
+  }
+</style>
+
+<script>
+  import { initPanZoom } from '../../lib/pan-zoom';
+  import { initTooltip } from '../../lib/graph-tooltip';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // --- Mobile tab switching ---
+    const mobileTabs = document.querySelectorAll<HTMLButtonElement>('#mobile-tabs .mobile-tab');
+    const mobileCatalog = document.getElementById('mobile-catalog');
+    const mobileRhizome = document.getElementById('mobile-rhizome');
+
+    mobileTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        mobileTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.dataset.target;
+        if (mobileCatalog) mobileCatalog.style.display = target === 'catalog' ? '' : 'none';
+        if (mobileRhizome) mobileRhizome.style.display = target === 'rhizome' ? '' : 'none';
+      });
+    });
+
+    // --- Desktop split-pane ---
+    const viewport = document.getElementById('rhizome-viewport');
+    const world = document.getElementById('rhizome-world');
+    if (!viewport || !world) return;
+
+    // Parse layout data
+    const layoutEl = document.getElementById('rhizome-layout-data');
+    if (!layoutEl) return;
+    const layout: {
+      organisms: {
+        id: string; cx: number; cy: number; color: string;
+        experiments: { baseName: string; cx: number; cy: number; size: number }[];
+      }[];
+      junctions: { cx: number; cy: number; tag: string; fromSeries: string[] }[];
+    } = JSON.parse(layoutEl.textContent || '{}');
+
+    // Build baseName → spore position map
+    const sporePositions: Record<string, { cx: number; cy: number; seriesId: string }> = {};
+    for (const org of layout.organisms) {
+      for (const exp of org.experiments) {
+        sporePositions[exp.baseName] = { cx: exp.cx, cy: exp.cy, seriesId: org.id };
+      }
+    }
+
+    // Init pan-zoom (start zoomed out to see overview)
+    const pz = initPanZoom(viewport, world, {
+      minScale: 0.3,
+      maxScale: 2.5,
+      scale: 0.65,
+      hint: true,
+    });
+
+    // Init tooltips on spore nodes
+    initTooltip(viewport, '.spore-node');
+
+    // DOM refs
+    const catalogRows = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>('#catalog-scroll a.tree-row')
+    );
+    const allSpores = world.querySelectorAll<HTMLElement>('.spore-node');
+    const allOrganisms = world.querySelectorAll<HTMLElement>('.organism');
+    const allTendrils = world.querySelectorAll<SVGPathElement>('.tendril');
+    const allJunctions = world.querySelectorAll<SVGGElement>('.junction-group');
+    const statusBar = document.getElementById('hybrid-status');
+
+    let selectedIndex = -1;
+    let syncActive = false;
+
+    // --- Helpers ---
+
+    function clearCatalogSync() {
+      catalogRows.forEach(r => r.classList.remove('synced', 'active'));
+    }
+
+    function clearRhizomeSync() {
+      world.classList.remove('has-focus');
+      allSpores.forEach(s => {
+        s.classList.remove('focused', 'dimmed');
+      });
+      allOrganisms.forEach(el => el.classList.remove('focused'));
+      allTendrils.forEach(el => el.classList.remove('focused'));
+      allJunctions.forEach(el => el.classList.remove('focused'));
+    }
+
+    function clearAllSync() {
+      clearCatalogSync();
+      clearRhizomeSync();
+      syncActive = false;
+    }
+
+    // --- Catalog → Rhizome sync ---
+
+    function catalogToRhizome(baseName: string) {
+      const pos = sporePositions[baseName];
+      if (!pos) return;
+
+      syncActive = true;
+
+      // Zoom rhizome to center on the spore
+      const vpRect = viewport.getBoundingClientRect();
+      const targetScale = 1.2;
+      const targetX = vpRect.width / 2 - pos.cx * targetScale;
+      const targetY = vpRect.height / 2 - pos.cy * targetScale;
+
+      pz.setState({ x: targetX, y: targetY, scale: targetScale }, true);
+
+      // Highlight matching spore, dim others
+      allSpores.forEach(s => {
+        if (s.dataset.baseName === baseName) {
+          s.classList.add('focused');
+          s.classList.remove('dimmed');
+        } else {
+          s.classList.remove('focused');
+          s.classList.add('dimmed');
+        }
+      });
+
+      // Dim organisms + tendrils except the matching series
+      world.classList.add('has-focus');
+      allOrganisms.forEach(el => el.classList.toggle('focused', el.dataset.series === pos.seriesId));
+      allTendrils.forEach(el => el.classList.toggle('focused', el.dataset.series === pos.seriesId));
+      allJunctions.forEach(el => {
+        const ids = (el.dataset.seriesIds || '').split(',');
+        el.classList.toggle('focused', ids.includes(pos.seriesId));
+      });
+    }
+
+    // --- Rhizome → Catalog sync ---
+
+    function rhizomeToCatalog(baseName: string) {
+      syncActive = true;
+
+      clearCatalogSync();
+      const row = catalogRows.find(r => r.dataset.baseName === baseName);
+      if (row) {
+        row.classList.add('synced');
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Update keyboard index
+        selectedIndex = catalogRows.indexOf(row);
+      }
+    }
+
+    // --- Catalog hover/click events ---
+
+    catalogRows.forEach((row, i) => {
+      const baseName = row.dataset.baseName || '';
+
+      row.addEventListener('mouseenter', () => {
+        clearCatalogSync();
+        row.classList.add('active');
+        selectedIndex = i;
+        catalogToRhizome(baseName);
+      });
+
+      row.addEventListener('mouseleave', () => {
+        clearAllSync();
+      });
+
+      // Click = sync only; navigate via Enter or Ctrl+click
+      row.addEventListener('click', (e: MouseEvent) => {
+        if (e.ctrlKey || e.metaKey) return; // allow Ctrl+click to navigate
+        e.preventDefault();
+        clearCatalogSync();
+        row.classList.add('active');
+        selectedIndex = i;
+        catalogToRhizome(baseName);
+      });
+    });
+
+    // --- Rhizome spore hover events ---
+
+    allSpores.forEach(spore => {
+      const baseName = spore.dataset.baseName || '';
+
+      spore.addEventListener('mouseenter', () => {
+        rhizomeToCatalog(baseName);
+      });
+
+      spore.addEventListener('mouseleave', () => {
+        clearCatalogSync();
+        syncActive = false;
+      });
+
+      // Click on spore = sync, not navigate
+      spore.addEventListener('click', (e: MouseEvent) => {
+        if (e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        rhizomeToCatalog(baseName);
+      });
+    });
+
+    // --- Keyboard navigation ---
+
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+
+      // Only handle if desktop layout is visible
+      const container = document.getElementById('hybrid-container');
+      if (!container || getComputedStyle(container).display === 'none') return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = selectedIndex < 0 ? 0 : Math.min(selectedIndex + 1, catalogRows.length - 1);
+        selectRow(next);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = selectedIndex <= 0 ? 0 : selectedIndex - 1;
+        selectRow(prev);
+      } else if (e.key === 'Enter' && selectedIndex >= 0) {
+        e.preventDefault();
+        window.location.href = catalogRows[selectedIndex].href;
+      } else if (e.key === 'Escape') {
+        clearAllSync();
+        selectedIndex = -1;
+      }
+    });
+
+    function selectRow(index: number) {
+      if (index < 0 || index >= catalogRows.length) return;
+      clearCatalogSync();
+      selectedIndex = index;
+      const row = catalogRows[index];
+      row.classList.add('active');
+      row.scrollIntoView({ block: 'nearest' });
+      catalogToRhizome(row.dataset.baseName || '');
+    }
+  });
+</script>
