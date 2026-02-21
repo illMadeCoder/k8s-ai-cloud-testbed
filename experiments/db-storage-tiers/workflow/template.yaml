@@ -51,10 +51,10 @@ spec:
         args:
           - |
             echo "=== Waiting for ArgoCD to sync 10 naive-db variants + loadgen ==="
-            echo "10 StatefulSets with PVCs across 5 StorageClasses + kube-prometheus-stack"
+            echo "10 StatefulSets with 64Gi PVCs across 5 StorageClasses + kube-prometheus-stack"
             echo "Hyperdisk PVC provisioning may take extra time..."
-            for i in $(seq 1 30); do
-              echo "Wait $i/30 (30s intervals)..."
+            for i in $(seq 1 50); do
+              echo "Wait $i/50 (30s intervals = 25 min)..."
               sleep 30
             done
             echo "Stack sync wait complete"
@@ -65,9 +65,9 @@ spec:
         command: [sh, -c]
         args:
           - |
-            echo "=== Observation window (40 min) ==="
+            echo "=== Observation window (50 min) ==="
             echo "LoadGen runs sustained 60s write bursts against 10 variants (~10 min),"
             echo "plus reads and mixed OLTP (~10 min), plus 3 min cooldown = ~23 min."
-            echo "Allowing 40 min total for benchmark completion and metric settlement."
-            sleep 2400
+            echo "Allowing 50 min total for benchmark completion and metric settlement."
+            sleep 3000
             echo "Observation complete"
