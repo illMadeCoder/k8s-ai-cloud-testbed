@@ -1,14 +1,264 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Breadcrumb from '../../components/Breadcrumb.astro';
-import SeriesCard from '../../components/SeriesCard.astro';
-import { loadAllExperiments, groupBySeries } from '../../lib/experiments';
+import { loadAllExperiments, groupBySeries, groupExperiments, getAllTags, getDisplayTitle } from '../../lib/experiments';
 import { loadSeries } from '../../lib/series';
+import type { ExperimentGroup } from '../../lib/experiments';
+import type { Series } from '../../lib/series';
 
 const experiments = loadAllExperiments();
 const seriesGroups = groupBySeries(experiments);
 const allSeries = loadSeries();
+const allGroups = groupExperiments(experiments);
+const tags = getAllTags(experiments);
 const base = import.meta.env.BASE_URL;
+
+// --- Deterministic hash ---
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+// --- Canvas world dimensions ---
+const WORLD_W = 1400;
+const WORLD_H = 1000;
+
+// --- Series color map ---
+const defaultColors: Record<string, string> = {
+  'this-lab': '#a78bfa',
+  'ecosystem-comparisons': '#34d399',
+  'cloud-database-internals': '#f97316',
+  'messages-and-streams': '#38bdf8',
+};
+function getSeriesColor(s: Series): string {
+  return s.color || defaultColors[s.id] || '#a78bfa';
+}
+
+// --- Constellation quadrant centers ---
+const quadrants = [
+  { cx: 350, cy: 280 },
+  { cx: 1050, cy: 280 },
+  { cx: 350, cy: 720 },
+  { cx: 1050, cy: 720 },
+];
+
+// --- Generate 220 background stars ---
+interface BgStar {
+  x: number;
+  y: number;
+  size: number;
+  delay: number;
+  duration: number;
+  opacity: number;
+}
+const bgStars: BgStar[] = [];
+for (let i = 0; i < 220; i++) {
+  const h = hashStr(`bgstar-${i}-salt`);
+  bgStars.push({
+    x: (h % WORLD_W),
+    y: ((h * 7 + 131) % WORLD_H),
+    size: 1 + (h % 3),
+    delay: ((h % 50) / 10),
+    duration: 2 + (h % 30) / 10,
+    opacity: 0.2 + (h % 8) / 10,
+  });
+}
+
+// --- Compute experiment star positions ---
+interface StarData {
+  x: number;
+  y: number;
+  radius: number;
+  color: string;
+  seriesId: string;
+  baseName: string;
+  title: string;
+  runCount: number;
+  tags: string[];
+  href: string;
+}
+
+interface ConstellationData {
+  seriesId: string;
+  name: string;
+  description: string;
+  color: string;
+  cx: number;
+  cy: number;
+  stars: StarData[];
+  empty: boolean;
+  boundaryRadius: number;
+}
+
+const constellations: ConstellationData[] = [];
+
+allSeries.forEach((s, idx) => {
+  const q = quadrants[idx % quadrants.length];
+  const groups = seriesGroups[s.id] ?? [];
+  const color = getSeriesColor(s);
+  const stars: StarData[] = [];
+
+  groups.forEach((g) => {
+    const h = hashStr(g.baseName);
+    const angle = ((h % 360) * Math.PI) / 180;
+    const dist = 40 + (h % 110);
+    const jitterX = ((h * 3) % 40) - 20;
+    const jitterY = ((h * 7) % 40) - 20;
+    const x = q.cx + Math.cos(angle) * dist + jitterX;
+    const y = q.cy + Math.sin(angle) * dist + jitterY;
+    const runCount = g.runs.length;
+    const radius = Math.min(20, Math.max(8, 6 + runCount * 1.5));
+
+    stars.push({
+      x,
+      y,
+      radius,
+      color,
+      seriesId: s.id,
+      baseName: g.baseName,
+      title: getDisplayTitle(g),
+      runCount,
+      tags: g.tags,
+      href: `${base}experiments/${g.baseName}/`,
+    });
+  });
+
+  let boundaryRadius = 160;
+  if (stars.length > 0) {
+    let maxDist = 0;
+    for (const star of stars) {
+      const d = Math.sqrt((star.x - q.cx) ** 2 + (star.y - q.cy) ** 2);
+      if (d > maxDist) maxDist = d;
+    }
+    boundaryRadius = maxDist + 50;
+  }
+
+  constellations.push({
+    seriesId: s.id,
+    name: s.name,
+    description: s.description,
+    color,
+    cx: q.cx,
+    cy: q.cy,
+    stars,
+    empty: stars.length === 0,
+    boundaryRadius,
+  });
+});
+
+// --- Compute tag nebulae ---
+interface Nebula {
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+  color1: string;
+  color2: string;
+  opacity: number;
+}
+
+const allStars = constellations.flatMap(c => c.stars);
+const tagStarMap = new Map<string, StarData[]>();
+for (const star of allStars) {
+  for (const t of star.tags) {
+    const arr = tagStarMap.get(t) ?? [];
+    arr.push(star);
+    tagStarMap.set(t, arr);
+  }
+}
+
+const nebulae: Nebula[] = [];
+for (const [, starGroup] of tagStarMap) {
+  if (starGroup.length < 2) continue;
+  let sx = 0, sy = 0;
+  for (const star of starGroup) { sx += star.x; sy += star.y; }
+  const cx = sx / starGroup.length;
+  const cy = sy / starGroup.length;
+  let maxDist = 0;
+  for (const star of starGroup) {
+    const d = Math.sqrt((star.x - cx) ** 2 + (star.y - cy) ** 2);
+    if (d > maxDist) maxDist = d;
+  }
+  const spread = Math.max(60, maxDist + 40);
+  const seriesColors = [...new Set(starGroup.map(s => s.color))];
+  nebulae.push({
+    cx,
+    cy,
+    rx: spread * 1.2,
+    ry: spread * 0.9,
+    color1: seriesColors[0],
+    color2: seriesColors.length > 1 ? seriesColors[1] : seriesColors[0],
+    opacity: 0.06 + Math.min(0.09, starGroup.length * 0.01),
+  });
+}
+
+// --- Constellation lines ---
+interface ConstellationLine {
+  x1: number; y1: number; x2: number; y2: number; color: string; seriesId: string;
+}
+const constellationLines: ConstellationLine[] = [];
+for (const c of constellations) {
+  if (c.stars.length < 2) continue;
+  const sorted = [...c.stars].sort((a, b) => a.baseName.localeCompare(b.baseName));
+  for (let i = 0; i < sorted.length - 1; i++) {
+    constellationLines.push({
+      x1: sorted[i].x,
+      y1: sorted[i].y,
+      x2: sorted[i + 1].x,
+      y2: sorted[i + 1].y,
+      color: c.color,
+      seriesId: c.seriesId,
+    });
+  }
+}
+
+function lineLength(l: ConstellationLine): number {
+  return Math.sqrt((l.x2 - l.x1) ** 2 + (l.y2 - l.y1) ** 2);
+}
+
+// --- 4-pointed star SVG path ---
+function starPath(cx: number, cy: number, R: number): string {
+  const r = R * 0.3;
+  const points: [number, number][] = [];
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * 45 - 90) * (Math.PI / 180);
+    const radius = i % 2 === 0 ? R : r;
+    points.push([
+      cx + Math.cos(angle) * radius,
+      cy + Math.sin(angle) * radius,
+    ]);
+  }
+  return `M${points.map(p => p.join(',')).join('L')}Z`;
+}
+
+// --- Mobile card data ---
+interface MobileCard {
+  seriesId: string;
+  name: string;
+  description: string;
+  color: string;
+  experimentCount: number;
+  experiments: { baseName: string; title: string; runCount: number; href: string }[];
+}
+const mobileCards: MobileCard[] = allSeries.map(s => {
+  const groups = seriesGroups[s.id] ?? [];
+  return {
+    seriesId: s.id,
+    name: s.name,
+    description: s.description,
+    color: getSeriesColor(s),
+    experimentCount: groups.length,
+    experiments: groups.map(g => ({
+      baseName: g.baseName,
+      title: getDisplayTitle(g),
+      runCount: g.runs.length,
+      href: `${base}experiments/${g.baseName}/`,
+    })),
+  };
+});
 ---
 
 <Base title="Series — K8s Cloud TestBed">
@@ -20,19 +270,550 @@ const base = import.meta.env.BASE_URL;
     slot="breadcrumb"
   />
 
-  <h1 class="text-2xl font-bold mb-2">Ongoing Series</h1>
-  <p class="text-text-muted mb-8 max-w-2xl">
-    Long-term research tracks grouping related experiments around a common theme.
-  </p>
+  <!-- Desktop: Star chart canvas -->
+  <div class="constellation-canvas" id="constellation-viewport">
+    <div class="constellation-world" id="constellation-world">
+      <svg
+        viewBox={`0 0 ${WORLD_W} ${WORLD_H}`}
+        xmlns="http://www.w3.org/2000/svg"
+        class="constellation-svg"
+      >
+        <defs>
+          <filter id="star-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="star-glow-hover" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {nebulae.map((n, i) => (
+            <radialGradient id={`nebula-${i}`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color={n.color1} stop-opacity={String(n.opacity)} />
+              <stop offset="40%" stop-color={n.color2} stop-opacity={String(n.opacity * 0.5)} />
+              <stop offset="100%" stop-color={n.color1} stop-opacity="0" />
+            </radialGradient>
+          ))}
+        </defs>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {allSeries.map((s) => (
-      <SeriesCard
-        id={s.id}
-        name={s.name}
-        description={s.description}
-        experimentCount={(seriesGroups[s.id] ?? []).length}
-      />
-    ))}
+        {/* Background stars */}
+        {bgStars.map((s) => (
+          <circle
+            cx={s.x}
+            cy={s.y}
+            r={s.size}
+            fill="white"
+            opacity={s.opacity}
+            class="bg-star"
+            style={`animation-delay: ${s.delay}s; animation-duration: ${s.duration}s;`}
+          />
+        ))}
+
+        {/* Nebula clouds */}
+        {nebulae.map((n, i) => (
+          <ellipse
+            cx={n.cx}
+            cy={n.cy}
+            rx={n.rx}
+            ry={n.ry}
+            fill={`url(#nebula-${i})`}
+            class="nebula"
+          />
+        ))}
+
+        {/* Constellation boundary circles */}
+        {constellations.map(c => (
+          <circle
+            cx={c.cx}
+            cy={c.cy}
+            r={c.boundaryRadius}
+            fill="none"
+            stroke={c.color}
+            stroke-width="0.5"
+            stroke-dasharray="6 4"
+            opacity="0.15"
+            class="constellation-boundary"
+            data-series={c.seriesId}
+          />
+        ))}
+
+        {/* Constellation labels */}
+        {constellations.map(c => (
+          <text
+            x={c.cx}
+            y={c.cy - c.boundaryRadius - 12}
+            text-anchor="middle"
+            fill={c.color}
+            opacity={c.empty ? '0.25' : '0.45'}
+            class="constellation-label"
+            data-series={c.seriesId}
+          >
+            {c.name.toUpperCase()}
+          </text>
+        ))}
+
+        {/* Coming soon for empty constellations */}
+        {constellations.filter(c => c.empty).map(c => (
+          <text
+            x={c.cx}
+            y={c.cy + 4}
+            text-anchor="middle"
+            fill={c.color}
+            opacity="0.2"
+            class="constellation-coming-soon"
+          >
+            Coming soon
+          </text>
+        ))}
+
+        {/* Constellation lines */}
+        {constellationLines.map((l, i) => (
+          <line
+            x1={l.x1}
+            y1={l.y1}
+            x2={l.x2}
+            y2={l.y2}
+            stroke={l.color}
+            stroke-width="1"
+            opacity="0.25"
+            class="constellation-line"
+            data-series={l.seriesId}
+            style={`stroke-dasharray: ${lineLength(l)}; stroke-dashoffset: ${lineLength(l)}; animation-delay: ${0.3 + i * 0.15}s;`}
+          />
+        ))}
+
+        {/* Experiment stars */}
+        {allStars.map(s => (
+          <a href={s.href} class="star-link">
+            <path
+              d={starPath(s.x, s.y, s.radius)}
+              fill={s.color}
+              filter="url(#star-glow)"
+              opacity={String(0.6 + Math.min(0.4, s.runCount * 0.05))}
+              class="star-node"
+              data-series={s.seriesId}
+              data-basename={s.baseName}
+              data-tooltip-title={s.title}
+              data-tooltip-body={`${s.runCount} run${s.runCount !== 1 ? 's' : ''}`}
+              data-tooltip-meta={s.tags.join(' / ')}
+              data-tooltip-color={s.color}
+            />
+          </a>
+        ))}
+      </svg>
+    </div>
+    <div class="constellation-legend">
+      {constellations.map(c => (
+        <button
+          class="legend-item"
+          data-series={c.seriesId}
+          style={`--legend-color: ${c.color};`}
+        >
+          <span class="legend-dot" style={`background: ${c.color};`} />
+          <span class="legend-name">{c.name}</span>
+          <span class="legend-count">
+            {c.stars.length > 0 ? c.stars.length : '--'}
+          </span>
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <!-- Mobile: Card-based fallback -->
+  <div class="mobile-constellation">
+    <h1 class="mobile-title">Ongoing Series</h1>
+    <p class="mobile-subtitle">
+      Long-term research tracks grouping related experiments around a common theme.
+    </p>
+    <div class="mobile-grid">
+      {mobileCards.map(card => (
+        <div class="mobile-card" style={`--card-color: ${card.color};`}>
+          <div class="mobile-card-stars" aria-hidden="true">
+            {Array.from({ length: 8 }).map((_, i) => {
+              const h = hashStr(`mobile-star-${card.seriesId}-${i}`);
+              return (
+                <span
+                  class="mobile-bg-star"
+                  style={`left: ${h % 100}%; top: ${(h * 3) % 100}%; animation-delay: ${(h % 40) / 10}s; font-size: ${1 + (h % 3)}px;`}
+                />
+              );
+            })}
+          </div>
+          <h2 class="mobile-card-name">{card.name}</h2>
+          <p class="mobile-card-desc">{card.description}</p>
+          {card.experiments.length > 0 ? (
+            <ul class="mobile-card-list">
+              {card.experiments.map(exp => (
+                <li>
+                  <a href={exp.href} class="mobile-exp-link" style={`color: ${card.color};`}>
+                    <svg class="mobile-star-icon" viewBox="0 0 24 24" width="14" height="14">
+                      <path
+                        d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"
+                        fill={card.color}
+                        opacity="0.8"
+                      />
+                    </svg>
+                    <span>{exp.title}</span>
+                    <span class="mobile-run-count">{exp.runCount} run{exp.runCount !== 1 ? 's' : ''}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="mobile-coming-soon">Coming soon</p>
+          )}
+        </div>
+      ))}
+    </div>
   </div>
 </Base>
+
+<style>
+  .constellation-canvas {
+    display: none;
+    position: relative;
+    width: 100%;
+    min-height: 85vh;
+    background: #050a18;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: grab;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  @media (min-width: 768px) {
+    .constellation-canvas {
+      display: block;
+    }
+    .mobile-constellation {
+      display: none;
+    }
+  }
+
+  .constellation-world {
+    width: 100%;
+    height: 100%;
+    transform-origin: 0 0;
+  }
+
+  .constellation-svg {
+    width: 100%;
+    height: 100%;
+    min-height: 85vh;
+  }
+
+  .bg-star {
+    animation: twinkle ease-in-out infinite;
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.8; }
+  }
+
+  .nebula {
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+
+  .constellation-label {
+    font-family: var(--font-mono), monospace;
+    font-size: 13px;
+    letter-spacing: 0.35em;
+    font-weight: 600;
+    pointer-events: none;
+  }
+
+  .constellation-coming-soon {
+    font-family: var(--font-mono), monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    font-style: italic;
+    pointer-events: none;
+  }
+
+  .constellation-line {
+    animation: draw-line 1.2s ease forwards;
+  }
+
+  @keyframes draw-line {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .star-node {
+    cursor: pointer;
+    transition: filter 0.2s, opacity 0.2s;
+  }
+
+  .star-link:hover .star-node,
+  .star-node:hover {
+    filter: url(#star-glow-hover);
+    opacity: 1 !important;
+  }
+
+  .star-link {
+    text-decoration: none;
+  }
+
+  .constellation-legend {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    z-index: 10;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(5, 10, 24, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    font-family: var(--font-mono), monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .legend-item:hover {
+    border-color: var(--legend-color);
+    color: var(--text);
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .legend-name {
+    white-space: nowrap;
+  }
+
+  .legend-count {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  .constellation-svg.highlight .star-node:not(.highlight-active) {
+    opacity: 0.1 !important;
+    filter: none !important;
+  }
+
+  .constellation-svg.highlight .constellation-line:not(.highlight-active) {
+    opacity: 0.03 !important;
+  }
+
+  .constellation-svg.highlight .constellation-boundary:not(.highlight-active) {
+    opacity: 0.03 !important;
+  }
+
+  .constellation-svg.highlight .constellation-label:not(.highlight-active) {
+    opacity: 0.1 !important;
+  }
+
+  .constellation-svg.highlight .star-node.highlight-active {
+    opacity: 1 !important;
+  }
+
+  .constellation-svg.highlight .constellation-line.highlight-active {
+    opacity: 0.5 !important;
+  }
+
+  .constellation-svg.highlight .constellation-boundary.highlight-active {
+    opacity: 0.3 !important;
+  }
+
+  .constellation-svg.highlight .constellation-label.highlight-active {
+    opacity: 0.7 !important;
+  }
+
+  .mobile-constellation {
+    display: block;
+  }
+
+  @media (min-width: 768px) {
+    .mobile-constellation {
+      display: none;
+    }
+  }
+
+  .mobile-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+  }
+
+  .mobile-subtitle {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    max-width: 36rem;
+    font-size: 0.9rem;
+  }
+
+  .mobile-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .mobile-card {
+    position: relative;
+    overflow: hidden;
+    background: #050a18;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid var(--card-color);
+    border-radius: 8px;
+    padding: 1.25rem;
+  }
+
+  .mobile-card-stars {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .mobile-bg-star {
+    position: absolute;
+    display: block;
+    width: 2px;
+    height: 2px;
+    background: white;
+    border-radius: 50%;
+    opacity: 0.3;
+    animation: twinkle 3s ease-in-out infinite;
+  }
+
+  .mobile-card-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--card-color);
+    margin-bottom: 0.35rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .mobile-card-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+    position: relative;
+    z-index: 1;
+  }
+
+  .mobile-card-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .mobile-card-list li + li {
+    margin-top: 0.4rem;
+  }
+
+  .mobile-exp-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    text-decoration: none;
+    transition: opacity 0.15s;
+    font-family: var(--font-mono), monospace;
+  }
+
+  .mobile-exp-link:hover {
+    opacity: 0.8;
+  }
+
+  .mobile-star-icon {
+    flex-shrink: 0;
+  }
+
+  .mobile-run-count {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    opacity: 0.6;
+  }
+
+  .mobile-coming-soon {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-style: italic;
+    opacity: 0.4;
+    position: relative;
+    z-index: 1;
+  }
+</style>
+
+<script>
+  import { initPanZoom } from '../../lib/pan-zoom';
+  import { initTooltip } from '../../lib/graph-tooltip';
+
+  function init() {
+    const viewport = document.getElementById('constellation-viewport');
+    const world = document.getElementById('constellation-world');
+    if (!viewport || !world) return;
+
+    initPanZoom(viewport, world, { minScale: 0.4, maxScale: 2.5 });
+    initTooltip(viewport, '.star-node');
+
+    const svg = viewport.querySelector('.constellation-svg');
+    const legendItems = viewport.querySelectorAll('.legend-item');
+
+    function highlightSeries(seriesId: string | null) {
+      if (!svg) return;
+      if (!seriesId) {
+        svg.classList.remove('highlight');
+        svg.querySelectorAll('.highlight-active').forEach(el => el.classList.remove('highlight-active'));
+        return;
+      }
+      svg.classList.add('highlight');
+      svg.querySelectorAll('.highlight-active').forEach(el => el.classList.remove('highlight-active'));
+      svg.querySelectorAll(`[data-series="${seriesId}"]`).forEach(el => el.classList.add('highlight-active'));
+    }
+
+    legendItems.forEach(item => {
+      const seriesId = (item as HTMLElement).dataset.series;
+      item.addEventListener('mouseenter', () => highlightSeries(seriesId ?? null));
+      item.addEventListener('mouseleave', () => highlightSeries(null));
+    });
+
+    const starNodes = svg?.querySelectorAll('.star-node') ?? [];
+    starNodes.forEach(star => {
+      star.addEventListener('mouseenter', () => {
+        const seriesId = (star as HTMLElement).dataset.series;
+        highlightSeries(seriesId ?? null);
+      });
+      star.addEventListener('mouseleave', () => {
+        highlightSeries(null);
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  document.addEventListener('astro:page-load', init);
+</script>
