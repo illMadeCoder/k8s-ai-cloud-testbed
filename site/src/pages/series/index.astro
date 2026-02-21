@@ -1,14 +1,197 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Breadcrumb from '../../components/Breadcrumb.astro';
-import SeriesCard from '../../components/SeriesCard.astro';
-import { loadAllExperiments, groupBySeries } from '../../lib/experiments';
+import { loadAllExperiments, groupBySeries, groupExperiments, getAllTags, getDisplayTitle } from '../../lib/experiments';
 import { loadSeries } from '../../lib/series';
+import type { ExperimentGroup } from '../../lib/experiments';
+import type { Series } from '../../lib/series';
 
 const experiments = loadAllExperiments();
 const seriesGroups = groupBySeries(experiments);
 const allSeries = loadSeries();
+const allGroups = groupExperiments(experiments);
+const tags = getAllTags(experiments);
 const base = import.meta.env.BASE_URL;
+
+// --- Canvas layout: 1200x900, organisms in quadrants with organic offsets ---
+const CANVAS_W = 1200;
+const CANVAS_H = 900;
+
+// Quadrant centers with organic offsets
+const quadrantCenters = [
+  { x: 280, y: 220 },   // top-left
+  { x: 880, y: 250 },   // top-right
+  { x: 320, y: 680 },   // bottom-left
+  { x: 850, y: 650 },   // bottom-right
+];
+
+// Seeded pseudo-random for deterministic layout
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+interface OrganismData {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  cx: number;
+  cy: number;
+  experiments: {
+    baseName: string;
+    title: string;
+    runCount: number;
+    tags: string[];
+    cx: number;
+    cy: number;
+    size: number;
+    href: string;
+  }[];
+  isEmpty: boolean;
+}
+
+interface JunctionData {
+  cx: number;
+  cy: number;
+  color: string;
+  tag: string;
+  fromSeries: string[];
+  size: number;
+}
+
+interface TendrilData {
+  seriesId: string;
+  color: string;
+  path: string;
+}
+
+const organisms: OrganismData[] = [];
+const tendrils: TendrilData[] = [];
+const junctions: JunctionData[] = [];
+
+// Build organism data
+allSeries.forEach((s, i) => {
+  const center = quadrantCenters[i % quadrantCenters.length];
+  const exps = seriesGroups[s.id] ?? [];
+  const color = s.color || '#60a5fa';
+  const isEmpty = exps.length === 0;
+
+  // Compute spore positions along bezier-like arcs from the organism
+  const rng = seededRandom(s.id.length * 1000 + i * 7919);
+  const sporeExps = exps.map((group, j) => {
+    const angle = ((2 * Math.PI) / Math.max(exps.length, 1)) * j + rng() * 0.4 - 0.2;
+    const dist = 120 + rng() * 80 + j * 25;
+    const cx = center.x + Math.cos(angle) * dist;
+    const cy = center.y + Math.sin(angle) * dist;
+    const runCount = group.runs.length;
+    const size = Math.max(20, Math.min(30, 16 + runCount * 0.6));
+
+    return {
+      baseName: group.baseName,
+      title: getDisplayTitle(group),
+      runCount,
+      tags: group.tags,
+      cx: Math.round(cx),
+      cy: Math.round(cy),
+      size: Math.round(size),
+      href: `${base}experiments/${group.baseName}/`,
+    };
+  });
+
+  organisms.push({
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    color,
+    cx: center.x,
+    cy: center.y,
+    experiments: sporeExps,
+    isEmpty,
+  });
+
+  // Generate tendrils (bezier curves from organism to each spore)
+  for (const spore of sporeExps) {
+    const dx = spore.cx - center.x;
+    const dy = spore.cy - center.y;
+    const perpX = -dy * 0.25 * (rng() - 0.5);
+    const perpY = dx * 0.25 * (rng() - 0.5);
+    const cp1x = Math.round(center.x + dx * 0.3 + perpX);
+    const cp1y = Math.round(center.y + dy * 0.3 + perpY);
+    const cp2x = Math.round(center.x + dx * 0.7 - perpX * 0.5);
+    const cp2y = Math.round(center.y + dy * 0.7 - perpY * 0.5);
+
+    tendrils.push({
+      seriesId: s.id,
+      color,
+      path: `M ${center.x} ${center.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${spore.cx} ${spore.cy}`,
+    });
+  }
+});
+
+// Find shared tags across series for junctions
+const tagToSeries: Record<string, { seriesIds: string[]; positions: { cx: number; cy: number }[] }> = {};
+for (const org of organisms) {
+  for (const exp of org.experiments) {
+    for (const tag of exp.tags) {
+      if (!tagToSeries[tag]) tagToSeries[tag] = { seriesIds: [], positions: [] };
+      if (!tagToSeries[tag].seriesIds.includes(org.id)) {
+        tagToSeries[tag].seriesIds.push(org.id);
+        tagToSeries[tag].positions.push({ cx: exp.cx, cy: exp.cy });
+      }
+    }
+  }
+}
+
+for (const [tag, data] of Object.entries(tagToSeries)) {
+  if (data.seriesIds.length < 2) continue;
+  const avgCx = Math.round(data.positions.reduce((s, p) => s + p.cx, 0) / data.positions.length);
+  const avgCy = Math.round(data.positions.reduce((s, p) => s + p.cy, 0) / data.positions.length);
+
+  const involvedOrgs = organisms.filter(o => data.seriesIds.includes(o.id));
+  const blendColor = involvedOrgs.length > 0 ? involvedOrgs[0].color : '#60a5fa';
+
+  junctions.push({
+    cx: avgCx,
+    cy: avgCy,
+    color: blendColor,
+    tag,
+    fromSeries: data.seriesIds,
+    size: 10 + data.seriesIds.length * 2,
+  });
+}
+
+// Generate junction tendrils connecting junction to nearest experiment from each series
+const junctionTendrils: TendrilData[] = [];
+for (const junction of junctions) {
+  for (const seriesId of junction.fromSeries) {
+    const org = organisms.find(o => o.id === seriesId);
+    if (!org || org.experiments.length === 0) continue;
+    let closest = org.experiments[0];
+    let minDist = Infinity;
+    for (const exp of org.experiments) {
+      const d = Math.hypot(exp.cx - junction.cx, exp.cy - junction.cy);
+      if (d < minDist) { minDist = d; closest = exp; }
+    }
+    if (!closest) continue;
+    const rng2 = seededRandom(junction.cx * 31 + junction.cy * 17 + seriesId.length);
+    const dx = junction.cx - closest.cx;
+    const dy = junction.cy - closest.cy;
+    const perpX = -dy * 0.2 * (rng2() - 0.5);
+    const perpY = dx * 0.2 * (rng2() - 0.5);
+    junctionTendrils.push({
+      seriesId,
+      color: org.color,
+      path: `M ${closest.cx} ${closest.cy} Q ${Math.round(closest.cx + dx * 0.5 + perpX)} ${Math.round(closest.cy + dy * 0.5 + perpY)}, ${junction.cx} ${junction.cy}`,
+    });
+  }
+}
+
+// Serialize layout data for client-side interaction
+const layoutData = JSON.stringify({ organisms, junctions });
 ---
 
 <Base title="Series — K8s Cloud TestBed">
@@ -20,19 +203,551 @@ const base = import.meta.env.BASE_URL;
     slot="breadcrumb"
   />
 
-  <h1 class="text-2xl font-bold mb-2">Ongoing Series</h1>
-  <p class="text-text-muted mb-8 max-w-2xl">
-    Long-term research tracks grouping related experiments around a common theme.
-  </p>
-
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {allSeries.map((s) => (
-      <SeriesCard
-        id={s.id}
-        name={s.name}
-        description={s.description}
-        experimentCount={(seriesGroups[s.id] ?? []).length}
-      />
-    ))}
+  <!-- Mobile fallback list -->
+  <div class="rhizome-mobile">
+    <h1 class="text-2xl font-bold mb-2">Ongoing Series</h1>
+    <p class="mobile-subtitle">
+      Long-term research tracks — a living network of experiments.
+    </p>
+    <div class="mobile-list">
+      {allSeries.map((s) => {
+        const exps = seriesGroups[s.id] ?? [];
+        const color = s.color || '#60a5fa';
+        return (
+          <a href={`${base}series/${s.id}/`} class="mobile-card" style={`--series-color: ${color}`}>
+            <div class="mobile-card-dot" style={`background: ${color}; box-shadow: 0 0 12px ${color}80`} />
+            <div class="mobile-card-content">
+              <h2 class="mobile-card-title">{s.name}</h2>
+              <p class="mobile-card-desc">{s.description}</p>
+              <span class="mobile-card-count">
+                {exps.length > 0 ? `${exps.length} experiment${exps.length !== 1 ? 's' : ''}` : 'Coming soon'}
+              </span>
+            </div>
+          </a>
+        );
+      })}
+    </div>
   </div>
+
+  <!-- Desktop rhizome canvas -->
+  <div class="rhizome-desktop">
+    <div class="rhizome-header">
+      <h1 class="text-2xl font-bold mb-1">The Rhizome</h1>
+      <p class="rhizome-subtitle">
+        A living network of experiments — lateral connections emerge where research tracks share common ground.
+      </p>
+    </div>
+
+    <div id="rhizome-viewport" class="rhizome-viewport">
+      <div id="rhizome-world" class="rhizome-world" style={`width:${CANVAS_W}px;height:${CANVAS_H}px`}>
+        <!-- SVG layer for tendrils and junctions -->
+        <svg
+          class="rhizome-svg"
+          viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+          width={CANVAS_W}
+          height={CANVAS_H}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            {organisms.map(org => (
+              <filter id={`glow-${org.id}`} x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            ))}
+            <filter id="glow-junction" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <!-- Tendrils from organisms to spores -->
+          {tendrils.map((t, i) => (
+            <path
+              class="tendril"
+              d={t.path}
+              stroke={t.color}
+              stroke-width="1.5"
+              fill="none"
+              opacity="0.4"
+              data-series={t.seriesId}
+              style={`--tendril-delay: ${i * 0.08}s`}
+            />
+          ))}
+
+          <!-- Junction tendrils -->
+          {junctionTendrils.map((t, i) => (
+            <path
+              class="tendril junction-tendril"
+              d={t.path}
+              stroke={t.color}
+              stroke-width="1"
+              fill="none"
+              opacity="0.25"
+              stroke-dasharray="4 4"
+              data-series={t.seriesId}
+              style={`--tendril-delay: ${(tendrils.length + i) * 0.08}s`}
+            />
+          ))}
+
+          <!-- Junction diamonds -->
+          {junctions.map((j) => (
+            <g
+              class="junction-group"
+              data-tag={j.tag}
+              data-series-ids={j.fromSeries.join(',')}
+            >
+              <rect
+                x={j.cx - j.size / 2}
+                y={j.cy - j.size / 2}
+                width={j.size}
+                height={j.size}
+                rx="2"
+                fill={j.color}
+                opacity="0.35"
+                transform={`rotate(45, ${j.cx}, ${j.cy})`}
+                filter="url(#glow-junction)"
+              />
+              <text
+                x={j.cx}
+                y={j.cy + j.size / 2 + 14}
+                text-anchor="middle"
+                fill={j.color}
+                font-size="9"
+                opacity="0.5"
+                font-family="var(--font-mono)"
+              >
+                {j.tag}
+              </text>
+            </g>
+          ))}
+        </svg>
+
+        <!-- Organism nodes (HTML overlays for richer interaction) -->
+        {organisms.map((org) => (
+          <a
+            href={`${base}series/${org.id}/`}
+            class:list={['organism', { 'organism--empty': org.isEmpty }]}
+            style={`left:${org.cx}px;top:${org.cy}px;--org-color:${org.color}`}
+            data-series={org.id}
+          >
+            <div class="organism-blob" />
+            <span class="organism-label">{org.name}</span>
+            {org.isEmpty && <span class="organism-soon">Coming soon</span>}
+          </a>
+        ))}
+
+        <!-- Spore nodes -->
+        {organisms.flatMap(org =>
+          org.experiments.map(exp => (
+            <a
+              href={exp.href}
+              class="spore-node"
+              style={`left:${exp.cx}px;top:${exp.cy}px;width:${exp.size}px;height:${exp.size}px;--spore-color:${org.color}`}
+              data-series={org.id}
+              data-tooltip-title={exp.title}
+              data-tooltip-body={`${exp.runCount} run${exp.runCount !== 1 ? 's' : ''}`}
+              data-tooltip-meta={exp.tags.join(', ')}
+              data-tooltip-color={org.color}
+            >
+              <span class="spore-inner" />
+            </a>
+          ))
+        )}
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="rhizome-legend">
+      {organisms.map(org => (
+        <button
+          class="legend-item"
+          data-series={org.id}
+          style={`--legend-color: ${org.color}`}
+        >
+          <span class="legend-dot" />
+          <span class="legend-label">{org.name}</span>
+          <span class="legend-count">
+            {org.experiments.length > 0
+              ? `${org.experiments.length}`
+              : '0'}
+          </span>
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <script id="rhizome-layout-data" type="application/json" set:html={layoutData} />
 </Base>
+
+<style>
+  /* --- Mobile fallback (< 768px) --- */
+  .rhizome-mobile {
+    display: block;
+  }
+  .rhizome-desktop {
+    display: none;
+  }
+
+  @media (min-width: 768px) {
+    .rhizome-mobile {
+      display: none;
+    }
+    .rhizome-desktop {
+      display: block;
+    }
+  }
+
+  .mobile-subtitle {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    max-width: 32rem;
+    font-size: 0.875rem;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .mobile-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--series-color);
+    border-radius: 6px;
+    background: var(--bg-card);
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .mobile-card:hover {
+    border-left-color: var(--series-color);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--series-color) 30%, transparent);
+  }
+
+  .mobile-card-dot {
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 5px;
+  }
+
+  .mobile-card-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+  }
+
+  .mobile-card-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0 0 0.5rem;
+    line-height: 1.4;
+  }
+
+  .mobile-card-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  /* --- Desktop rhizome --- */
+  .rhizome-header {
+    margin-bottom: 1rem;
+  }
+
+  .rhizome-subtitle {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    max-width: 40rem;
+  }
+
+  .rhizome-viewport {
+    position: relative;
+    width: 100%;
+    min-height: 80vh;
+    border-radius: 8px;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 40% 40%, #1a1e3a 0%, #0d1117 60%, #080b12 100%);
+    border: 1px solid var(--border);
+  }
+
+  .rhizome-world {
+    position: relative;
+    transform-origin: 0 0;
+  }
+
+  .rhizome-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+
+  /* --- Tendrils --- */
+  .tendril {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: tendril-grow 2s ease-out forwards;
+    animation-delay: var(--tendril-delay, 0s);
+  }
+
+  @keyframes tendril-grow {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* --- Organisms --- */
+  .organism {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
+    z-index: 3;
+    cursor: pointer;
+  }
+
+  .organism-blob {
+    width: 80px;
+    height: 80px;
+    background: var(--org-color);
+    opacity: 0.85;
+    border-radius: 50%;
+    clip-path: polygon(
+      50% 2%, 72% 8%, 92% 25%, 98% 50%,
+      93% 75%, 73% 93%, 50% 98%, 28% 92%,
+      8% 74%, 2% 50%, 7% 26%, 27% 8%
+    );
+    box-shadow: 0 0 30px color-mix(in srgb, var(--org-color) 60%, transparent),
+                0 0 60px color-mix(in srgb, var(--org-color) 30%, transparent);
+    animation: organism-pulse 3s ease-in-out infinite;
+    transition: transform 0.3s, opacity 0.3s;
+  }
+
+  .organism--empty .organism-blob {
+    width: 50px;
+    height: 50px;
+    opacity: 0.35;
+    animation-duration: 5s;
+  }
+
+  .organism:hover .organism-blob {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+
+  @keyframes organism-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 1;
+    }
+  }
+
+  .organism-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--org-color);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--org-color) 50%, transparent);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .organism-soon {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* --- Spore nodes --- */
+  .spore-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    z-index: 2;
+    cursor: pointer;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, filter 0.2s;
+  }
+
+  .spore-node:hover {
+    transform: translate(-50%, -50%) scale(1.3);
+    z-index: 4;
+  }
+
+  .spore-inner {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--spore-color) 90%, white), var(--spore-color));
+    opacity: 0.7;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--spore-color) 50%, transparent);
+    transition: opacity 0.2s, box-shadow 0.2s;
+  }
+
+  .spore-node:hover .spore-inner {
+    opacity: 1;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--spore-color) 70%, transparent);
+  }
+
+  /* --- Junction diamonds --- */
+  .junction-group {
+    transition: opacity 0.3s;
+  }
+
+  /* --- Legend --- */
+  .rhizome-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    justify-content: center;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+  }
+
+  .legend-item:hover,
+  .legend-item.active {
+    border-color: var(--legend-color);
+    color: var(--legend-color);
+    background: color-mix(in srgb, var(--legend-color) 8%, transparent);
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--legend-color);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--legend-color) 50%, transparent);
+  }
+
+  .legend-count {
+    opacity: 0.6;
+  }
+
+  /* --- Focus state: dim non-hovered series --- */
+  .rhizome-world.has-focus .organism:not(.focused) .organism-blob {
+    opacity: 0.15;
+  }
+  .rhizome-world.has-focus .organism:not(.focused) .organism-label {
+    opacity: 0.3;
+  }
+  .rhizome-world.has-focus .spore-node:not(.focused) .spore-inner {
+    opacity: 0.1;
+  }
+  .rhizome-world.has-focus .tendril:not(.focused) {
+    opacity: 0.05;
+  }
+  .rhizome-world.has-focus .junction-group:not(.focused) {
+    opacity: 0.1;
+  }
+</style>
+
+<script>
+  import { initPanZoom } from '../../lib/pan-zoom';
+  import { initTooltip } from '../../lib/graph-tooltip';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const viewport = document.getElementById('rhizome-viewport');
+    const world = document.getElementById('rhizome-world');
+    if (!viewport || !world) return;
+
+    // Init pan-zoom
+    const pz = initPanZoom(viewport, world, {
+      minScale: 0.4,
+      maxScale: 2.5,
+      hint: true,
+    });
+
+    // Init tooltips on spore nodes
+    initTooltip(viewport, '.spore-node');
+
+    // Focus+context on hover
+    const allOrganisms = world.querySelectorAll<HTMLElement>('.organism');
+    const allSpores = world.querySelectorAll<HTMLElement>('.spore-node');
+    const allTendrils = world.querySelectorAll<SVGPathElement>('.tendril');
+    const allJunctions = world.querySelectorAll<SVGGElement>('.junction-group');
+
+    function setFocus(seriesId: string | null) {
+      if (seriesId) {
+        world.classList.add('has-focus');
+        allOrganisms.forEach(el => el.classList.toggle('focused', el.dataset.series === seriesId));
+        allSpores.forEach(el => el.classList.toggle('focused', el.dataset.series === seriesId));
+        allTendrils.forEach(el => el.classList.toggle('focused', el.dataset.series === seriesId));
+        allJunctions.forEach(el => {
+          const ids = (el.dataset.seriesIds || '').split(',');
+          el.classList.toggle('focused', ids.includes(seriesId));
+        });
+      } else {
+        world.classList.remove('has-focus');
+        allOrganisms.forEach(el => el.classList.remove('focused'));
+        allSpores.forEach(el => el.classList.remove('focused'));
+        allTendrils.forEach(el => el.classList.remove('focused'));
+        allJunctions.forEach(el => el.classList.remove('focused'));
+      }
+    }
+
+    // Hover on organisms
+    allOrganisms.forEach(el => {
+      el.addEventListener('mouseenter', () => setFocus(el.dataset.series || null));
+      el.addEventListener('mouseleave', () => setFocus(null));
+    });
+
+    // Hover on spores
+    allSpores.forEach(el => {
+      el.addEventListener('mouseenter', () => setFocus(el.dataset.series || null));
+      el.addEventListener('mouseleave', () => setFocus(null));
+    });
+
+    // Legend hover
+    const legendItems = document.querySelectorAll<HTMLButtonElement>('.legend-item');
+    legendItems.forEach(btn => {
+      btn.addEventListener('mouseenter', () => setFocus(btn.dataset.series || null));
+      btn.addEventListener('mouseleave', () => setFocus(null));
+    });
+  });
+</script>
