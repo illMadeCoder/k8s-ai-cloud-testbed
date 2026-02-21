@@ -18,8 +18,8 @@ spec:
           command: [sh, -c]
           args:
             - |
-              echo "Waiting for all 10 naive-db variants..."
-              VARIANTS="naive-db-fsync-hdd naive-db-nosync-hdd naive-db-fsync-balanced naive-db-nosync-balanced naive-db-fsync-ssd naive-db-nosync-ssd naive-db-fsync-hyperdisk-balanced naive-db-nosync-hyperdisk-balanced naive-db-fsync-hyperdisk-extreme naive-db-nosync-hyperdisk-extreme"
+              echo "Waiting for all 8 naive-db variants..."
+              VARIANTS="naive-db-fsync-hdd naive-db-nosync-hdd naive-db-fsync-balanced naive-db-nosync-balanced naive-db-fsync-ssd naive-db-nosync-ssd naive-db-fsync-hyperdisk-balanced naive-db-nosync-hyperdisk-balanced"
               for i in $(seq 1 180); do
                 all_ready=1
                 status=""
@@ -48,7 +48,7 @@ spec:
             - |
               set -e
 
-              # All 10 variants: {fsync,nosync} × {hdd,balanced,ssd,hyperdisk-balanced,hyperdisk-extreme}
+              # All 8 variants: {fsync,nosync} × {hdd,balanced,ssd,hyperdisk-balanced}
               FSYNC_HDD="http://naive-db-fsync-hdd"
               NOSYNC_HDD="http://naive-db-nosync-hdd"
               FSYNC_BAL="http://naive-db-fsync-balanced"
@@ -57,11 +57,9 @@ spec:
               NOSYNC_SSD="http://naive-db-nosync-ssd"
               FSYNC_HDB="http://naive-db-fsync-hyperdisk-balanced"
               NOSYNC_HDB="http://naive-db-nosync-hyperdisk-balanced"
-              FSYNC_HDE="http://naive-db-fsync-hyperdisk-extreme"
-              NOSYNC_HDE="http://naive-db-nosync-hyperdisk-extreme"
 
-              ALL_URLS="$FSYNC_HDD $NOSYNC_HDD $FSYNC_BAL $NOSYNC_BAL $FSYNC_SSD $NOSYNC_SSD $FSYNC_HDB $NOSYNC_HDB $FSYNC_HDE $NOSYNC_HDE"
-              ALL_NAMES="fsync-hdd nosync-hdd fsync-balanced nosync-balanced fsync-ssd nosync-ssd fsync-hyperdisk-balanced nosync-hyperdisk-balanced fsync-hyperdisk-extreme nosync-hyperdisk-extreme"
+              ALL_URLS="$FSYNC_HDD $NOSYNC_HDD $FSYNC_BAL $NOSYNC_BAL $FSYNC_SSD $NOSYNC_SSD $FSYNC_HDB $NOSYNC_HDB"
+              ALL_NAMES="fsync-hdd nosync-hdd fsync-balanced nosync-balanced fsync-ssd nosync-ssd fsync-hyperdisk-balanced nosync-hyperdisk-balanced"
 
               # ============================================================
               # Phase 1: Sustained high-throughput writes (60s per variant)
