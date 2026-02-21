@@ -51,7 +51,7 @@ spec:
         args:
           - |
             echo "=== Waiting for ArgoCD to sync 8 naive-db variants + loadgen ==="
-            echo "8 StatefulSets with 64Gi PVCs across 4 StorageClasses + kube-prometheus-stack"
+            echo "8 StatefulSets with 1Gi/10Gi PVCs across 4 StorageClasses + kube-prometheus-stack"
             echo "Hyperdisk Balanced PVC provisioning may take extra time..."
             for i in $(seq 1 40); do
               echo "Wait $i/40 (30s intervals = 20 min)..."

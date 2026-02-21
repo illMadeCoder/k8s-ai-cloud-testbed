@@ -20,8 +20,32 @@ Read `experiments/{name}/experiment.yaml` and extract these key fields for use t
 - `spec.workflow.template` — the WorkflowTemplate name
 - `spec.workflow.completion.mode` — `workflow` or `manual`
 - `spec.targets[*].name` — target names (e.g., `app`, `loadgen`)
+- `spec.title` — experiment title
+- `spec.description` — what it does and why
+- `spec.hypothesis.claim` — the testable claim
+- `spec.hypothesis.questions` — what it should answer
+- `spec.series` — which research series it belongs to
+- `spec.targets[*].cluster.machineType` — machine types in use
+- `spec.metrics[*].group` — distinct metric groups (e.g., hdd, balanced, ssd, hdb)
 
 Store these in your working memory — you'll reference them in every subsequent step.
+
+### Intent summary
+
+After extraction, output a brief intent summary that captures what this experiment is trying to prove and what differentiates it from prior work:
+
+```
+Intent:
+  Series: {series name} (#{position in series, if known})
+  Claim: "{hypothesis claim, first sentence}"
+  Metric groups: {list of distinct groups from spec.metrics[*].group}
+  Differentiator: {groups that are NEW vs prior series experiments} — see below
+  Machine: {machineType} (preemptible: {true/false})
+```
+
+**Identifying the differentiator:** For experiments in a series, check which metric groups are new by scanning `site/data/{series-prefix}*.json` for previously published metric names. Any group whose metrics do NOT appear in prior results is the differentiating group — the reason this experiment exists beyond what's already been measured. If no series or no prior data, treat all groups as differentiating.
+
+This intent summary is used by the quality gate in Step 5.5 to ensure the experiment's raison d'etre was actually captured.
 
 ### Iteration tracking
 
@@ -300,6 +324,19 @@ Run all of these checks and track their results (PASS/WARN/FAIL):
 - If any metric would render as "0.00" for a non-zero value → WARN
 - If unit is missing on a metric that should have one → WARN
 
+**Check 6: Intent Coverage**
+- Using the intent fields from Step 1, identify the experiment's differentiating metric groups
+  (groups that are new relative to prior series experiments, or if no series, all groups)
+- For each differentiating group, check if ANY metric in that group has non-null data
+  in `summary.metrics.queries`
+- Report: "Intent coverage: X/Y differentiating groups have data"
+  - list each differentiating group and its status (e.g., "hdb: 0/7 metrics", "ssd: 5/5 metrics")
+- If ANY differentiating group has ZERO metrics with data → FAIL
+  ("Experiment's differentiating data missing — {group} has no results.
+   This means the experiment reproduced prior results without adding new signal.")
+- If all differentiating groups have at least partial data → PASS
+- If no differentiating groups identified (no series, no groups defined) → N/A
+
 ### Quality Scorecard
 
 Report the results as a scorecard:
@@ -311,6 +348,8 @@ Results Quality:
   [FAIL] Workload pods: 0 visible in cadvisor
   [N/A]  Machine verdict: no success criteria defined
   [PASS] Presentation: 10/10 metrics render correctly
+  [FAIL] Intent coverage: 0/1 differentiating groups (hdb: 0/7 metrics)
+         "Experiment reproduced db-dsc results without Hyperdisk data"
 ```
 
 Determine the overall quality gate status:
@@ -498,7 +537,23 @@ Report the quality scorecard with all warnings. Proceed to Step 7 but include th
    | Missing load generation | `add-load-test` | Add load-test step to workflow template (if no `k8s/loadgen.yaml` exists) |
    | Missing `unit` field on latency metrics | `add-metric-units` | Add `unit: seconds` to metrics ending in `_latency`, `_p50`, `_p99` in experiment.yaml |
 
+   **If intent coverage fails (differentiating group has no data):**
+   - Identify which components/resources correspond to the missing group
+     (e.g., hdb group → naive-db-*-hyperdisk-balanced pods → StorageClass bench-hyperdisk-balanced)
+   - Check if the issue is infrastructure incompatibility:
+     - For storage experiments: check if the machine type supports the StorageClass disk type
+       (Hyperdisk requires C3, C4, N4, A3, M3, M4 — not E2 or N2)
+     - Check PVC status on the target (if still running): `kubectl get pvc -n {experiment}`
+     - Check events for provisioning failures
+   - Report root cause: e.g., "n2-standard-8 does not support Hyperdisk Balanced volumes.
+     Compatible families: C3, C4, N4, A3, M3, M4."
+   - This is NOT auto-fixable (machine type change requires re-provisioning the cluster).
+     Escalate to user immediately — do not auto-fix with skip logic.
+
    **Not auto-fixable** (escalate to user):
+   - Intent coverage failure (differentiating data missing) — likely infrastructure mismatch,
+     requires experiment YAML change + full re-run. Do NOT make the workload "skip" missing
+     variants — that masks the root cause and produces duplicate results.
    - AI verdict `insufficient` but custom metrics are present — may be a data timing issue
    - Root cause not identified by the diagnostics above
 

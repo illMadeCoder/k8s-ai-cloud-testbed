@@ -46,9 +46,12 @@ Ask about target setup:
 - `Custom` — Let user specify target names
 
 **Machine type for main target:**
-- `e2-standard-2` — Lightweight (loadgen, simple demos)
-- `e2-standard-4` — Default (most experiments)
+- `e2-standard-4` — Default (most experiments, cost-effective)
 - `e2-standard-8` — Heavy compute (large observability stacks)
+- `c3-standard-4` — Compute-optimized (supports Hyperdisk)
+- `c3-standard-8` — Heavy compute + Hyperdisk support
+- `n4-standard-4` — Latest gen (supports Hyperdisk, best price-performance)
+- `Custom` — Let user specify any valid GKE machine type
 
 All targets default to `preemptible: true` and observability enabled with `transport: tailscale`.
 
@@ -318,6 +321,17 @@ After the experiment-validator passes, run these additional checks:
 3. **Query variable check:** If any queries use `$NAMESPACE`, warn and suggest replacing with `$EXPERIMENT`:
    - `grep '$NAMESPACE' experiments/{name}/experiment.yaml`
    - "$NAMESPACE resolves to the Experiment CR namespace ('experiments'), not the target namespace. Use $EXPERIMENT instead."
+
+4. **Infrastructure compatibility:** Check that the chosen machine type supports
+   all StorageClasses referenced by the experiment's components:
+   - Scan component `k8s/` manifests for `storageClassName:` references
+   - If any StorageClass uses `hyperdisk-balanced`, `hyperdisk-extreme`,
+     or `hyperdisk-throughput` in the name:
+     - Check machine type family: E2 and N2 do NOT support Hyperdisk
+     - Compatible families: C3, C4, N4, A3, M3, M4
+     - If incompatible, FAIL: "Machine type {type} does not support Hyperdisk.
+       Use C3, C4, or N4 family instead."
+   - If no Hyperdisk storage referenced → PASS
 
 ## Step 6: Generate WorkflowTemplate
 

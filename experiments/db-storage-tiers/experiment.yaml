@@ -5,7 +5,7 @@ metadata:
   namespace: experiments
 spec:
   title: "GKE Storage Tier Showdown: 4 Disk Types from HDD to Hyperdisk Balanced"
-  description: "Comparison: fsync-per-write vs no-fsync across four GKE persistent disk types (pd-standard, pd-balanced, pd-ssd, hyperdisk-balanced) on n2-standard-8 — measures how disk tier interacts with durability guarantees under sustained 60-second maximum-rate write bursts"
+  description: "Comparison: fsync-per-write vs no-fsync across four GKE persistent disk types (pd-standard, pd-balanced, pd-ssd, hyperdisk-balanced) on c3-standard-8 — measures how disk tier interacts with durability guarantees under sustained 60-second maximum-rate write bursts"
   tags: ["comparison", "storage", "database", "baseline"]
   series: cloud-database-internals
   publish: true
@@ -62,7 +62,7 @@ spec:
     - name: app
       cluster:
         type: gke
-        machineType: n2-standard-8
+        machineType: c3-standard-8
         preemptible: true
       components:
         - app: naive-db-storage-bench
