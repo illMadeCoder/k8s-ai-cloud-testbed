@@ -401,11 +401,28 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     <div id="hero-modal" class="hero-modal" role="dialog" aria-label="Welcome to Cloud Testbed">
       <div class="hero-modal-grid">
         <div class="hero-modal-intro">
-          <h1 class="hero-modal-title">Cloud Testbed</h1>
-          <p class="hero-modal-desc">
+          <h1 class="hero-modal-title">
+            <svg class="hero-modal-logo" viewBox="0 0 44 52" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="44" height="52" rx="4" fill="currentColor" opacity="0.25" />
+              <rect x="4" y="4" width="36" height="12" rx="2" fill="currentColor" />
+              <circle cx="34" cy="10" r="2.5" fill="var(--bg)" opacity="0.8" />
+              <rect x="8" y="8" width="14" height="4" rx="1" fill="var(--bg)" opacity="0.35" />
+              <rect x="4" y="20" width="36" height="12" rx="2" fill="currentColor" />
+              <circle cx="34" cy="26" r="2.5" fill="var(--bg)" opacity="0.8" />
+              <rect x="8" y="24" width="14" height="4" rx="1" fill="var(--bg)" opacity="0.35" />
+              <rect x="4" y="36" width="36" height="12" rx="2" fill="currentColor" />
+              <circle cx="34" cy="42" r="2.5" fill="var(--bg)" opacity="0.8" />
+              <rect x="8" y="40" width="14" height="4" rx="1" fill="var(--bg)" opacity="0.35" />
+            </svg>
+            Cloud Testbed UI
+          </h1>
+          <p class="hero-modal-desc hero-modal-desc--full">
             A custom Kubernetes operator provisions production cloud clusters, deploys competing
             technology stacks, runs standardized workloads, and publishes AI-analyzed
             results. All automated, all reproducible.
+          </p>
+          <p class="hero-modal-desc hero-modal-desc--short">
+            GitOps experiment in the cloud.
           </p>
           <div class="hero-modal-badges">
             <span class="hero-badge">Talos</span>
@@ -2528,6 +2545,16 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     color: var(--text);
     margin: 0 0 0.75rem;
     letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .hero-modal-logo {
+    width: 1.5em;
+    height: 1.5em;
+    flex-shrink: 0;
+    color: var(--accent);
   }
 
   .hero-modal-desc {
@@ -2537,6 +2564,8 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     line-height: 1.6;
     margin: 0 0 1rem;
   }
+
+  .hero-modal-desc--short { display: none; }
 
   .hero-modal-badges {
     display: flex;
@@ -2718,7 +2747,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
   .hero-modal-arch .arch-here .arch-name { color: var(--accent); font-size: 0.8rem; }
   .hero-modal-arch .arch-here .arch-icon { color: var(--accent); }
 
-  /* --- Mobile: single column, show arch below intro --- */
+  /* --- Mobile: interleave arch between desc and badges --- */
   @media (max-width: 767px) {
     .hero-modal {
       padding: 1.5rem;
@@ -2728,13 +2757,22 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     }
 
     .hero-modal-grid {
-      grid-template-columns: 1fr;
-      gap: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
     }
 
-    .hero-modal-title {
-      font-size: 1.5rem;
-    }
+    /* Flatten both columns so children participate in the flex order */
+    .hero-modal-intro { display: contents; }
+
+    .hero-modal-title { font-size: 1.5rem; order: 1; }
+    .hero-modal-desc { order: 2; }
+    .hero-modal-desc--full { display: none; }
+    .hero-modal-desc--short { display: block; }
+    .hero-modal-arch { order: 3; margin: 1rem 0; }
+    .hero-modal-badges { display: none; }
+    .hero-modal-repo { order: 5; }
+    .hero-modal-cta { order: 6; }
 
     /* Tighten arch diagram for narrow screens */
     .hero-modal-arch .arch-name { font-size: 0.8rem; }
@@ -3047,6 +3085,8 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       heroBackdrop.classList.add('visible');
       heroModalOpen = true;
       heroDismiss?.focus();
+      const cp = document.querySelector<HTMLElement>('.conv-panel');
+      if (cp) cp.style.display = 'none';
     }
 
     function hideHeroModal() {
@@ -3054,6 +3094,8 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       heroBackdrop.classList.remove('visible');
       heroModalOpen = false;
       sessionStorage.setItem('hero-seen', '1');
+      const cp = document.querySelector<HTMLElement>('.conv-panel');
+      if (cp) cp.style.display = '';
       setTimeout(() => {
         if (!heroModalOpen) heroBackdrop.style.display = 'none';
       }, 250);
