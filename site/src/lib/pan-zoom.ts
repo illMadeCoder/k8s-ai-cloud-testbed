@@ -67,25 +67,36 @@ export function initPanZoom(
     }
   }
 
-  // --- Mouse drag ---
+  // --- Mouse/touch drag ---
+  const DRAG_THRESHOLD = 5; // px — movement below this is a tap, not a drag
+  let dragConfirmed = false;
+
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (target.closest('a, button, [data-no-pan]')) return;
     isDragging = true;
+    dragConfirmed = false;
     startX = e.clientX;
     startY = e.clientY;
     startPanX = state.x;
     startPanY = state.y;
-    viewport.style.cursor = 'grabbing';
-    viewport.setPointerCapture(e.pointerId);
     dismissHint();
   }
 
   function onPointerMove(e: PointerEvent) {
     if (!isDragging || activeTouches >= 2) return;
-    state.x = startPanX + (e.clientX - startX);
-    state.y = startPanY + (e.clientY - startY);
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!dragConfirmed) {
+      if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+      // Passed threshold — commit to drag and capture pointer
+      dragConfirmed = true;
+      viewport.style.cursor = 'grabbing';
+      viewport.setPointerCapture(e.pointerId);
+    }
+    state.x = startPanX + dx;
+    state.y = startPanY + dy;
     applyTransform();
   }
 
@@ -93,7 +104,10 @@ export function initPanZoom(
     if (!isDragging) return;
     isDragging = false;
     viewport.style.cursor = 'grab';
-    viewport.releasePointerCapture(e.pointerId);
+    if (dragConfirmed) {
+      viewport.releasePointerCapture(e.pointerId);
+    }
+    dragConfirmed = false;
   }
 
   // --- Scroll-wheel zoom toward cursor ---
