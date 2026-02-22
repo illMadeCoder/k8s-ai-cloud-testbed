@@ -36,6 +36,7 @@ export function initPanZoom(
 
   // Touch pinch state
   let lastPinchDist = 0;
+  let activeTouches = 0;
 
   function applyTransform() {
     world.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
@@ -82,7 +83,7 @@ export function initPanZoom(
   }
 
   function onPointerMove(e: PointerEvent) {
-    if (!isDragging) return;
+    if (!isDragging || activeTouches >= 2) return;
     state.x = startPanX + (e.clientX - startX);
     state.y = startPanY + (e.clientY - startY);
     applyTransform();
@@ -123,7 +124,10 @@ export function initPanZoom(
   }
 
   function onTouchStart(e: TouchEvent) {
-    if (e.touches.length === 2) {
+    activeTouches = e.touches.length;
+    if (activeTouches >= 2) {
+      // Stop any in-progress pan so pinch doesn't also drag
+      isDragging = false;
       lastPinchDist = pinchDist(e);
       dismissHint();
     }
@@ -152,6 +156,10 @@ export function initPanZoom(
     }
   }
 
+  function onTouchEnd(e: TouchEvent) {
+    activeTouches = e.touches.length;
+  }
+
   // Set initial cursor and transform
   viewport.style.cursor = 'grab';
   viewport.style.overflow = 'hidden';
@@ -166,6 +174,8 @@ export function initPanZoom(
   viewport.addEventListener('wheel', onWheel, { passive: false });
   viewport.addEventListener('touchstart', onTouchStart, { passive: true });
   viewport.addEventListener('touchmove', onTouchMove, { passive: false });
+  viewport.addEventListener('touchend', onTouchEnd, { passive: true });
+  viewport.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
   function cleanup() {
     viewport.removeEventListener('pointerdown', onPointerDown);
@@ -175,6 +185,8 @@ export function initPanZoom(
     viewport.removeEventListener('wheel', onWheel);
     viewport.removeEventListener('touchstart', onTouchStart);
     viewport.removeEventListener('touchmove', onTouchMove);
+    viewport.removeEventListener('touchend', onTouchEnd);
+    viewport.removeEventListener('touchcancel', onTouchEnd);
     hintEl?.remove();
   }
 
