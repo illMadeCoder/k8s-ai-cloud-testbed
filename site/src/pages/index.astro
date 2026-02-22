@@ -13,6 +13,14 @@ const allGroups = groupExperiments(experiments);
 const tags = getAllTags(experiments);
 const base = import.meta.env.BASE_URL;
 
+function getVerdict(group: ExperimentGroup) {
+  if (group.tags.includes('tutorial')) {
+    return { text: 'Tutorial', cls: 'verdict-tutorial' };
+  }
+  const v = group.latest.analysis?.hypothesisVerdict || group.latest.phase || '';
+  return { text: v, cls: 'verdict-' + v.toLowerCase().replace(/\s+/g, '-') };
+}
+
 // --- Catalog tree data (from zettel-index) ---
 interface SeriesEntry {
   series: Series;
@@ -572,6 +580,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
                     data-base-name={group.baseName}
                   >
                     <span class="tree-branch" style={`color: ${series.color || 'var(--text-muted)'}`}>{branch}</span>
+                    {getVerdict(group).text && <span class={`tree-verdict ${getVerdict(group).cls}`}>{getVerdict(group).text}</span>}
                     <span class="tree-exp-name">{title}</span>
                     <span class="tree-runs">{group.latest.createdAt ? formatDate(group.latest.createdAt) : ''}</span>
                   </a>
@@ -599,6 +608,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
                   data-base-name={group.baseName}
                 >
                   <span class="tree-branch" style="color: var(--text-muted)">{branch}</span>
+                  {getVerdict(group).text && <span class={`tree-verdict ${getVerdict(group).cls}`}>{getVerdict(group).text}</span>}
                   <span class="tree-exp-name">{title}</span>
                   <span class="tree-runs">{group.latest.createdAt ? formatDate(group.latest.createdAt) : ''}</span>
                 </a>
@@ -653,6 +663,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
                     data-base-name={group.baseName}
                   >
                     <span class="tree-branch" style={`color: ${series.color || 'var(--text-muted)'}`}>{branch}</span>
+                    {getVerdict(group).text && <span class={`tree-verdict ${getVerdict(group).cls}`}>{getVerdict(group).text}</span>}
                     <span class="tree-exp-name">{title}</span>
                     <span class="tree-runs">{group.latest.createdAt ? formatDate(group.latest.createdAt) : ''}</span>
                   </a>
@@ -681,6 +692,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
                   data-base-name={group.baseName}
                 >
                   <span class="tree-branch" style="color: var(--text-muted)">{branch}</span>
+                  {getVerdict(group).text && <span class={`tree-verdict ${getVerdict(group).cls}`}>{getVerdict(group).text}</span>}
                   <span class="tree-exp-name">{title}</span>
                   <span class="tree-runs">{group.latest.createdAt ? formatDate(group.latest.createdAt) : ''}</span>
                 </a>
@@ -1521,6 +1533,18 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     border-left: 2px solid transparent;
   }
 
+  .tree-verdict {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.05rem 0.3rem;
+    border-radius: 2px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+
   a.tree-row:hover {
     background: color-mix(in srgb, var(--accent) 10%, transparent);
     color: var(--text);
@@ -1916,7 +1940,6 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     display: none;
     width: 340px;
     padding: 0.75rem 1rem;
-    overflow: hidden;
     background: rgba(13, 17, 23, 0.88);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -1931,6 +1954,8 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     opacity: 0;
     transition: opacity 0.15s ease;
     pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
   }
 
   .experiment-card.visible {
@@ -1966,6 +1991,11 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
   :global(.verdict-insufficient) {
     color: #d29922;
     background: rgba(210, 153, 34, 0.1);
+  }
+
+  :global(.verdict-tutorial) {
+    color: #34d399;
+    background: rgba(52, 211, 153, 0.1);
   }
 
   :global(.verdict-complete),
@@ -2018,22 +2048,6 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     color: var(--text-muted);
     line-height: 1.4;
     margin: 0 0 0.4rem;
-    max-height: 8em;
-    overflow-y: auto;
-    scroll-behavior: smooth;
-  }
-
-  .card-desc::-webkit-scrollbar {
-    width: 3px;
-  }
-
-  .card-desc::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .card-desc::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
-    border-radius: 3px;
   }
 
   .card-tags {
@@ -2084,6 +2098,8 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     opacity: 0;
     transition: opacity 0.15s ease;
     pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
   }
 
   .series-card.visible {
@@ -2930,7 +2946,8 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     function buildExpandCard(data: SporeData): HTMLElement {
       const wrap = document.createElement('div');
       wrap.className = 'tree-expand';
-      const expandVerdict = data.verdict || data.phase || 'Unknown';
+      const expandIsTutorial = data.tags.includes('tutorial');
+      const expandVerdict = expandIsTutorial ? 'Tutorial' : (data.verdict || data.phase || 'Unknown');
       const verdictClass = 'verdict-' + expandVerdict.toLowerCase().replace(/\s+/g, '-');
       wrap.innerHTML = `<div class="tree-expand-card" style="--expand-color:${data.seriesColor}">
         <div class="card-header">
@@ -3312,7 +3329,8 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       selectedSeriesId = null;
 
       // Populate content
-      const verdict = data.verdict || data.phase || 'Unknown';
+      const isTutorial = data.tags.includes('tutorial');
+      const verdict = isTutorial ? 'Tutorial' : (data.verdict || data.phase || 'Unknown');
       cardPhase.textContent = verdict;
       cardPhase.className = 'card-phase verdict-' + verdict.toLowerCase().replace(/\s+/g, '-');
       cardRuns.textContent = `${data.runCount} run${data.runCount !== 1 ? 's' : ''}`;
@@ -3373,7 +3391,9 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       const gap = 16;
       const orgR = 40 * st.scale; // organism visual radius
       const paneW = paneRect.width;
-      const visibleH = vpRect.bottom - paneRect.top;
+      const toolbarEl = document.querySelector<HTMLElement>('.conv-panel');
+      const toolbarH = toolbarEl ? toolbarEl.getBoundingClientRect().height : 0;
+      const visibleH = vpRect.bottom - paneRect.top - toolbarH;
 
       // Organism bounding box in pane coords
       const orgL = orgLeft - orgR;
@@ -3476,6 +3496,43 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         if (!seriesCardVisible) scard.style.display = 'none';
       }, 200);
     }
+
+    // --- Drag cards ---
+    function makeDraggable(el: HTMLElement) {
+      let dragging = false;
+      let dragStartX = 0, dragStartY = 0;
+      let cardStartX = 0, cardStartY = 0;
+
+      el.addEventListener('pointerdown', (e: PointerEvent) => {
+        if ((e.target as HTMLElement).closest('a')) return;
+        dragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        cardStartX = el.offsetLeft;
+        cardStartY = el.offsetTop;
+        el.setPointerCapture(e.pointerId);
+        el.style.cursor = 'grabbing';
+        e.preventDefault();
+      });
+
+      el.addEventListener('pointermove', (e: PointerEvent) => {
+        if (!dragging) return;
+        el.style.left = `${cardStartX + e.clientX - dragStartX}px`;
+        el.style.top = `${cardStartY + e.clientY - dragStartY}px`;
+      });
+
+      el.addEventListener('pointerup', () => {
+        dragging = false;
+        el.style.cursor = '';
+      });
+
+      el.addEventListener('pointercancel', () => {
+        dragging = false;
+        el.style.cursor = '';
+      });
+    }
+    makeDraggable(card);
+    makeDraggable(scard);
 
     // --- Helpers ---
 
@@ -3610,14 +3667,14 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         maxY = Math.max(maxY, exp.cy + exp.size);
       }
 
-      const pad = 60;
+      const pad = 120;
       minX -= pad; maxX += pad; minY -= pad; maxY += pad;
 
       const bboxW = maxX - minX;
       const bboxH = maxY - minY;
       const vpRect = viewport.getBoundingClientRect();
 
-      const fitScale = Math.min(vpRect.width / bboxW, vpRect.height / bboxH, 2.5);
+      const fitScale = Math.min(vpRect.width / bboxW, vpRect.height / bboxH, 1.8);
       const centerX = (minX + maxX) / 2;
       const centerY = (minY + maxY) / 2;
 
