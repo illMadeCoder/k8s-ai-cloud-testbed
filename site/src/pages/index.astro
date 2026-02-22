@@ -2851,15 +2851,9 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
                       scale: focusScale,
                     }, false);
                     if (pzState.selectSpore) pzState.selectSpore(mobileSelectedBaseName!);
-                  } else if (selectedSeries) {
-                    // Zoom to selected series organism + show series card
-                    const focusScale = 1.2;
-                    pzState.pz.setState({
-                      x: vpRect.width / 2 - selectedSeries.cx * focusScale,
-                      y: vpRect.height / 2 - selectedSeries.cy * focusScale,
-                      scale: focusScale,
-                    }, false);
-                    if (pzState.selectSeries) pzState.selectSeries(mobileSelectedSeriesId!);
+                  } else if (selectedSeries && pzState.selectSeries) {
+                    // Zoom to fit full series (organism + experiments), same as clicking a tendril
+                    pzState.selectSeries(mobileSelectedSeriesId!);
                   } else {
                     // No selection — show full graph overview
                     pzState.pz.setState({
@@ -3639,11 +3633,10 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     };
 
     pzState.selectSeries = (seriesId: string) => {
-      clearAllSync();
-      highlightSeries(seriesId);
-      focusedSeriesId = seriesId;
+      zoomToSeries(seriesId);
       selectedSeriesId = seriesId;
-      showSeriesCard(seriesId);
+      const fit = computeSeriesFit(seriesId);
+      showSeriesCard(seriesId, fit);
     };
 
     // --- Catalog hover/click events ---
