@@ -3325,24 +3325,45 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       const cardW = scard.offsetWidth || 280;
       const cardH = scard.offsetHeight || 280;
       const gap = 16;
+      const orgR = 40 * st.scale; // organism visual radius
       const paneW = paneRect.width;
       const visibleH = vpRect.bottom - paneRect.top;
 
-      const minLeft = 8;
-      const maxTop = visibleH - cardH - 8;
+      // Organism bounding box in pane coords
+      const orgL = orgLeft - orgR;
+      const orgRight = orgLeft + orgR;
+      const orgT = orgTop - orgR;
+      const orgB = orgTop + orgR;
 
-      // Default: card to the right of organism
-      let left = orgLeft + 40 * st.scale + gap;
-      let top = orgTop - cardH / 2;
+      let left: number;
+      let top: number;
 
-      // Flip left if near right edge
-      if (left + cardW > paneW - 16) {
-        left = orgLeft - 40 * st.scale - gap - cardW;
+      // Try right of organism
+      left = orgRight + gap;
+      top = orgTop - cardH / 2;
+      if (left + cardW > paneW - 8) {
+        // Try left of organism
+        left = orgL - gap - cardW;
+      }
+      // Check if horizontal placement overlaps (card got clamped onto the organism)
+      if (left < 8) left = 8;
+      const cardRight = left + cardW;
+      const horizontalOverlap = left < orgRight + gap && cardRight > orgL - gap;
+
+      if (horizontalOverlap) {
+        // Place below or above organism instead
+        left = Math.max(8, Math.min(orgLeft - cardW / 2, paneW - cardW - 8));
+        // Prefer below
+        top = orgB + gap;
+        if (top + cardH > visibleH - 8) {
+          // Place above
+          top = orgT - gap - cardH;
+        }
       }
 
-      // Clamp within visible bounds
-      left = Math.max(minLeft, Math.min(left, paneW - cardW - 8));
-      top = Math.max(8, Math.min(top, maxTop));
+      // Final clamp
+      left = Math.max(8, Math.min(left, paneW - cardW - 8));
+      top = Math.max(8, Math.min(top, visibleH - cardH - 8));
 
       scard.style.left = `${Math.round(left)}px`;
       scard.style.top = `${Math.round(top)}px`;
