@@ -3839,11 +3839,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         const seriesId = org.dataset.series;
         if (!seriesId) return;
 
-        if (selectedSeriesId === seriesId) {
-          // Second click: navigate to series page
-          window.location.href = layout.base + 'series/' + seriesId + '/';
-          return;
-        }
+        if (selectedSeriesId === seriesId) return;
 
         zoomToSeries(seriesId);
         selectedSeriesId = seriesId;
