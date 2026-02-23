@@ -1038,6 +1038,28 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       </div>
     </div>
   </div>
+
+  <!-- Architecture diagram modal (full-screen, above experiment overlay) -->
+  <div id="arch-modal" class="arch-modal" aria-hidden="true">
+    <div class="arch-modal-backdrop"></div>
+    <div class="arch-modal-panel">
+      <div class="arch-modal-header">
+        <button id="arch-modal-close">&larr; Back</button>
+        <div class="arch-modal-toolbar">
+          <button class="arch-zoom-btn" data-action="zoom-out" title="Zoom out">&minus;</button>
+          <span class="arch-zoom-label">100%</span>
+          <button class="arch-zoom-btn" data-action="zoom-in" title="Zoom in">+</button>
+          <button class="arch-zoom-btn" data-action="zoom-fit" title="Fit to width">Fit</button>
+        </div>
+      </div>
+      <div class="arch-modal-scroll">
+        <div class="arch-modal-area">
+          <div id="arch-modal-render"></div>
+        </div>
+      </div>
+      <p id="arch-modal-caption" class="arch-modal-caption"></p>
+    </div>
+  </div>
 </Base>
 
 <style>
@@ -3025,6 +3047,163 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       padding: 1rem 0.75rem 3rem;
     }
   }
+
+  /* ========== ARCHITECTURE DIAGRAM MODAL ========== */
+  .arch-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+    pointer-events: none;
+  }
+
+  .arch-modal.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .arch-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .arch-modal-panel {
+    position: relative;
+    z-index: 1;
+    width: min(1200px, 96vw);
+    height: 94vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transform: scale(0.95);
+    transition: transform 0.25s ease;
+  }
+
+  .arch-modal.visible .arch-modal-panel {
+    transform: scale(1);
+  }
+
+  .arch-modal-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .arch-modal-header button,
+  .arch-zoom-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    padding: 0.35rem 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .arch-modal-header button:hover,
+  .arch-zoom-btn:hover {
+    background: var(--bg-card);
+    border-color: var(--text-muted);
+  }
+
+  .arch-modal-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .arch-zoom-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.6rem;
+    height: 1.6rem;
+    padding: 0 0.4rem;
+    font-size: 0.7rem;
+    line-height: 1;
+  }
+
+  .arch-zoom-label {
+    min-width: 2.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .arch-modal-scroll {
+    flex: 1 1 auto;
+    overflow: auto;
+    padding: 1.25rem;
+  }
+
+  .arch-modal-area {
+    margin: 0 auto;
+  }
+
+  .arch-modal-caption {
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    font-family: var(--font-mono);
+    margin: 0;
+    padding: 0.5rem 1.25rem 0.75rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+  }
+
+  .arch-modal-caption:empty {
+    display: none;
+  }
+
+  /* "View Architecture" button in overlay */
+  :global(.arch-open-btn) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 8px);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+
+  :global(.arch-open-btn:hover) {
+    background: var(--bg-surface);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  :global(.arch-open-btn svg) {
+    opacity: 0.7;
+    flex-shrink: 0;
+  }
 </style>
 
 <script>
@@ -4747,7 +4926,203 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
 
       // Fire mermaid:ready in case mermaid diagrams are waiting for it
       window.dispatchEvent(new CustomEvent('mermaid:ready'));
+
+      // Replace mermaid diagrams with "View Architecture" buttons in overlay
+      const mermaidWrappers = overlayContent.querySelectorAll<HTMLElement>('.mermaid-wrapper[data-mermaid-source]');
+      mermaidWrappers.forEach(wrapper => {
+        const source = wrapper.dataset.mermaidSource || '';
+        const caption = wrapper.querySelector('.mermaid-caption')?.textContent || '';
+        const btn = document.createElement('button');
+        btn.className = 'arch-open-btn';
+        btn.dataset.mermaidSource = source;
+        btn.dataset.mermaidCaption = caption;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h6"/><path d="M3 15h6"/></svg> View Architecture`;
+        wrapper.replaceWith(btn);
+      });
     }
+
+    // Delegated click handler for "View Architecture" buttons
+    overlayContent.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('.arch-open-btn');
+      if (!btn) return;
+      openArchModal(btn.dataset.mermaidSource || '', btn.dataset.mermaidCaption || '');
+    });
+
+    // --- Architecture diagram full-screen modal ---
+    const archModal = document.getElementById('arch-modal')!;
+    const archModalClose = document.getElementById('arch-modal-close')!;
+    const archModalBackdrop = archModal.querySelector('.arch-modal-backdrop')!;
+    const archModalRender = document.getElementById('arch-modal-render')!;
+    const archModalCaption = document.getElementById('arch-modal-caption')!;
+    const archModalScroll = archModal.querySelector('.arch-modal-scroll') as HTMLElement;
+    const archModalArea = archModal.querySelector('.arch-modal-area') as HTMLElement;
+    const archZoomLabel = archModal.querySelector('.arch-zoom-label') as HTMLElement;
+    let archModalOpen = false;
+
+    const ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+
+    async function openArchModal(source: string, caption: string) {
+      if (archModalOpen) return;
+      archModalOpen = true;
+
+      archModalCaption.textContent = caption;
+      archModalRender.innerHTML = '<div style="padding:2rem;color:var(--text-muted);text-align:center">Rendering diagram...</div>';
+      archModal.setAttribute('aria-hidden', 'false');
+      archModal.classList.add('visible');
+
+      // Ensure mermaid is loaded
+      if (typeof (window as any).mermaidLib === 'undefined') {
+        const mod = await import('mermaid');
+        (window as any).mermaidLib = mod.default;
+        (window as any).__mermaidInitialized = false;
+      }
+
+      const mermaidLib = (window as any).mermaidLib;
+
+      // Initialize mermaid with theme if needed
+      if (!(window as any).__mermaidInitialized) {
+        const style = getComputedStyle(document.documentElement);
+        mermaidLib.initialize({
+          startOnLoad: false,
+          theme: 'base',
+          themeVariables: {
+            darkMode: true,
+            background: style.getPropertyValue('--bg').trim(),
+            primaryColor: style.getPropertyValue('--bg').trim(),
+            primaryTextColor: style.getPropertyValue('--text').trim(),
+            primaryBorderColor: style.getPropertyValue('--accent').trim(),
+            secondaryColor: style.getPropertyValue('--bg-card').trim(),
+            secondaryBorderColor: style.getPropertyValue('--accent').trim(),
+            secondaryTextColor: style.getPropertyValue('--text').trim(),
+            tertiaryColor: style.getPropertyValue('--bg').trim(),
+            tertiaryBorderColor: style.getPropertyValue('--text-muted').trim(),
+            tertiaryTextColor: style.getPropertyValue('--text').trim(),
+            lineColor: style.getPropertyValue('--text-muted').trim(),
+            nodeTextColor: style.getPropertyValue('--text').trim(),
+            clusterBkg: style.getPropertyValue('--bg-card').trim(),
+            clusterBorder: style.getPropertyValue('--accent').trim(),
+            edgeLabelBackground: style.getPropertyValue('--bg').trim(),
+            noteBkgColor: style.getPropertyValue('--bg-card').trim(),
+            noteTextColor: style.getPropertyValue('--text').trim(),
+            noteBorderColor: style.getPropertyValue('--text-muted').trim(),
+            fontFamily: style.getPropertyValue('--font-mono').trim(),
+            fontSize: '14px',
+          },
+          flowchart: { htmlLabels: true, curve: 'monotoneY', padding: 15 },
+        });
+        (window as any).__mermaidInitialized = true;
+      }
+
+      try {
+        const renderId = 'arch-modal-svg-' + Date.now();
+        const result = await mermaidLib.render(renderId, source);
+        archModalRender.innerHTML = result.svg;
+        initArchZoom();
+      } catch (err) {
+        archModalRender.innerHTML = '<pre style="color:var(--text-muted);font-size:0.75rem;white-space:pre;overflow-x:auto;padding:1rem">' +
+          source.replace(/</g, '&lt;') + '</pre>';
+      }
+    }
+
+    function initArchZoom() {
+      const svg = archModalRender.querySelector('svg');
+      if (!svg) return;
+
+      let naturalW: number, naturalH: number;
+      const vb = svg.getAttribute('viewBox');
+      if (vb) {
+        const parts = vb.split(/[\s,]+/);
+        naturalW = parseFloat(parts[2]);
+        naturalH = parseFloat(parts[3]);
+      }
+      if (!naturalW! || !naturalH!) {
+        naturalW = parseFloat(svg.getAttribute('width') || '') || svg.getBoundingClientRect().width;
+        naturalH = parseFloat(svg.getAttribute('height') || '') || svg.getBoundingClientRect().height;
+      }
+      if (!naturalW || !naturalH) return;
+
+      svg.style.width = naturalW + 'px';
+      svg.style.height = naturalH + 'px';
+      svg.style.maxWidth = 'none';
+      svg.style.display = 'block';
+
+      let currentScale = 1;
+
+      function fitScale() {
+        return Math.min(1, archModalScroll.clientWidth / naturalW);
+      }
+
+      function applyZoom(scale: number) {
+        currentScale = scale;
+        archModalRender.style.transform = 'scale(' + scale + ')';
+        archModalRender.style.transformOrigin = '0 0';
+        archModalArea.style.width = Math.ceil(naturalW * scale) + 'px';
+        archModalArea.style.height = Math.ceil(naturalH * scale) + 'px';
+        archZoomLabel.textContent = Math.round(scale * 100) + '%';
+      }
+
+      function findStepIndex(scale: number) {
+        let closest = 0;
+        let minDiff = Math.abs(ZOOM_STEPS[0] - scale);
+        for (let i = 1; i < ZOOM_STEPS.length; i++) {
+          const diff = Math.abs(ZOOM_STEPS[i] - scale);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = i;
+          }
+        }
+        return closest;
+      }
+
+      // Wire zoom buttons
+      archModal.querySelectorAll<HTMLElement>('.arch-zoom-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const action = btn.dataset.action;
+          if (action === 'zoom-fit') {
+            applyZoom(fitScale());
+          } else if (action === 'zoom-in') {
+            const idx = findStepIndex(currentScale);
+            if (idx < ZOOM_STEPS.length - 1) applyZoom(ZOOM_STEPS[idx + 1]);
+          } else if (action === 'zoom-out') {
+            const idx = findStepIndex(currentScale);
+            if (idx > 0) applyZoom(ZOOM_STEPS[idx - 1]);
+          }
+        });
+      });
+
+      // Start at fit-to-width for the large modal
+      applyZoom(fitScale());
+    }
+
+    function closeArchModal() {
+      if (!archModalOpen) return;
+      archModalOpen = false;
+      archModal.classList.remove('visible');
+      archModal.setAttribute('aria-hidden', 'true');
+
+      setTimeout(() => {
+        if (!archModalOpen) {
+          archModalRender.innerHTML = '';
+          archModalCaption.textContent = '';
+          archModalArea.style.width = '';
+          archModalArea.style.height = '';
+          archModalRender.style.transform = '';
+          archZoomLabel.textContent = '100%';
+        }
+      }, 250);
+    }
+
+    archModalClose.addEventListener('click', closeArchModal);
+    archModalBackdrop.addEventListener('click', closeArchModal);
+    // Capture phase so arch-modal Escape fires before the overlay/nav keydown handler
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && archModalOpen) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        closeArchModal();
+      }
+    }, true);
 
     // --- Sync with AI toolbar height ---
     const convPanel = document.querySelector<HTMLElement>('.conv-panel');
