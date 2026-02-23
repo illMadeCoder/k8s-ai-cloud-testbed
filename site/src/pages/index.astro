@@ -4103,40 +4103,58 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     storyEnterLab.addEventListener('click', hideStoryPanel);
 
     // --- Drag cards ---
-    function makeDraggable(el: HTMLElement) {
-      let dragging = false;
+    function makeDraggable(el: HTMLElement, onClick?: () => void) {
+      const DRAG_THRESHOLD = 5;
+      let pointerDown = false;
+      let dragConfirmed = false;
       let dragStartX = 0, dragStartY = 0;
       let cardStartX = 0, cardStartY = 0;
 
       el.addEventListener('pointerdown', (e: PointerEvent) => {
-        if ((e.target as HTMLElement).closest('a')) return;
-        dragging = true;
+        if ((e.target as HTMLElement).closest('a, button')) return;
+        pointerDown = true;
+        dragConfirmed = false;
         dragStartX = e.clientX;
         dragStartY = e.clientY;
         cardStartX = el.offsetLeft;
         cardStartY = el.offsetTop;
-        el.setPointerCapture(e.pointerId);
-        el.style.cursor = 'grabbing';
         e.preventDefault();
       });
 
       el.addEventListener('pointermove', (e: PointerEvent) => {
-        if (!dragging) return;
-        el.style.left = `${cardStartX + e.clientX - dragStartX}px`;
-        el.style.top = `${cardStartY + e.clientY - dragStartY}px`;
+        if (!pointerDown) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        if (!dragConfirmed) {
+          if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+          dragConfirmed = true;
+          el.setPointerCapture(e.pointerId);
+          el.style.cursor = 'grabbing';
+        }
+        el.style.left = `${cardStartX + dx}px`;
+        el.style.top = `${cardStartY + dy}px`;
       });
 
       el.addEventListener('pointerup', () => {
-        dragging = false;
+        if (pointerDown && !dragConfirmed && onClick) onClick();
+        pointerDown = false;
+        dragConfirmed = false;
         el.style.cursor = '';
       });
 
       el.addEventListener('pointercancel', () => {
-        dragging = false;
+        pointerDown = false;
+        dragConfirmed = false;
         el.style.cursor = '';
       });
     }
-    makeDraggable(card);
+    makeDraggable(card, () => {
+      const baseName = selectedBaseName || hoverBaseName;
+      if (baseName) {
+        const data = sporeDataMap[baseName];
+        if (data) openExperimentOverlay(baseName, data.href);
+      }
+    });
     makeDraggable(scard);
 
     // --- Helpers ---
