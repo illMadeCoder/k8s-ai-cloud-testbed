@@ -1009,7 +1009,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     <div class="overlay-backdrop"></div>
     <div class="overlay-panel">
       <div class="overlay-header">
-        <button id="overlay-close" aria-label="Back to lab">&larr; Back to Lab</button>
+        <button id="overlay-close" aria-label="Back to lab">&larr;</button>
         <div class="overlay-brand">
           <svg class="root-icon" viewBox="0 0 16 20" width="14" height="17" fill="currentColor">
             <rect x="0" y="0" width="16" height="20" rx="2" opacity="0.3" />
@@ -2939,13 +2939,17 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
   }
 
   .overlay-header button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
     background: none;
     border: 1px solid var(--border);
     border-radius: 4px;
     color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+    padding: 0;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
   }
@@ -2956,11 +2960,10 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
   }
 
   .overlay-brand {
-    margin-left: auto;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    color: var(--text-muted);
+    margin-left: auto;
   }
 
   .overlay-brand .root-icon {
@@ -2972,7 +2975,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     font-size: 0.7rem;
     font-weight: 600;
     letter-spacing: 0.08em;
-    opacity: 0.7;
+    color: var(--text);
   }
 
   .overlay-scroll {
@@ -4326,19 +4329,28 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       });
     });
 
-    // --- Catalog root click → zoom to hub + show modal ---
+    // --- Catalog root click → zoom to hub first, modal on second click ---
     const catalogRoot = document.getElementById('catalog-root');
     if (catalogRoot) {
       catalogRoot.addEventListener('click', () => {
-        zoomToHub();
-        showHeroModal();
+        if (!isHubView) {
+          zoomToHub();
+        } else {
+          showHeroModal();
+        }
       });
     }
 
-    // --- Mobile catalog root click → show modal ---
+    // --- Mobile catalog root click → zoom to hub first, modal on second click ---
     document.querySelectorAll<HTMLElement>('.mobile-catalog .catalog-root').forEach(el => {
       el.style.cursor = 'pointer';
-      el.addEventListener('click', () => showHeroModal());
+      el.addEventListener('click', () => {
+        if (!isHubView) {
+          zoomToHub();
+        } else {
+          showHeroModal();
+        }
+      });
     });
 
     // --- Zoom controls ---
@@ -4742,13 +4754,13 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       const scripts = overlayContent.querySelectorAll('script');
       scripts.forEach(oldScript => {
         if (oldScript.type === 'module' || oldScript.src) return;
+        // Skip MermaidDiagram scripts — we render those ourselves below
+        // to avoid race conditions (their applyZoom(1) overwrites our fitScale)
+        if (oldScript.textContent && oldScript.textContent.includes('mermaidLib')) return;
         const newScript = document.createElement('script');
         newScript.textContent = oldScript.textContent;
         oldScript.replaceWith(newScript);
       });
-
-      // Fire mermaid:ready in case mermaid diagrams are waiting for it
-      window.dispatchEvent(new CustomEvent('mermaid:ready'));
 
       // Directly render mermaid diagrams in the overlay.
       // The re-executed MermaidDiagram scripts are unreliable (duplicate render IDs,

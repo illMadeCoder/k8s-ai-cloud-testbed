@@ -62,66 +62,74 @@ const machineVerdict = getMachineVerdict(experiment);
 const markdown = experimentToMarkdown({ experiment, displayName, tags });
 ---
 
-<div class="detail-header">
-  <div>
-    <h1>{displayName}</h1>
-    {seriesSiblings && (
-      <div class="detail-series">
-        Part of the <a href={`${base}series/`} class="series-link" style={seriesColor ? `color: ${seriesColor}` : undefined}>{seriesSiblings.seriesName}</a> Series
-      </div>
-    )}
-    <p class="description">{experiment.description}</p>
-    {tags.length > 0 && (
-      <div class="detail-tags">
-        {tags.map((tag) => (
-          <a href={`${base}tags/${tag}/`} class="tag tag-link">{tag}</a>
-        ))}
-      </div>
-    )}
+<div class="experiment-detail-root">
+<div class="detail-card" style={`border-left: 3px solid ${seriesColor || '#475569'}`}>
+  <!-- Card header: verdict badge + run count | date -->
+  <div class="detail-card-header">
+    <div class="detail-card-header-left">
+      {verdictLabel && (
+        <span class={`badge badge-${verdict === 'validated' ? 'complete' : verdict === 'invalidated' ? 'failed' : 'warning'}`}>
+          Hypothesis {verdictLabel}
+        </span>
+      )}
+      {!verdictLabel && machineVerdict && (
+        <span class={`badge badge-${machineVerdict === 'validated' ? 'complete' : machineVerdict === 'invalidated' ? 'failed' : 'warning'}`}>
+          Hypothesis {machineVerdict.charAt(0).toUpperCase() + machineVerdict.slice(1)}
+        </span>
+      )}
+      {runHistory && (
+        <span class="run-count">{runHistory.runs.length} {runHistory.runs.length === 1 ? 'run' : 'runs'}</span>
+      )}
+    </div>
+    <span class="detail-card-date">{formatDate(experiment.createdAt)}</span>
   </div>
-</div>
 
-<div class="stats-row">
-  {verdictLabel && (
-    <div class={`metric-card verdict-card verdict-${verdict!.replace(/\s+/g, '-')}`}>
-      <span class="metric-label">Hypothesis</span>
-      <span class="metric-value verdict-value">{verdictLabel}</span>
+  <!-- Title -->
+  <h1 class="detail-card-title">{displayName}</h1>
+
+  <!-- Series link -->
+  {seriesSiblings && (
+    <div class="detail-card-series">
+      Part of the <a href={`${base}series/`} class="series-link" style={seriesColor ? `color: ${seriesColor}` : undefined}>{seriesSiblings.seriesName}</a> Series
     </div>
   )}
-  {machineVerdict && !verdictLabel && (
-    <div class={`metric-card verdict-card verdict-${machineVerdict}`}>
-      <span class="metric-label">Hypothesis</span>
-      <span class="metric-value verdict-value">{machineVerdict.charAt(0).toUpperCase() + machineVerdict.slice(1)}</span>
+
+  <!-- Description (clamped) -->
+  <p class="detail-card-desc">{experiment.description}</p>
+
+  <!-- Tags -->
+  {tags.length > 0 && (
+    <div class="detail-card-tags">
+      {tags.map((tag) => (
+        <a href={`${base}tags/${tag}/`} class="tag tag-link">{tag}</a>
+      ))}
     </div>
   )}
-  <MetricCard label="Created" value={formatDate(experiment.createdAt)} />
-  <MetricCard label="Duration" value={formatDuration(experiment.durationSeconds)} />
-  {experiment.costEstimate && (
-    <MetricCard label="Est. Cost" value={formatCost(experiment.costEstimate.totalUSD)} />
-  )}
-  <button class="metric-card copy-btn" id="copy-page-btn">
-    <span class="metric-label">Clipboard</span>
-    <span class="metric-value copy-btn-label">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-      </svg>
-      Copy
-    </span>
-  </button>
-  <button class="metric-card copy-btn" id="md-download-btn">
-    <span class="metric-label">Download</span>
-    <span class="metric-value copy-btn-label">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" y1="15" x2="12" y2="3"/>
-      </svg>
-      .md
-    </span>
-  </button>
+
+  <!-- Meta footer: duration, cost, actions -->
+  <div class="detail-card-footer">
+    <div class="detail-card-meta">
+      <span>Duration: {formatDuration(experiment.durationSeconds)}</span>
+      {experiment.costEstimate && <span>Cost: {formatCost(experiment.costEstimate.totalUSD)}</span>}
+    </div>
+    <div class="detail-card-actions">
+      <button class="action-btn" id="copy-page-btn" title="Copy as markdown">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      </button>
+      <button class="action-btn" id="md-download-btn" title="Download .md">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </button>
+    </div>
+  </div>
 </div>
 
 <details class="section section-metadata">
@@ -344,6 +352,7 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
     </details>
   );
 })()}
+</div>
 
 <script>
   import vegaEmbed from 'vega-embed';
@@ -365,11 +374,14 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
       if (!md) return;
 
       navigator.clipboard.writeText(md.textContent).then(function() {
-        var label = btn.querySelector('.copy-btn-label');
-        if (!label) return;
-        var original = label.innerHTML;
-        label.textContent = 'Copied!';
-        setTimeout(function() { label.innerHTML = original; }, 1500);
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+        btn.title = 'Copied!';
+        setTimeout(function() {
+          btn.style.borderColor = '';
+          btn.style.color = '';
+          btn.title = 'Copy as markdown';
+        }, 1500);
       });
     });
   })();
@@ -395,58 +407,114 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
 </script>
 
 <style>
-  .detail-header {
+  .experiment-detail-root {
+    --bg-card: color-mix(in srgb, var(--bg) 60%, var(--bg-surface));
+  }
+
+  .detail-card {
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 6%, var(--bg-card)) 0%,
+      var(--bg-card) 60%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
     margin-bottom: 2rem;
   }
-  .detail-header h1 {
-    font-size: 1.75rem;
-    font-weight: 700;
-    margin: 0.5rem 0 0.25rem;
-    font-family: var(--font-mono);
-    word-break: break-all;
+
+  .detail-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
   }
-  .detail-series {
-    font-size: 0.85rem;
+
+  .detail-card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .run-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+  }
+
+  .detail-card-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .detail-card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+    font-family: var(--font-mono);
+    word-break: break-word;
+  }
+
+  .detail-card-series {
+    font-size: 0.75rem;
     color: var(--text-muted);
     margin-bottom: 0.5rem;
   }
-  .description {
+
+  .detail-card-desc {
+    font-size: 0.9rem;
     color: var(--text-muted);
     margin-bottom: 0.75rem;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
-  .detail-tags {
+
+  .detail-card-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.125rem;
+    gap: 0.375rem;
+    margin-bottom: 0.75rem;
   }
-  .verdict-card {
+
+  .detail-card-footer {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 1rem 1.25rem;
-    border-radius: var(--radius);
-    min-width: 140px;
+    align-items: center;
+    justify-content: space-between;
   }
-  .verdict-value {
-    font-size: 1.05rem;
-  }
-  .verdict-validated {
-    background: color-mix(in srgb, #22c55e 15%, var(--bg-surface));
-  }
-  .verdict-validated .verdict-value {
-    color: #22c55e;
-  }
-  .verdict-invalidated {
-    background: color-mix(in srgb, #ef4444 15%, var(--bg-surface));
-  }
-  .verdict-invalidated .verdict-value {
-    color: #ef4444;
-  }
-  .verdict-insufficient {
-    background: var(--bg-surface);
-  }
-  .verdict-insufficient .verdict-value {
+
+  .detail-card-meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
+  }
+
+  .detail-card-actions {
+    display: flex;
+    gap: 0.375rem;
+  }
+
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .action-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
   }
   .current-run {
     background: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -503,7 +571,7 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
   }
   .study-question-card {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.75rem;
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -694,23 +762,21 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
     text-decoration: underline;
   }
 
-  .copy-btn {
-    cursor: pointer;
-    border: 1px solid transparent;
-    font-family: var(--font-mono);
-    transition: border-color 0.15s;
-  }
-  .copy-btn:hover {
-    border-color: var(--accent);
-  }
-  .copy-btn-label {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 1.05rem;
-  }
-
   @media (max-width: 640px) {
+    .detail-card {
+      padding: 1rem;
+    }
+
+    .detail-card-title {
+      font-size: 1.1rem;
+    }
+
+    .detail-card-footer {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
     .metrics-list {
       padding: 0.5rem;
       gap: 0.75rem;
@@ -722,10 +788,6 @@ const markdown = experimentToMarkdown({ experiment, displayName, tags });
 
     .metric-panel-insight {
       padding: 0.5rem 0.75rem;
-    }
-
-    .detail-header h1 {
-      font-size: 1.35rem;
     }
   }
 </style>
