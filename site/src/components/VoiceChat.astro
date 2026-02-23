@@ -305,6 +305,20 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
     return 'Error: Unknown tool ' + name;
   }
 
+  function buildInstructions(mode) {
+    var context = labPreamble;
+    if (pageContext) {
+      context += '\n\nPage content:\n\n' + pageContext;
+    } else {
+      var mdEl = document.getElementById('page-markdown');
+      if (mdEl && mdEl.textContent) {
+        context += '\n\nPage content:\n\n' + mdEl.textContent;
+      }
+    }
+    var brevity = ' Keep answers brief — a few sentences is ideal. Only go deeper if the user asks for detail or the question genuinely requires it.';
+    return 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The visitor is viewing "' + pageTopic + '". Be conversational, technically accurate, and enthusiastic. Help them understand the content on this page — results, methodology, and implications. Only reference experiments and data mentioned in the provided context — never invent experiments. You have access to tools that can browse the project GitHub repository — use them to look up code, configs, or directory structure when the user asks about implementation details.' + brevity + (mode === 'voice' ? ' Keep responses extra concise for voice.' : '') + '\n\nContext:\n\n' + context;
+  }
+
   async function connect(mode) {
     if (connState !== 'disconnected') return;
     connState = 'connecting';
@@ -361,25 +375,15 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
       dc = pc.createDataChannel('oai-events');
 
       dc.onopen = function() {
-        var mdEl = document.getElementById('page-markdown');
-        var context = labPreamble;
-        if (mdEl && mdEl.textContent) {
-          context += '\n\nPage content:\n\n' + mdEl.textContent;
-        } else if (pageContext) {
-          context += '\n\nPage content:\n\n' + pageContext;
-        }
         var modalities = mode === 'voice' ? ['audio', 'text'] : ['text'];
         var turnDetection = mode === 'voice' ? { type: 'server_vad' } : null;
-
-        var brevity = ' Keep answers brief — a few sentences is ideal. Only go deeper if the user asks for detail or the question genuinely requires it.';
-        var instructions = 'You are an AI assistant on the K8s Cloud TestBed, a Kubernetes benchmarking portfolio site. Always respond in English. The visitor is viewing "' + pageTopic + '". Be conversational, technically accurate, and enthusiastic. Help them understand the content on this page — results, methodology, and implications. Only reference experiments and data mentioned in the provided context — never invent experiments. You have access to tools that can browse the project GitHub repository — use them to look up code, configs, or directory structure when the user asks about implementation details.' + brevity + (mode === 'voice' ? ' Keep responses extra concise for voice.' : '') + '\n\nContext:\n\n' + context;
 
         dc.send(JSON.stringify({
           type: 'session.update',
           session: {
             modalities: modalities,
             voice: getVoice(),
-            instructions: instructions,
+            instructions: buildInstructions(mode),
             tools: repoTools,
             input_audio_transcription: { model: 'whisper-1' },
             turn_detection: turnDetection
@@ -655,6 +659,30 @@ const workerUrl = 'https://voice-proxy.illmadecoder.workers.dev';
     }
   });
   voiceSelect.addEventListener('click', function(e) { e.stopPropagation(); });
+
+  // Listen for context updates from SPA overlay navigation
+  window.addEventListener('voicechat:context', function(e) {
+    var detail = e.detail || {};
+    if (detail.pageTopic !== undefined) pageTopic = detail.pageTopic;
+    if (detail.pageContext !== undefined) pageContext = detail.pageContext;
+
+    // Update placeholder
+    if (detail.placeholder) {
+      defaultPlaceholder = detail.placeholder;
+      if (connState === 'disconnected' || connState === 'text') {
+        input.placeholder = defaultPlaceholder;
+      }
+    }
+
+    // If connected, push updated instructions to live session
+    if (dc && dc.readyState === 'open') {
+      var currentMode = connState === 'voice' ? 'voice' : 'text';
+      dc.send(JSON.stringify({
+        type: 'session.update',
+        session: { instructions: buildInstructions(currentMode) }
+      }));
+    }
+  });
 
   // Init
   setPanelState('minimized');

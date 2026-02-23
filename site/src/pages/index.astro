@@ -5048,6 +5048,17 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
 
           overlayContent.innerHTML = main.innerHTML;
           initOverlayContent();
+
+          // Push experiment context to VoiceChat
+          var overlayMd = overlayContent.querySelector('#page-markdown');
+          var expTitle = sporeDataMap[baseName]?.title || baseName;
+          window.dispatchEvent(new CustomEvent('voicechat:context', {
+            detail: {
+              pageTopic: expTitle,
+              pageContext: overlayMd ? overlayMd.textContent : '',
+              placeholder: 'Ask about ' + expTitle + '\u2026',
+            }
+          }));
         })
         .catch(err => {
           overlayContent.innerHTML = `
@@ -5064,6 +5075,15 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       overlayEl.classList.remove('visible');
       overlayEl.setAttribute('aria-hidden', 'true');
       document.title = savedTitle;
+
+      // Restore homepage context for VoiceChat
+      window.dispatchEvent(new CustomEvent('voicechat:context', {
+        detail: {
+          pageTopic: 'TestBed UI \u2014 K8s Cloud TestBed',
+          pageContext: '',
+          placeholder: 'Ask about the testbed\u2026',
+        }
+      }));
 
       if (overlayPushedState) {
         overlayPushedState = false;
