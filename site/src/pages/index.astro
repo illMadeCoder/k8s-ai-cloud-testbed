@@ -4125,11 +4125,20 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       });
     });
 
-    // --- Catalog root click → zoom to hub ---
+    // --- Catalog root click → zoom to hub + show modal ---
     const catalogRoot = document.getElementById('catalog-root');
     if (catalogRoot) {
-      catalogRoot.addEventListener('click', () => zoomToHub());
+      catalogRoot.addEventListener('click', () => {
+        zoomToHub();
+        showHeroModal();
+      });
     }
+
+    // --- Mobile catalog root click → show modal ---
+    document.querySelectorAll<HTMLElement>('.mobile-catalog .catalog-root').forEach(el => {
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', () => showHeroModal());
+    });
 
     // --- Zoom controls ---
     function zoomToFit() {
