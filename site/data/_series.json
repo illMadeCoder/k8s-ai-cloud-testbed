@@ -53,6 +53,10 @@
         "db-fvm": ["db-dsc"],
         "db-dsc": ["db-st"]
       },
+      "transitions": {
+        "db-fvm→db-dsc": "Fsync penalty confirmed on SSD — does disk hardware change the picture?",
+        "db-dsc→db-st": "SSD won convincingly — how does emerging Hyperdisk compare?"
+      },
       "color": "#f97316",
       "shape": "hexagon"
     },

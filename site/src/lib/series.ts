@@ -16,6 +16,7 @@ export interface Series {
   sources?: SeriesSource[];
   order?: string[];
   dag?: Record<string, string[]>;
+  transitions?: Record<string, string>;
   color?: string;
   shape?: string;
 }
