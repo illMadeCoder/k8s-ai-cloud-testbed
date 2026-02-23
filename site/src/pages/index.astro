@@ -326,7 +326,11 @@ allSeries.forEach((s, i) => {
     const bmx = mt05*mt05*mt05*originX + 3*mt05*mt05*t05*cp1x + 3*mt05*t05*t05*cp2x + t05*t05*t05*spore.cx;
     const bmy = mt05*mt05*mt05*originY + 3*mt05*mt05*t05*cp1y + 3*mt05*t05*t05*cp2y + t05*t05*t05*spore.cy;
 
-    const parentBaseName = dag ? dag.parentOf[spore.baseName] : undefined;
+    // For DAG root nodes (no parent spore), use series ID as the "parent"
+    // so the organism→root-experiment edge also gets into edgeMap
+    const dagParent = dag ? dag.parentOf[spore.baseName] : undefined;
+    const isDAGRoot = dag && !dagParent && dag.roots.includes(spore.baseName);
+    const parentBaseName = dagParent || (isDAGRoot ? s.id : undefined);
 
     tendrils.push({
       seriesId: s.id,
@@ -962,7 +966,6 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
 
       <!-- Floating experiment card -->
       <div id="experiment-card" class="experiment-card" aria-hidden="true">
-        <div class="card-chain"></div>
         <div class="card-header">
           <span class="card-phase"></span>
           <span class="card-runs"></span>
@@ -971,12 +974,22 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         <a class="card-title" href="#"></a>
         <p class="card-series"></p>
         <p class="card-desc"></p>
-        <div class="card-journey"></div>
         <div class="card-tags"></div>
         <div class="card-footer">
           <span class="card-duration"></span>
           <span class="card-cost"></span>
         </div>
+      </div>
+
+      <!-- Floating edge card (connection story between two experiments) -->
+      <div id="edge-card" class="edge-card" aria-hidden="true">
+        <div class="ecard-endpoints">
+          <span class="ecard-from"></span>
+          <span class="ecard-arrow">&rarr;</span>
+          <span class="ecard-to"></span>
+        </div>
+        <div class="ecard-story"></div>
+        <div class="ecard-series"></div>
       </div>
 
       <!-- Floating series card -->
@@ -3119,76 +3132,67 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     }
   }
 
-  /* Chain breadcrumb at top of experiment card */
-  .card-chain {
+  /* --- Edge card (connection story) --- */
+  .edge-card {
+    position: absolute;
+    z-index: 20;
+    display: none;
+    width: 300px;
+    padding: 0.75rem 1rem;
+    background: rgba(13, 17, 23, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 3px solid var(--edge-color, var(--accent));
+    border-radius: 6px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5),
+                0 0 40px color-mix(in srgb, var(--edge-color, var(--accent)) 15%, transparent);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: auto;
+  }
+  .edge-card.visible {
+    opacity: 1;
+  }
+
+  .ecard-endpoints {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.15rem;
-    padding: 0.4rem 0.6rem;
-    margin: -0.6rem -0.75rem 0.5rem;
-    background: rgba(255,255,255,0.02);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    font-size: 0.6rem;
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    line-height: 1.6;
+    gap: 0.4rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.65rem;
+    color: var(--text-muted);
   }
-
-  .chain-step {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.2em;
+  .ecard-from, .ecard-to {
     padding: 0.15em 0.4em;
+    background: rgba(255,255,255,0.06);
     border-radius: 3px;
-    color: var(--fg-muted, rgba(255,255,255,0.5));
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
   }
-  .chain-step:hover {
-    background: rgba(255,255,255,0.08);
-    color: var(--fg, #e2e2e8);
-  }
-  .chain-step--current {
-    background: var(--chain-color, rgba(255,255,255,0.1));
-    color: var(--bg, #0a0a0f);
-    font-weight: 600;
-    cursor: default;
-  }
-  .chain-step--current:hover {
-    background: var(--chain-color);
-    color: var(--bg, #0a0a0f);
+  .ecard-arrow {
+    color: var(--edge-color, var(--accent));
+    font-size: 0.8rem;
+    flex-shrink: 0;
   }
 
-  .chain-arrow {
-    color: var(--fg-muted, rgba(255,255,255,0.3));
-    font-size: 0.7em;
-  }
-
-  /* Journey context callout */
-  .card-journey {
-    margin: 0.5rem 0;
-    padding: 0.5rem 0.6rem;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-left: 2px solid var(--card-glow, rgba(255,255,255,0.2));
-    border-radius: 0 4px 4px 0;
-    background: rgba(255,255,255,0.02);
-  }
-
-  .journey-label {
-    font-size: 0.55rem;
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: var(--fg-muted, rgba(255,255,255,0.4));
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 0.25rem;
-  }
-
-  .journey-text {
-    font-size: 0.7rem;
+  .ecard-story {
+    font-size: 0.75rem;
     font-style: italic;
-    color: var(--fg-muted, rgba(255,255,255,0.65));
+    color: var(--text);
     line-height: 1.5;
+    margin-bottom: 0.5rem;
+  }
+
+  .ecard-series {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
   }
 
   /* --- Edge-focus mode: dim everything except active edge + endpoints --- */
@@ -3207,7 +3211,8 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     transition: opacity 0.3s;
   }
   :global(.rhizome-world.edge-focus .tendril-group.edge-active),
-  :global(.rhizome-world.edge-focus .spore-node.edge-active) {
+  :global(.rhizome-world.edge-focus .spore-node.edge-active),
+  :global(.rhizome-world.edge-focus .organism.edge-active) {
     opacity: 1 !important;
     pointer-events: auto !important;
   }
@@ -3644,9 +3649,13 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     const scardCovers = scard.querySelector<HTMLElement>('.scard-covers')!;
     const scardSources = scard.querySelector<HTMLElement>('.scard-sources')!;
 
-    // --- Chain card refs ---
-    const cardChain = card.querySelector<HTMLElement>('.card-chain')!;
-    const cardJourney = card.querySelector<HTMLElement>('.card-journey')!;
+    // --- Edge card refs ---
+    const ecard = document.getElementById('edge-card')!;
+    const ecardFrom = ecard.querySelector<HTMLElement>('.ecard-from')!;
+    const ecardTo = ecard.querySelector<HTMLElement>('.ecard-to')!;
+    const ecardStory = ecard.querySelector<HTMLElement>('.ecard-story')!;
+    const ecardSeries = ecard.querySelector<HTMLElement>('.ecard-series')!;
+    let ecardVisible = false;
 
     // Platform icon SVGs (12×12, inline)
     const srcIcons: Record<string, string> = {
@@ -3800,64 +3809,6 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       cardCost.textContent = data.cost ? `Cost: ${data.cost}` : '';
       cardFooter.style.display = (data.duration || data.cost) ? '' : 'none';
 
-      // Chain breadcrumb
-      const seriesId = data.seriesId;
-      const dagParentOf = layout.dagMaps?.[seriesId];
-      const meta = layout.dagMeta?.[seriesId];
-
-      if (dagParentOf && meta && baseName in meta.steps) {
-        // Build full chain from DAG topological order
-        const allSteps = Object.entries(meta.steps).sort((a, b) => a[1] - b[1]);
-        const stepIcons = ['','\u2776','\u2777','\u2778','\u2779','\u277a','\u277b','\u277c','\u277d','\u277e','\u277f'];
-
-        cardChain.innerHTML = allSteps.map(([name, step], i) => {
-          const icon = stepIcons[step] || step;
-          const spore = sporeDataMap[name];
-          const label = spore ? spore.title.split(/:\s*/)[0].split(' ').slice(0, 3).join(' ') : name;
-          const isCurrent = name === baseName;
-          const arrow = i < allSteps.length - 1 ? ' <span class="chain-arrow">\u2192</span> ' : '';
-          return `<span class="chain-step${isCurrent ? ' chain-step--current' : ''}" data-base-name="${name}" style="--chain-color:${data.seriesColor}">${icon} ${label}</span>${arrow}`;
-        }).join('');
-
-        cardChain.style.display = '';
-
-        // Attach click handlers
-        cardChain.querySelectorAll<HTMLElement>('.chain-step').forEach(el => {
-          el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const bn = el.dataset.baseName;
-            if (bn && bn !== baseName) {
-              selectedBaseName = bn;
-              const pzTarget = catalogToRhizome(bn);
-              showCard(bn, pzTarget);
-              rhizomeToCatalog(bn);
-            }
-          });
-        });
-      } else {
-        cardChain.innerHTML = '';
-        cardChain.style.display = 'none';
-      }
-
-      // Journey context ("WHY THIS EXPERIMENT")
-      if (meta && dagParentOf) {
-        const parentName = dagParentOf[baseName];
-        if (parentName) {
-          const transKey = `${parentName}\u2192${baseName}`;
-          const transText = meta.transitions[transKey];
-          if (transText) {
-            cardJourney.innerHTML = `<div class="journey-label">WHY THIS EXPERIMENT</div><div class="journey-text">${transText}</div>`;
-            cardJourney.style.display = '';
-          } else {
-            cardJourney.style.display = 'none';
-          }
-        } else {
-          cardJourney.style.display = 'none';
-        }
-      } else {
-        cardJourney.style.display = 'none';
-      }
-
       // Series color border + glow + shape icon
       card.style.borderLeftColor = data.seriesColor;
       card.style.setProperty('--card-glow', data.seriesColor);
@@ -3883,10 +3834,10 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     // --- Edge-focus mode ---
     let edgeFocusActive = false;
 
-    function positionCardAtEdge(edge: { mx: number; my: number; ox: number; oy: number; tx: number; ty: number }, pzOverride?: { x: number; y: number; scale: number }) {
+    function positionEdgeCard(edge: { mx: number; my: number; ox: number; oy: number; tx: number; ty: number }, pzOverride?: { x: number; y: number; scale: number }) {
       const st = pzOverride || pz.getState();
       const vpRect = viewport.getBoundingClientRect();
-      const paneRect = card.parentElement!.getBoundingClientRect();
+      const paneRect = ecard.parentElement!.getBoundingClientRect();
 
       // Edge direction vector
       const edx = edge.tx - edge.ox;
@@ -3909,8 +3860,8 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       let left = vpX + offsetX;
       let top = vpY + offsetY;
 
-      const cardW = 340;
-      const cardH = card.offsetHeight || 200;
+      const cardW = 300;
+      const cardH = ecard.offsetHeight || 140;
       const paneW = paneRect.width;
       const visibleH = vpRect.bottom - paneRect.top;
 
@@ -3918,8 +3869,61 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       left = Math.max(8, Math.min(left, paneW - cardW - 8));
       top = Math.max(8, Math.min(top, visibleH - cardH - 8));
 
-      card.style.left = `${Math.round(left)}px`;
-      card.style.top = `${Math.round(top)}px`;
+      ecard.style.left = `${Math.round(left)}px`;
+      ecard.style.top = `${Math.round(top)}px`;
+    }
+
+    function showEdgeCard(childBaseName: string, edge: { mx: number; my: number; ox: number; oy: number; tx: number; ty: number; parentBaseName: string }) {
+      const childData = sporeDataMap[childBaseName];
+      if (!childData) return;
+
+      // Parent can be a spore (experiment→experiment) or a series (series→root experiment)
+      const parentSpore = sporeDataMap[edge.parentBaseName];
+      const parentSeries = seriesDataMap[edge.parentBaseName];
+      const fromLabel = parentSpore
+        ? parentSpore.title.split(/:\s*/)[0].split(' ').slice(0, 4).join(' ')
+        : parentSeries?.name || edge.parentBaseName;
+      const fromTitle = parentSpore ? parentSpore.title : (parentSeries?.name || edge.parentBaseName);
+
+      const shortLabel = (title: string) => title.split(/:\s*/)[0].split(' ').slice(0, 4).join(' ');
+      ecardFrom.textContent = fromLabel;
+      ecardFrom.title = fromTitle;
+      ecardTo.textContent = shortLabel(childData.title);
+      ecardTo.title = childData.title;
+
+      // Transition story text — key is "parent→child"
+      const seriesId = childData.seriesId;
+      const meta = layout.dagMeta?.[seriesId];
+      const transKey = `${edge.parentBaseName}\u2192${childBaseName}`;
+      const transText = meta?.transitions?.[transKey];
+      if (transText) {
+        ecardStory.textContent = transText;
+        ecardStory.style.display = '';
+      } else {
+        ecardStory.textContent = '';
+        ecardStory.style.display = 'none';
+      }
+
+      ecardSeries.textContent = childData.seriesName;
+
+      // Style
+      ecard.style.setProperty('--edge-color', childData.seriesColor);
+      ecard.style.borderLeftColor = childData.seriesColor;
+      ecard.style.display = 'block';
+      positionEdgeCard(edge);
+      void ecard.offsetHeight;
+      ecard.classList.add('visible');
+      ecard.setAttribute('aria-hidden', 'false');
+      ecardVisible = true;
+    }
+
+    function hideEdgeCard() {
+      ecard.classList.remove('visible');
+      ecard.setAttribute('aria-hidden', 'true');
+      ecardVisible = false;
+      setTimeout(() => {
+        if (!ecardVisible) ecard.style.display = 'none';
+      }, 200);
     }
 
     function clearEdgeFocus() {
@@ -3927,7 +3931,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       edgeFocusActive = false;
       world.classList.remove('edge-focus');
       world.querySelectorAll('.edge-active').forEach(el => el.classList.remove('edge-active'));
-      hideCard();
+      hideEdgeCard();
     }
 
     // --- Series card functions ---
@@ -4422,13 +4426,41 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       });
     });
 
-    // --- Tendril (organism → spore) hit area events: behave like hovering/clicking the spore ---
+    // --- Tendril (organism → spore) hit area events ---
     const tendrilHitAreas = world.querySelectorAll<SVGPathElement>('.tendril-hit');
     tendrilHitAreas.forEach(hit => {
       const baseName = hit.dataset.baseName || '';
+      const edge = layout.edgeMap?.[baseName];
 
       hit.addEventListener('mouseenter', () => {
-        if (selectedBaseName || edgeFocusActive) return;
+        if (selectedBaseName) return;
+
+        // DAG edge hover → edge-focus mode with dimming + edge card
+        if (edge) {
+          clearEdgeFocus();
+          clearRhizomeSync();
+          hideCard();
+          hideSeriesCard();
+
+          edgeFocusActive = true;
+          world.classList.add('edge-focus');
+
+          const tendrilGroup = hit.closest('.tendril-group');
+          if (tendrilGroup) tendrilGroup.classList.add('edge-active');
+
+          const childSpore = world.querySelector(`.spore-node[data-base-name="${baseName}"]`);
+          if (childSpore) childSpore.classList.add('edge-active');
+          // Parent can be a spore or an organism (series→root edge)
+          const parentEl = world.querySelector(`.spore-node[data-base-name="${edge.parentBaseName}"]`)
+            || world.querySelector(`.organism[data-series="${edge.parentBaseName}"]`);
+          if (parentEl) parentEl.classList.add('edge-active');
+
+          showEdgeCard(baseName, edge);
+          return;
+        }
+
+        // Non-DAG tendril hover → highlight spore
+        if (edgeFocusActive) return;
         clearRhizomeSync();
         rhizomeToCatalog(baseName);
         focusSpore(baseName);
@@ -4437,9 +4469,19 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       });
 
       hit.addEventListener('mouseleave', () => {
-        if (selectedBaseName || edgeFocusActive) return;
-        clearCatalogSync();
-        clearRhizomeSync();
+        if (selectedBaseName) return;
+
+        // DAG edge: exit edge-focus
+        if (edge && edgeFocusActive) {
+          clearEdgeFocus();
+          return;
+        }
+
+        // Non-DAG tendril
+        if (!edgeFocusActive) {
+          clearCatalogSync();
+          clearRhizomeSync();
+        }
       });
 
       hit.addEventListener('click', (e: MouseEvent) => {
@@ -4447,39 +4489,9 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         e.preventDefault();
         e.stopPropagation();
 
-        const edge = layout.edgeMap?.[baseName];
+        // For DAG edges, click selects the child node (normal spore selection)
+        if (edgeFocusActive) clearEdgeFocus();
 
-        // DAG edge click → enter edge-focus mode
-        if (edge) {
-          // Clear any previous state
-          clearEdgeFocus();
-          clearCatalogSync();
-          clearRhizomeSync();
-          selectedBaseName = null;
-          hoverBaseName = null;
-          hideSeriesCard();
-          selectedSeriesId = null;
-
-          edgeFocusActive = true;
-          world.classList.add('edge-focus');
-
-          // Activate the clicked tendril group
-          const tendrilGroup = hit.closest('.tendril-group');
-          if (tendrilGroup) tendrilGroup.classList.add('edge-active');
-
-          // Activate both endpoint spore nodes
-          const childSpore = world.querySelector(`.spore-node[data-base-name="${baseName}"]`);
-          if (childSpore) childSpore.classList.add('edge-active');
-          const parentSpore = world.querySelector(`.spore-node[data-base-name="${edge.parentBaseName}"]`);
-          if (parentSpore) parentSpore.classList.add('edge-active');
-
-          // Show the experiment card for the child, positioned at edge midpoint
-          showCard(baseName);
-          positionCardAtEdge(edge);
-          return;
-        }
-
-        // Non-DAG tendril: existing behavior
         if (selectedBaseName === baseName) {
           const data = sporeDataMap[baseName];
           if (data) openExperimentOverlay(baseName, data.href);

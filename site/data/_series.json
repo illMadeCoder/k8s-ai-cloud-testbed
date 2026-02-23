@@ -54,6 +54,7 @@
         "db-dsc": ["db-st"]
       },
       "transitions": {
+        "cloud-database-internals→db-fvm": "Establish a baseline — how much does fsync actually cost for database writes?",
         "db-fvm→db-dsc": "Fsync penalty confirmed on SSD — does disk hardware change the picture?",
         "db-dsc→db-st": "SSD won convincingly — how does emerging Hyperdisk compare?"
       },
