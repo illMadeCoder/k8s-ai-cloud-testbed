@@ -153,6 +153,10 @@ interface TendrilData {
   baseName?: string;
   color: string;
   path: string;
+  parentBaseName?: string;
+  ox?: number; oy?: number;
+  tx?: number; ty?: number;
+  mx?: number; my?: number;
 }
 
 const organisms: OrganismData[] = [];
@@ -317,11 +321,22 @@ allSeries.forEach((s, i) => {
     const cp2x = Math.round(originX + dx * 0.7 - perpX * 0.5);
     const cp2y = Math.round(originY + dy * 0.7 - perpY * 0.5);
 
+    // Compute Bezier midpoint at t=0.5 for edge-click positioning
+    const t05 = 0.5, mt05 = 0.5;
+    const bmx = mt05*mt05*mt05*originX + 3*mt05*mt05*t05*cp1x + 3*mt05*t05*t05*cp2x + t05*t05*t05*spore.cx;
+    const bmy = mt05*mt05*mt05*originY + 3*mt05*mt05*t05*cp1y + 3*mt05*t05*t05*cp2y + t05*t05*t05*spore.cy;
+
+    const parentBaseName = dag ? dag.parentOf[spore.baseName] : undefined;
+
     tendrils.push({
       seriesId: s.id,
       baseName: spore.baseName,
       color,
       path: `M ${originX} ${originY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${spore.cx} ${spore.cy}`,
+      parentBaseName: parentBaseName || undefined,
+      ox: Math.round(originX), oy: Math.round(originY),
+      tx: Math.round(spore.cx), ty: Math.round(spore.cy),
+      mx: Math.round(bmx), my: Math.round(bmy),
     });
   }
 });
@@ -423,8 +438,16 @@ for (const s of allSeries) {
   }
 }
 
+// Build edge map for edge-click transitions (keyed by child baseName)
+const edgeMap: Record<string, { mx: number; my: number; ox: number; oy: number; tx: number; ty: number; parentBaseName: string }> = {};
+for (const t of tendrils) {
+  if (t.parentBaseName && t.mx != null) {
+    edgeMap[t.baseName!] = { mx: t.mx!, my: t.my!, ox: t.ox!, oy: t.oy!, tx: t.tx!, ty: t.ty!, parentBaseName: t.parentBaseName };
+  }
+}
+
 // Serialize for client-side sync
-const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, dagMaps, dagMeta, base });
+const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, dagMaps, dagMeta, edgeMap, base });
 ---
 
 <Base
@@ -939,6 +962,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
 
       <!-- Floating experiment card -->
       <div id="experiment-card" class="experiment-card" aria-hidden="true">
+        <div class="card-chain"></div>
         <div class="card-header">
           <span class="card-phase"></span>
           <span class="card-runs"></span>
@@ -947,6 +971,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         <a class="card-title" href="#"></a>
         <p class="card-series"></p>
         <p class="card-desc"></p>
+        <div class="card-journey"></div>
         <div class="card-tags"></div>
         <div class="card-footer">
           <span class="card-duration"></span>
@@ -963,15 +988,6 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         <div class="scard-body"></div>
         <div class="scard-covers"></div>
         <div class="scard-sources"></div>
-      </div>
-
-      <!-- Story panel (narrative chain reading mode) -->
-      <div id="story-backdrop" class="story-backdrop" style="display:none"></div>
-      <div id="story-panel" class="story-panel" aria-hidden="true" style="display:none">
-        <button id="story-close" class="story-close" aria-label="Close story">&times;</button>
-        <h2 class="story-title"></h2>
-        <div class="story-timeline"></div>
-        <button class="story-enter-lab">Enter the Lab</button>
       </div>
 
       <!-- Zoom controls -->
@@ -3103,158 +3119,102 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     }
   }
 
-  /* Story panel backdrop */
-  .story-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 900;
-    backdrop-filter: blur(4px);
-  }
-
-  /* Story panel */
-  .story-panel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: min(420px, 90vw);
-    background: var(--bg, #0a0a0f);
-    border-left: 1px solid var(--border, rgba(255,255,255,0.08));
-    z-index: 901;
+  /* Chain breadcrumb at top of experiment card */
+  .card-chain {
     display: flex;
-    flex-direction: column;
-    padding: 2rem 1.5rem;
-    overflow-y: auto;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-  }
-  .story-panel.visible {
-    transform: translateX(0);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.4rem 0.6rem;
+    margin: -0.6rem -0.75rem 0.5rem;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.6rem;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    line-height: 1.6;
   }
 
-  .story-close {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    background: none;
-    border: none;
+  .chain-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2em;
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
     color: var(--fg-muted, rgba(255,255,255,0.5));
-    font-size: 1.5rem;
     cursor: pointer;
-    padding: 0.25rem;
-    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
   }
-  .story-close:hover { color: var(--fg, #e2e2e8); }
-
-  .story-title {
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin: 0 0 1.5rem 0;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid currentColor;
-  }
-
-  /* Chapter */
-  .story-chapter {
-    display: flex;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .story-chapter:hover {
-    background: rgba(255,255,255,0.04);
-  }
-
-  .story-step-icon {
-    font-size: 1.2rem;
-    flex-shrink: 0;
-    width: 2rem;
-    text-align: center;
-    line-height: 1.4;
-  }
-
-  .story-chapter-content {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .story-chapter-title {
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    font-size: 0.8rem;
-    font-weight: 600;
+  .chain-step:hover {
+    background: rgba(255,255,255,0.08);
     color: var(--fg, #e2e2e8);
+  }
+  .chain-step--current {
+    background: var(--chain-color, rgba(255,255,255,0.1));
+    color: var(--bg, #0a0a0f);
+    font-weight: 600;
+    cursor: default;
+  }
+  .chain-step--current:hover {
+    background: var(--chain-color);
+    color: var(--bg, #0a0a0f);
+  }
+
+  .chain-arrow {
+    color: var(--fg-muted, rgba(255,255,255,0.3));
+    font-size: 0.7em;
+  }
+
+  /* Journey context callout */
+  .card-journey {
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-left: 2px solid var(--card-glow, rgba(255,255,255,0.2));
+    border-radius: 0 4px 4px 0;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .journey-label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    color: var(--fg-muted, rgba(255,255,255,0.4));
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     margin-bottom: 0.25rem;
   }
 
-  .story-chapter-meta {
-    display: flex;
-    gap: 0.5rem;
-    font-size: 0.65rem;
-    color: var(--fg-muted, rgba(255,255,255,0.5));
-    margin-bottom: 0.35rem;
-  }
-
-  .story-chapter-abstract {
+  .journey-text {
     font-size: 0.7rem;
     font-style: italic;
-    color: var(--fg-muted, rgba(255,255,255,0.5));
-    line-height: 1.4;
+    color: var(--fg-muted, rgba(255,255,255,0.65));
+    line-height: 1.5;
   }
 
-  /* Transition connector */
-  .story-transition {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0.5rem 0;
-    gap: 0.35rem;
+  /* --- Edge-focus mode: dim everything except active edge + endpoints --- */
+  :global(.rhizome-world.edge-focus .organism),
+  :global(.rhizome-world.edge-focus .organism-label),
+  :global(.rhizome-world.edge-focus .organism-soon),
+  :global(.rhizome-world.edge-focus .series-indicator),
+  :global(.rhizome-world.edge-focus .tendril-group),
+  :global(.rhizome-world.edge-focus .root-tendril-group),
+  :global(.rhizome-world.edge-focus .spore-node),
+  :global(.rhizome-world.edge-focus .hub-node),
+  :global(.rhizome-world.edge-focus .root-hub-group),
+  :global(.rhizome-world.edge-focus .root-graph-node) {
+    opacity: 0.08 !important;
+    pointer-events: none !important;
+    transition: opacity 0.3s;
   }
-
-  .story-transition-line {
-    width: 1px;
-    height: 1rem;
-    background: var(--ch-color, rgba(255,255,255,0.15));
-    opacity: 0.4;
+  :global(.rhizome-world.edge-focus .tendril-group.edge-active),
+  :global(.rhizome-world.edge-focus .spore-node.edge-active) {
+    opacity: 1 !important;
+    pointer-events: auto !important;
   }
-  .story-transition-line--long {
-    height: 2rem;
+  :global(.rhizome-world.edge-focus .tendril-group.edge-active .tendril) {
+    opacity: 0.9 !important;
+    filter: drop-shadow(0 0 12px var(--tendril-color, #60a5fa));
   }
-
-  .story-transition-text {
-    font-size: 0.7rem;
-    font-style: italic;
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: var(--ch-color, var(--fg-muted));
-    text-align: center;
-    max-width: 260px;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid var(--ch-color, rgba(255,255,255,0.1));
-    border-radius: 4px;
-    opacity: 0.7;
-    line-height: 1.4;
-  }
-
-  .story-enter-lab {
-    margin-top: auto;
-    padding: 0.6rem 1.2rem;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: var(--fg, #e2e2e8);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    font-size: 0.75rem;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background 0.2s;
-    text-align: center;
-  }
-  .story-enter-lab:hover {
-    background: rgba(255,255,255,0.1);
-  }
-
 
 </style>
 
@@ -3292,6 +3252,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       rootTendrils: { seriesId: string; p0x: number; p0y: number; p1x: number; p1y: number; p2x: number; p2y: number; p3x: number; p3y: number }[];
       dagMaps: Record<string, Record<string, string | null>>;
       dagMeta?: Record<string, { transitions: Record<string, string>; steps: Record<string, number> }>;
+      edgeMap?: Record<string, { mx: number; my: number; ox: number; oy: number; tx: number; ty: number; parentBaseName: string }>;
       base: string;
     } = JSON.parse(layoutEl.textContent || '{}');
 
@@ -3683,13 +3644,9 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     const scardCovers = scard.querySelector<HTMLElement>('.scard-covers')!;
     const scardSources = scard.querySelector<HTMLElement>('.scard-sources')!;
 
-    // --- Story panel refs ---
-    const storyBackdrop = document.getElementById('story-backdrop')!;
-    const storyPanel = document.getElementById('story-panel')!;
-    const storyClose = document.getElementById('story-close')!;
-    const storyTitle = storyPanel.querySelector<HTMLElement>('.story-title')!;
-    const storyTimeline = storyPanel.querySelector<HTMLElement>('.story-timeline')!;
-    const storyEnterLab = storyPanel.querySelector<HTMLElement>('.story-enter-lab')!;
+    // --- Chain card refs ---
+    const cardChain = card.querySelector<HTMLElement>('.card-chain')!;
+    const cardJourney = card.querySelector<HTMLElement>('.card-journey')!;
 
     // Platform icon SVGs (12×12, inline)
     const srcIcons: Record<string, string> = {
@@ -3741,7 +3698,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     cardTitle.addEventListener('pointerup', () => {
       if (!titlePointerDown) return;
       titlePointerDown = false;
-      const baseName = selectedBaseName || hoverBaseName;
+      const baseName = cardTitle.dataset.baseName || selectedBaseName || hoverBaseName;
       if (baseName) openExperimentOverlay(baseName, cardTitle.href);
     });
     cardTitle.addEventListener('pointercancel', () => { titlePointerDown = false; });
@@ -3832,6 +3789,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       cardDate.textContent = data.date;
       cardTitle.textContent = data.title;
       cardTitle.href = data.href;
+      cardTitle.dataset.baseName = baseName;
       cardSeries.innerHTML = `Part of the <span style="color:${data.seriesColor};font-weight:600">${data.seriesName}</span> Series`;
       cardDesc.textContent = data.description;
       cardDesc.style.display = data.description ? '' : 'none';
@@ -3841,6 +3799,64 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       cardDuration.textContent = data.duration ? `Duration: ${data.duration}` : '';
       cardCost.textContent = data.cost ? `Cost: ${data.cost}` : '';
       cardFooter.style.display = (data.duration || data.cost) ? '' : 'none';
+
+      // Chain breadcrumb
+      const seriesId = data.seriesId;
+      const dagParentOf = layout.dagMaps?.[seriesId];
+      const meta = layout.dagMeta?.[seriesId];
+
+      if (dagParentOf && meta && baseName in meta.steps) {
+        // Build full chain from DAG topological order
+        const allSteps = Object.entries(meta.steps).sort((a, b) => a[1] - b[1]);
+        const stepIcons = ['','\u2776','\u2777','\u2778','\u2779','\u277a','\u277b','\u277c','\u277d','\u277e','\u277f'];
+
+        cardChain.innerHTML = allSteps.map(([name, step], i) => {
+          const icon = stepIcons[step] || step;
+          const spore = sporeDataMap[name];
+          const label = spore ? spore.title.split(/:\s*/)[0].split(' ').slice(0, 3).join(' ') : name;
+          const isCurrent = name === baseName;
+          const arrow = i < allSteps.length - 1 ? ' <span class="chain-arrow">\u2192</span> ' : '';
+          return `<span class="chain-step${isCurrent ? ' chain-step--current' : ''}" data-base-name="${name}" style="--chain-color:${data.seriesColor}">${icon} ${label}</span>${arrow}`;
+        }).join('');
+
+        cardChain.style.display = '';
+
+        // Attach click handlers
+        cardChain.querySelectorAll<HTMLElement>('.chain-step').forEach(el => {
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const bn = el.dataset.baseName;
+            if (bn && bn !== baseName) {
+              selectedBaseName = bn;
+              const pzTarget = catalogToRhizome(bn);
+              showCard(bn, pzTarget);
+              rhizomeToCatalog(bn);
+            }
+          });
+        });
+      } else {
+        cardChain.innerHTML = '';
+        cardChain.style.display = 'none';
+      }
+
+      // Journey context ("WHY THIS EXPERIMENT")
+      if (meta && dagParentOf) {
+        const parentName = dagParentOf[baseName];
+        if (parentName) {
+          const transKey = `${parentName}\u2192${baseName}`;
+          const transText = meta.transitions[transKey];
+          if (transText) {
+            cardJourney.innerHTML = `<div class="journey-label">WHY THIS EXPERIMENT</div><div class="journey-text">${transText}</div>`;
+            cardJourney.style.display = '';
+          } else {
+            cardJourney.style.display = 'none';
+          }
+        } else {
+          cardJourney.style.display = 'none';
+        }
+      } else {
+        cardJourney.style.display = 'none';
+      }
 
       // Series color border + glow + shape icon
       card.style.borderLeftColor = data.seriesColor;
@@ -3862,6 +3878,56 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       setTimeout(() => {
         if (!cardVisible) card.style.display = 'none';
       }, 200);
+    }
+
+    // --- Edge-focus mode ---
+    let edgeFocusActive = false;
+
+    function positionCardAtEdge(edge: { mx: number; my: number; ox: number; oy: number; tx: number; ty: number }, pzOverride?: { x: number; y: number; scale: number }) {
+      const st = pzOverride || pz.getState();
+      const vpRect = viewport.getBoundingClientRect();
+      const paneRect = card.parentElement!.getBoundingClientRect();
+
+      // Edge direction vector
+      const edx = edge.tx - edge.ox;
+      const edy = edge.ty - edge.oy;
+      const len = Math.sqrt(edx * edx + edy * edy) || 1;
+      // Perpendicular (rotated 90° CCW)
+      const perpX = -edy / len;
+      const perpY = edx / len;
+      // Offset midpoint by 80 canvas units along perpendicular
+      const offX = edge.mx + perpX * 80;
+      const offY = edge.my + perpY * 80;
+
+      // Canvas coords → viewport coords
+      const vpX = offX * st.scale + st.x;
+      const vpY = offY * st.scale + st.y;
+
+      // Convert to pane-relative coords
+      const offsetX = vpRect.left - paneRect.left;
+      const offsetY = vpRect.top - paneRect.top;
+      let left = vpX + offsetX;
+      let top = vpY + offsetY;
+
+      const cardW = 340;
+      const cardH = card.offsetHeight || 200;
+      const paneW = paneRect.width;
+      const visibleH = vpRect.bottom - paneRect.top;
+
+      // Clamp to visible bounds
+      left = Math.max(8, Math.min(left, paneW - cardW - 8));
+      top = Math.max(8, Math.min(top, visibleH - cardH - 8));
+
+      card.style.left = `${Math.round(left)}px`;
+      card.style.top = `${Math.round(top)}px`;
+    }
+
+    function clearEdgeFocus() {
+      if (!edgeFocusActive) return;
+      edgeFocusActive = false;
+      world.classList.remove('edge-focus');
+      world.querySelectorAll('.edge-active').forEach(el => el.classList.remove('edge-active'));
+      hideCard();
     }
 
     // --- Series card functions ---
@@ -3992,103 +4058,6 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       }, 200);
     }
 
-    // --- Story panel ---
-    function showStoryPanel(seriesId: string) {
-      const meta = layout.dagMeta?.[seriesId];
-      if (!meta) return;
-
-      const org = layout.organisms.find((o: any) => o.id === seriesId);
-      if (!org) return;
-
-      storyTitle.textContent = org.name;
-      storyTitle.style.color = org.color;
-
-      // Build timeline
-      const dagParentOf = layout.dagMaps?.[seriesId] || {};
-      const allNodes = Object.keys(meta.steps).sort((a, b) => meta.steps[a] - meta.steps[b]);
-
-      let html = '';
-      for (const baseName of allNodes) {
-        const step = meta.steps[baseName];
-        const stepIcon = ['','\u2776','\u2777','\u2778','\u2779','\u277a','\u277b','\u277c','\u277d','\u277e','\u277f'][step] || step;
-        const spore = sporeDataMap[baseName];
-        if (!spore) continue;
-
-        const isTutorial = spore.tags.includes('tutorial');
-        const verdict = isTutorial ? 'Tutorial' : (spore.verdict || spore.phase || '');
-        const desc = spore.description ? spore.description.split('.')[0] + '.' : '';
-
-        const abstract = desc;
-
-        html += `<div class="story-chapter" data-base-name="${baseName}" style="--ch-color:${org.color}">`;
-        html += `  <div class="story-step-icon">${stepIcon}</div>`;
-        html += `  <div class="story-chapter-content">`;
-        html += `    <div class="story-chapter-title">${spore.title}</div>`;
-        html += `    <div class="story-chapter-meta">`;
-        html += `      <span class="verdict-${verdict.toLowerCase().replace(/\s+/g, '-')}">${verdict}</span>`;
-        html += `      <span>${spore.date}</span>`;
-        html += `    </div>`;
-        if (abstract) {
-          html += `    <div class="story-chapter-abstract">"${abstract}"</div>`;
-        }
-        html += `  </div>`;
-        html += `</div>`;
-
-        // Transition block (if there's a next node)
-        const children = allNodes.filter(n => dagParentOf[n] === baseName);
-        if (children.length > 0) {
-          const childName = children[0];
-          const transKey = `${baseName}\u2192${childName}`;
-          const transText = meta.transitions[transKey];
-          if (transText) {
-            html += `<div class="story-transition" style="--ch-color:${org.color}">`;
-            html += `  <div class="story-transition-line"></div>`;
-            html += `  <div class="story-transition-text">${transText}</div>`;
-            html += `  <div class="story-transition-line"></div>`;
-            html += `</div>`;
-          } else {
-            html += `<div class="story-transition" style="--ch-color:${org.color}"><div class="story-transition-line story-transition-line--long"></div></div>`;
-          }
-        }
-      }
-
-      storyTimeline.innerHTML = html;
-
-      // Attach click handlers to chapters
-      storyTimeline.querySelectorAll<HTMLElement>('.story-chapter').forEach(ch => {
-        ch.addEventListener('click', () => {
-          const bn = ch.dataset.baseName;
-          if (bn) {
-            hideStoryPanel();
-            const pzTarget = catalogToRhizome(bn);
-            selectedBaseName = bn;
-            showCard(bn, pzTarget);
-            rhizomeToCatalog(bn);
-          }
-        });
-      });
-
-      // Show
-      storyBackdrop.style.display = 'block';
-      storyPanel.style.display = 'flex';
-      void storyPanel.offsetHeight;
-      storyPanel.classList.add('visible');
-      storyPanel.setAttribute('aria-hidden', 'false');
-    }
-
-    function hideStoryPanel() {
-      storyPanel.classList.remove('visible');
-      storyPanel.setAttribute('aria-hidden', 'true');
-      setTimeout(() => {
-        storyPanel.style.display = 'none';
-        storyBackdrop.style.display = 'none';
-      }, 300);
-    }
-
-    storyClose.addEventListener('click', hideStoryPanel);
-    storyBackdrop.addEventListener('click', hideStoryPanel);
-    storyEnterLab.addEventListener('click', hideStoryPanel);
-
     // --- Drag cards ---
     function makeDraggable(el: HTMLElement, onClick?: () => void) {
       const DRAG_THRESHOLD = 5;
@@ -4136,7 +4105,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       });
     }
     makeDraggable(card, () => {
-      const baseName = selectedBaseName || hoverBaseName;
+      const baseName = cardTitle.dataset.baseName || selectedBaseName || hoverBaseName;
       if (baseName) {
         const data = sporeDataMap[baseName];
         if (data) openExperimentOverlay(baseName, data.href);
@@ -4164,6 +4133,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     }
 
     function clearAllSync() {
+      clearEdgeFocus();
       clearCatalogSync();
       clearRhizomeSync();
       selectedBaseName = null;
@@ -4433,6 +4403,9 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         e.preventDefault();
         e.stopPropagation();
 
+        // Exit edge-focus mode on any spore click
+        if (edgeFocusActive) clearEdgeFocus();
+
         if (selectedBaseName === baseName) {
           const data = sporeDataMap[baseName];
           if (data) openExperimentOverlay(baseName, data.href);
@@ -4455,7 +4428,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       const baseName = hit.dataset.baseName || '';
 
       hit.addEventListener('mouseenter', () => {
-        if (selectedBaseName) return;
+        if (selectedBaseName || edgeFocusActive) return;
         clearRhizomeSync();
         rhizomeToCatalog(baseName);
         focusSpore(baseName);
@@ -4464,7 +4437,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       });
 
       hit.addEventListener('mouseleave', () => {
-        if (selectedBaseName) return;
+        if (selectedBaseName || edgeFocusActive) return;
         clearCatalogSync();
         clearRhizomeSync();
       });
@@ -4474,17 +4447,41 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         e.preventDefault();
         e.stopPropagation();
 
-        // DAG tendril click → open story panel
-        const data = sporeDataMap[baseName];
-        if (data) {
-          const seriesId = data.seriesId;
-          if (seriesId && layout.dagMeta?.[seriesId]) {
-            showStoryPanel(seriesId);
-            return;
-          }
+        const edge = layout.edgeMap?.[baseName];
+
+        // DAG edge click → enter edge-focus mode
+        if (edge) {
+          // Clear any previous state
+          clearEdgeFocus();
+          clearCatalogSync();
+          clearRhizomeSync();
+          selectedBaseName = null;
+          hoverBaseName = null;
+          hideSeriesCard();
+          selectedSeriesId = null;
+
+          edgeFocusActive = true;
+          world.classList.add('edge-focus');
+
+          // Activate the clicked tendril group
+          const tendrilGroup = hit.closest('.tendril-group');
+          if (tendrilGroup) tendrilGroup.classList.add('edge-active');
+
+          // Activate both endpoint spore nodes
+          const childSpore = world.querySelector(`.spore-node[data-base-name="${baseName}"]`);
+          if (childSpore) childSpore.classList.add('edge-active');
+          const parentSpore = world.querySelector(`.spore-node[data-base-name="${edge.parentBaseName}"]`);
+          if (parentSpore) parentSpore.classList.add('edge-active');
+
+          // Show the experiment card for the child, positioned at edge midpoint
+          showCard(baseName);
+          positionCardAtEdge(edge);
+          return;
         }
 
+        // Non-DAG tendril: existing behavior
         if (selectedBaseName === baseName) {
+          const data = sporeDataMap[baseName];
           if (data) openExperimentOverlay(baseName, data.href);
           return;
         }
@@ -4580,7 +4577,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
       });
     });
 
-    // --- Root tendril hit area click → zoom to series (or open story panel if DAG) ---
+    // --- Root tendril hit area click → zoom to series ---
     const tendrilHits = world.querySelectorAll<SVGPathElement>('.root-tendril-hit');
     tendrilHits.forEach(hit => {
       hit.addEventListener('click', (e) => {
@@ -4593,13 +4590,7 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         if (focusedSeriesId === seriesId) {
           zoomToHub();
         } else {
-          // Open story panel for series with a DAG, otherwise just zoom
-          if (layout.dagMeta?.[seriesId]) {
-            zoomToSeries(seriesId);
-            showStoryPanel(seriesId);
-          } else {
-            zoomToSeries(seriesId);
-          }
+          zoomToSeries(seriesId);
         }
       });
     });
@@ -4849,6 +4840,10 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
     viewport.addEventListener('pointerdown', (e: PointerEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest('.spore-node') || target.closest('.organism') || target.closest('.series-indicator') || target.closest('.root-tendril-hit')) return;
+      if (edgeFocusActive) {
+        clearEdgeFocus();
+        return;
+      }
       if (cardVisible || selectedBaseName || seriesCardVisible || selectedSeriesId) {
         clearAllSync();
         selectedIndex = -1;
@@ -4890,6 +4885,9 @@ const layoutData = JSON.stringify({ organisms, rootTendrils: rootTendrilData, da
         if (isOverlayOpen()) {
           e.preventDefault();
           closeExperimentOverlay();
+        } else if (edgeFocusActive) {
+          e.preventDefault();
+          clearEdgeFocus();
         } else if (!isHubView) {
           e.preventDefault();
           zoomToHub();
